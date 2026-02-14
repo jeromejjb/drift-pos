@@ -1,4 +1,4 @@
-import { Smartphone, QrCode, Pizza, Check } from 'lucide-react';
+import { Pizza, Check } from 'lucide-react'; // Removed Smartphone and QrCode
 
 export function DinerShowcase() {
   return (
