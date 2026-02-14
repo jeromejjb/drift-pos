@@ -800,6 +800,110 @@ process.on('SIGINT', async () => {
   process.exit(0)
 });
 
+// ==================== USER ENDPOINTS ====================
+
+// Get user by ID
+app.get('/api/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        stripeCustomerId: true,
+        supabaseId: true,
+        createdAt: true,
+        lastLoginAt: true
+      }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Add subscription info (mock for now)
+    const userWithSubscription = {
+      ...user,
+      subscription: {
+        plan: 'free',
+        status: 'active',
+        features: ['basic_ordering', 'qr_codes']
+      }
+    };
+    
+    res.json(userWithSubscription);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// Update user by ID
+app.patch('/api/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, phone } = req.body;
+    
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        email,
+        phone
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true
+      }
+    });
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// ==================== RESTAURANT UPDATE ENDPOINT ====================
+
+// Update restaurant by ID (add this after the existing GET endpoint)
+app.patch('/api/restaurants/:restaurantId', async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const { name, address, phone, cuisine } = req.body;
+    
+    const restaurant = await prisma.restaurant.update({
+      where: { id: restaurantId },
+      data: {
+        name,
+        address,
+        phone
+        // Note: cuisine might need to be added to your schema if not present
+      },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        phone: true,
+        email: true,
+        logo: true,
+        timezone: true
+      }
+    });
+    
+    res.json(restaurant);
+  } catch (error) {
+    console.error('Error updating restaurant:', error);
+    res.status(500).json({ error: 'Failed to update restaurant' });
+  }
+});
+
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {

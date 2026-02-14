@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { QuickOrderModal } from '../components/pos/QuickOrderModal';
 import { 
   Clock, 
   Coffee, 
   Users, 
   DollarSign,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -43,29 +45,30 @@ export function DashboardPage() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showQuickOrder, setShowQuickOrder] = useState(false);
 
-useEffect(() => {
-  fetchDashboardData();
-  
-  const socket = io('http://localhost:3001');
-  socket.emit('join-restaurant', restaurantId);
-  
-  socket.on('order-updated', () => {
+  useEffect(() => {
     fetchDashboardData();
-  });
-  
-  return () => {
-    socket.disconnect();
-  };
-}, [restaurantId]);
+    
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001');
+    socket.emit('join-restaurant', restaurantId);
+    
+    socket.on('order-updated', () => {
+      fetchDashboardData();
+    });
+    
+    return () => {
+      socket.disconnect();
+    };
+  }, [restaurantId]);
 
   const fetchDashboardData = async () => {
     try {
       setRefreshing(true);
       
       const [statsRes, ordersRes] = await Promise.all([
-        fetch(`http://localhost:3001/api/restaurant/${restaurantId}/stats`),
-        fetch(`http://localhost:3001/api/restaurant/${restaurantId}/orders`)
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/restaurant/${restaurantId}/stats`),
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/restaurant/${restaurantId}/orders`)
       ]);
       
       const statsData = await statsRes.json();
@@ -141,7 +144,7 @@ useEffect(() => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-light">Good evening,</h2>
-          <p className="text-gray-400">Trattoria Bellini</p>
+          <p className="text-gray-400">Your Restaurant</p>
         </div>
         <button 
           onClick={fetchDashboardData}
@@ -151,7 +154,7 @@ useEffect(() => {
         </button>
       </div>
 
-      {/* Stats Grid - 2 columns on phone, 4 on tablet */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {stats.map((stat, i) => (
           <Card key={i} padding="md" className="hover:border-gray-200 transition-all">
@@ -171,7 +174,7 @@ useEffect(() => {
         ))}
       </div>
 
-      {/* Active Orders Summary - Tablet/Phone friendly */}
+      {/* Active Orders Summary */}
       <Card padding="lg" className="mb-6">
         <h3 className="font-medium mb-4">Active Orders</h3>
         <div className="grid grid-cols-3 gap-2">
@@ -246,12 +249,25 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Quick actions for tablet/phone */}
+      {/* Quick Order FAB */}
       <div className="fixed bottom-20 right-4 z-10">
-        <button className="w-14 h-14 bg-black text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform">
-          <span className="text-2xl">+</span>
+        <button
+          onClick={() => setShowQuickOrder(true)}
+          className="w-14 h-14 bg-black text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform hover:bg-gray-800"
+        >
+          <Plus className="w-6 h-6" />
         </button>
       </div>
+
+      {/* Quick Order Modal */}
+      <QuickOrderModal
+        isOpen={showQuickOrder}
+        onClose={() => setShowQuickOrder(false)}
+        restaurantId={restaurantId || ''}
+        onOrderComplete={() => {
+          fetchDashboardData();
+        }}
+      />
     </Layout>
   );
 }
