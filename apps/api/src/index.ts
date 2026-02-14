@@ -37,9 +37,31 @@ const io = new Server(httpServer, {
 });
 
 // Middleware
-app.use(helmet());
+// Configure Helmet with proper CSP for production
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:", "http:"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'", "https:", "http:", "wss:", "ws:"],
+        fontSrc: ["'self'", "data:", "https:", "http:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  })
+);
+
 app.use(cors({
-  origin: /^http:\/\/localhost:[0-9]{4}$/,
+  origin: [
+    /^http:\/\/localhost:[0-9]{4}$/,
+    'https://drift-diner.onrender.com',
+    'https://drift-restaurant.onrender.com',
+    'https://drift-landing.onrender.com',
+  ],
   credentials: true
 }));
 app.use(express.json());
@@ -324,7 +346,7 @@ app.get('/api/restaurant/:restaurantId/stats', async (req, res) => {
   }
 });
 
-// Create a new order (called from diner app) - Enhanced with detailed logging
+// Create a new order (called from diner app)
 app.post('/api/orders', async (req, res) => {
   try {
     const { restaurantId, tableId, userId, items, total, tip } = req.body;
@@ -338,7 +360,6 @@ app.post('/api/orders', async (req, res) => {
       tip 
     });
 
-    // Validate required fields
     if (!restaurantId || !tableId || !userId || !items || !total) {
       console.log('❌ Missing required fields');
       return res.status(400).json({ 
@@ -347,7 +368,6 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
-    // Check if restaurant exists
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId }
     });
@@ -356,9 +376,7 @@ app.post('/api/orders', async (req, res) => {
       console.log('❌ Restaurant not found:', restaurantId);
       return res.status(404).json({ error: 'Restaurant not found' });
     }
-    console.log('✅ Restaurant found:', restaurant.name);
 
-    // Check if table exists
     const table = await prisma.table.findUnique({
       where: { id: tableId }
     });
@@ -367,10 +385,7 @@ app.post('/api/orders', async (req, res) => {
       console.log('❌ Table not found:', tableId);
       return res.status(404).json({ error: 'Table not found' });
     }
-    console.log('✅ Table found:', table.number);
 
-    // Create or find user
-    console.log('👤 Ensuring user exists:', userId);
     const user = await prisma.user.upsert({
       where: { id: userId },
       update: {},
@@ -379,9 +394,7 @@ app.post('/api/orders', async (req, res) => {
         name: 'Guest User'
       }
     });
-    console.log('✅ User ready:', user.id);
 
-    // Verify menu items exist
     for (const item of items) {
       const menuItem = await prisma.menuItem.findUnique({
         where: { id: item.menuItemId }
@@ -392,11 +405,8 @@ app.post('/api/orders', async (req, res) => {
           error: `Menu item not found: ${item.menuItemId}` 
         });
       }
-      console.log(`✅ Menu item verified: ${menuItem.name}`);
     }
 
-    // Create the order
-    console.log('📝 Creating order...');
     const order = await prisma.order.create({
       data: {
         restaurantId,
@@ -424,47 +434,29 @@ app.post('/api/orders', async (req, res) => {
       }
     });
     
-    console.log('✅ Order created successfully. ID:', order.id);
-    console.log('📊 Order total:', order.total);
-    
-    // Emit socket event for real-time updates
     io.to(`restaurant:${restaurantId}`).emit('order-updated', order);
-    console.log('📡 Socket event emitted to restaurant:', restaurantId);
     
     res.json(order);
   } catch (error) {
     console.error('❌ Error creating order:', error);
     
-    // Handle Prisma-specific errors
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.error('Prisma error code:', error.code);
-      console.error('Prisma error meta:', error.meta);
       return res.status(500).json({ 
         error: 'Database error', 
         code: error.code,
-        message: error.message,
-        meta: error.meta
-      });
-    }
-    
-    if (error instanceof Prisma.PrismaClientValidationError) {
-      console.error('Prisma validation error:', error.message);
-      return res.status(500).json({ 
-        error: 'Validation error', 
-        message: error.message 
+        message: error.message
       });
     }
     
     const err = error as Error;
     res.status(500).json({ 
       error: 'Failed to create order', 
-      message: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      message: err.message
     });
   }
 });
 
-// Test endpoint to create an order (for testing)
+// Test endpoint to create an order
 app.post('/api/test/create-order', async (req, res) => {
   try {
     const { restaurantId, tableId, userId, items, total } = req.body;
@@ -651,14 +643,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Create a new restaurant (called from signup) - FIXED VERSION
+// Create a new restaurant (called from signup) - SINGLE VERSION
 app.post('/api/restaurants', async (req, res) => {
   try {
     const { name, email, supabaseUserId } = req.body;
     
     console.log('📝 Creating restaurant:', { name, email, supabaseUserId });
     
-    // Validate required fields
     if (!name || !email || !supabaseUserId) {
       return res.status(400).json({ 
         error: 'Missing required fields',
@@ -702,7 +693,7 @@ app.post('/api/restaurants', async (req, res) => {
       }
     });
     
-    // Also create user record
+    // Create user record
     try {
       await prisma.user.upsert({
         where: { email: email },
@@ -715,8 +706,7 @@ app.post('/api/restaurants', async (req, res) => {
         }
       });
     } catch (userError) {
-      console.log('⚠️ User may already exist or error creating:', userError);
-      // Continue even if user creation fails
+      console.log('⚠️ User creation issue:', userError);
     }
     
     console.log('✅ Restaurant created:', restaurant.id);
@@ -728,6 +718,35 @@ app.post('/api/restaurants', async (req, res) => {
       error: 'Failed to create restaurant',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// Get restaurant by ID
+app.get('/api/restaurants/:restaurantId', async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        logo: true,
+        timezone: true
+      }
+    });
+    
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+    
+    res.json(restaurant);
+  } catch (error) {
+    console.error('Error fetching restaurant:', error);
+    res.status(500).json({ error: 'Failed to fetch restaurant' });
   }
 });
 
@@ -740,90 +759,7 @@ process.on('SIGINT', async () => {
   console.log('Server shutting down')
   process.exit(0)
 });
-// Create a new restaurant (called from signup) - FINAL FIXED VERSION
-app.post('/api/restaurants', async (req, res) => {
-  try {
-    const { name, email, supabaseUserId } = req.body;
-    
-    console.log('📝 Creating restaurant:', { name, email, supabaseUserId });
-    
-    // Validate required fields
-    if (!name || !email || !supabaseUserId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        received: { name, email, supabaseUserId }
-      });
-    }
-    
-    // Check if restaurant already exists using raw query to avoid type issues
-    const existing = await prisma.$queryRaw`
-      SELECT * FROM "Restaurant" 
-      WHERE email = ${email} OR "supabaseUserId" = ${supabaseUserId}
-      LIMIT 1
-    `;
-    
-    if (existing && (existing as any[]).length > 0) {
-      console.log('⚠️ Restaurant already exists:', (existing as any[])[0].id);
-      return res.json((existing as any[])[0]);
-    }
-    
-    // Create new restaurant with default tables
-    const restaurant = await prisma.restaurant.create({
-      data: {
-        name: name,
-        email: email,
-        supabaseUserId: supabaseUserId,
-        tables: {
-          create: [
-            { number: 1, qrCode: `table_1_${Date.now()}` },
-            { number: 2, qrCode: `table_2_${Date.now()}` },
-            { number: 3, qrCode: `table_3_${Date.now()}` },
-            { number: 4, qrCode: `table_4_${Date.now()}` },
-            { number: 5, qrCode: `table_5_${Date.now()}` },
-          ]
-        }
-      },
-      include: {
-        tables: true
-      }
-    });
-    
-    // Also create user record
-    try {
-      await prisma.user.create({
-        data: {
-          id: supabaseUserId,
-          email: email,
-          name: name,
-          supabaseId: supabaseUserId
-        }
-      });
-    } catch (userError) {
-      console.log('⚠️ User creation failed (may already exist):', userError);
-      // Try upsert instead
-      await prisma.user.upsert({
-        where: { email: email },
-        update: {},
-        create: {
-          id: supabaseUserId,
-          email: email,
-          name: name,
-          supabaseId: supabaseUserId
-        }
-      }).catch(e => console.log('User upsert also failed:', e));
-    }
-    
-    console.log('✅ Restaurant created:', restaurant.id);
-    res.status(201).json(restaurant);
-    
-  } catch (error) {
-    console.error('❌ Error creating restaurant:', error);
-    res.status(500).json({ 
-      error: 'Failed to create restaurant',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+
 // Start server
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
@@ -839,4 +775,5 @@ httpServer.listen(PORT, () => {
   console.log(`🎯 Setup menu: POST http://localhost:${PORT}/api/debug/setup-menu`);
   console.log(`📋 Get menu: GET http://localhost:${PORT}/api/restaurant/[restaurantId]/menu`);
   console.log(`🏪 Create restaurant: POST http://localhost:${PORT}/api/restaurants`);
+  console.log(`🔍 Get restaurant: GET http://localhost:${PORT}/api/restaurants/[restaurantId]`);
 });
