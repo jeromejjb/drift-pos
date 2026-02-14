@@ -28,46 +28,78 @@ const adapter = new PrismaPg(pool);
 // Initialize Prisma Client WITH the adapter (required for Prisma 7)
 const prisma = new PrismaClient({ adapter });
 
-// Setup Socket.io with regex for any localhost port
+// Setup Socket.io with CORS for production
 const io = new Server(httpServer, {
   cors: {
-    origin: /^http:\/\/localhost:[0-9]{4}$/,
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'https://drift-diner.onrender.com',
+      'https://drift-restaurant.onrender.com',
+      'https://drift-landing.onrender.com',
+    ],
     credentials: true
   }
 });
 
 // Middleware
-// Configure Helmet with proper CSP for production
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:", "http:"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", "https:", "http:", "wss:", "ws:"],
-        fontSrc: ["'self'", "data:", "https:", "http:"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-      },
-    },
-  })
-);
+// Use helmet without CSP for now to avoid blocking issues
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
 
 app.use(cors({
   origin: [
-    /^http:\/\/localhost:[0-9]{4}$/,
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
     'https://drift-diner.onrender.com',
     'https://drift-restaurant.onrender.com',
     'https://drift-landing.onrender.com',
   ],
   credentials: true
 }));
+
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Health check endpoint
+// ==================== ROOT ENDPOINT ====================
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Drift API',
+    version: '1.0.0',
+    status: 'operational',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      restaurants: {
+        create: 'POST /api/restaurants',
+        get: 'GET /api/restaurants/:restaurantId',
+        tables: 'GET /api/restaurant/:restaurantId/tables',
+        orders: 'GET /api/restaurant/:restaurantId/orders',
+        stats: 'GET /api/restaurant/:restaurantId/stats',
+        menu: 'GET /api/restaurant/:restaurantId/menu'
+      },
+      orders: {
+        create: 'POST /api/orders',
+        update: 'PATCH /api/order/:orderId/status'
+      },
+      tables: {
+        lookup: 'GET /api/table/:tableId/restaurant',
+        qrCode: 'GET /api/table/:tableId/qrcode',
+        downloadQR: 'GET /api/table/:tableId/qrcode/download'
+      },
+      debug: {
+        setupMenu: 'POST /api/debug/setup-menu',
+        testRestaurant: 'POST /test/restaurant',
+        testOrder: 'POST /api/test/create-order'
+      }
+    }
+  });
+});
+
+// ==================== HEALTH CHECK ====================
 app.get('/health', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`
@@ -87,7 +119,7 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Test endpoint to create a restaurant
+// ==================== TEST ENDPOINTS ====================
 app.post('/test/restaurant', async (req, res) => {
   try {
     const restaurant = await prisma.restaurant.create({
@@ -96,9 +128,9 @@ app.post('/test/restaurant', async (req, res) => {
         address: '123 Main St',
         tables: {
           create: [
-            { number: 1, qrCode: 'table_1' },
-            { number: 2, qrCode: 'table_2' },
-            { number: 3, qrCode: 'table_3' },
+            { number: 1, qrCode: `table_1_${Date.now()}` },
+            { number: 2, qrCode: `table_2_${Date.now()}` },
+            { number: 3, qrCode: `table_3_${Date.now()}` },
           ]
         }
       },
@@ -111,6 +143,115 @@ app.post('/test/restaurant', async (req, res) => {
     const err = error as Error;
     console.error('Error creating restaurant:', err)
     res.status(500).json({ error: 'Failed to create restaurant' })
+  }
+});
+
+// ==================== RESTAURANT ENDPOINTS ====================
+
+// Create a new restaurant (called from signup)
+app.post('/api/restaurants', async (req, res) => {
+  try {
+    const { name, email, supabaseUserId } = req.body;
+    
+    console.log('📝 Creating restaurant:', { name, email, supabaseUserId });
+    
+    if (!name || !email || !supabaseUserId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        received: { name, email, supabaseUserId }
+      });
+    }
+    
+    // Check if restaurant already exists
+    const existing = await prisma.restaurant.findFirst({
+      where: {
+        OR: [
+          { email: email },
+          { supabaseUserId: supabaseUserId }
+        ]
+      }
+    });
+    
+    if (existing) {
+      console.log('⚠️ Restaurant already exists:', existing.id);
+      return res.json(existing);
+    }
+    
+    // Create new restaurant with default tables
+    const restaurant = await prisma.restaurant.create({
+      data: {
+        name: name,
+        email: email,
+        supabaseUserId: supabaseUserId,
+        tables: {
+          create: [
+            { number: 1, qrCode: `table_1_${Date.now()}` },
+            { number: 2, qrCode: `table_2_${Date.now()}` },
+            { number: 3, qrCode: `table_3_${Date.now()}` },
+            { number: 4, qrCode: `table_4_${Date.now()}` },
+            { number: 5, qrCode: `table_5_${Date.now()}` },
+          ]
+        }
+      },
+      include: {
+        tables: true
+      }
+    });
+    
+    // Create user record
+    try {
+      await prisma.user.upsert({
+        where: { email: email },
+        update: {},
+        create: {
+          id: supabaseUserId,
+          email: email,
+          name: name,
+          supabaseId: supabaseUserId
+        }
+      });
+    } catch (userError) {
+      console.log('⚠️ User creation issue:', userError);
+    }
+    
+    console.log('✅ Restaurant created:', restaurant.id);
+    res.status(201).json(restaurant);
+    
+  } catch (error) {
+    console.error('❌ Error creating restaurant:', error);
+    res.status(500).json({ 
+      error: 'Failed to create restaurant',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get restaurant by ID
+app.get('/api/restaurants/:restaurantId', async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        logo: true,
+        timezone: true
+      }
+    });
+    
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+    
+    res.json(restaurant);
+  } catch (error) {
+    console.error('Error fetching restaurant:', error);
+    res.status(500).json({ error: 'Failed to fetch restaurant' });
   }
 });
 
@@ -145,6 +286,26 @@ app.get('/api/table/:tableId/restaurant', async (req, res) => {
   }
 });
 
+// ==================== TABLE ENDPOINTS ====================
+
+// Get all tables for a restaurant
+app.get('/api/restaurant/:restaurantId/tables', async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    const tables = await prisma.table.findMany({
+      where: { restaurantId },
+      orderBy: { number: 'asc' }
+    });
+    
+    res.json(tables);
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error fetching tables:', err);
+    res.status(500).json({ error: 'Failed to fetch tables' });
+  }
+});
+
 // Generate QR code for a table
 app.get('/api/table/:tableId/qrcode', async (req, res) => {
   try {
@@ -159,7 +320,7 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
     
-    const baseUrl = process.env.DINER_URL || 'http://localhost:5173';
+    const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
     
     const qrDataUrl = await QRCode.toDataURL(url, {
@@ -199,7 +360,7 @@ app.get('/api/table/:tableId/qrcode/download', async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
     
-    const baseUrl = process.env.DINER_URL || 'http://localhost:5173';
+    const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
     
     const qrBuffer = await QRCode.toBuffer(url, {
@@ -221,23 +382,141 @@ app.get('/api/table/:tableId/qrcode/download', async (req, res) => {
   }
 });
 
-// Get all tables for a restaurant
-app.get('/api/restaurant/:restaurantId/tables', async (req, res) => {
+// ==================== MENU ENDPOINTS ====================
+
+// Get menu for a restaurant
+app.get('/api/restaurant/:restaurantId/menu', async (req, res) => {
   try {
     const { restaurantId } = req.params;
     
-    const tables = await prisma.table.findMany({
+    const categories = await prisma.menuCategory.findMany({
       where: { restaurantId },
-      orderBy: { number: 'asc' }
+      include: {
+        items: {
+          orderBy: { name: 'asc' }
+        }
+      },
+      orderBy: { sortOrder: 'asc' }
     });
     
-    res.json(tables);
+    res.json(categories);
   } catch (error) {
     const err = error as Error;
-    console.error('Error fetching tables:', err);
-    res.status(500).json({ error: 'Failed to fetch tables' });
+    console.error('Error fetching menu:', err);
+    res.status(500).json({ error: 'Failed to fetch menu' });
   }
 });
+
+// Debug endpoint to set up menu items
+app.post('/api/debug/setup-menu', async (req, res) => {
+  try {
+    const { restaurantId } = req.body;
+    
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId }
+    });
+    
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+    
+    const cat1 = await prisma.menuCategory.upsert({
+      where: { id: 'cat1' },
+      update: {},
+      create: {
+        id: 'cat1',
+        name: 'Antipasti',
+        sortOrder: 0,
+        restaurantId
+      }
+    });
+    
+    const cat2 = await prisma.menuCategory.upsert({
+      where: { id: 'cat2' },
+      update: {},
+      create: {
+        id: 'cat2',
+        name: 'Pizza',
+        sortOrder: 1,
+        restaurantId
+      }
+    });
+    
+    const items = await prisma.menuItem.createMany({
+      data: [
+        { 
+          id: 'item1', 
+          name: 'Arancini', 
+          description: 'Crispy rice balls with mozzarella', 
+          price: 12, 
+          isShared: true, 
+          categoryId: cat1.id, 
+          restaurantId 
+        },
+        { 
+          id: 'item2', 
+          name: 'Calamari', 
+          description: 'Fried squid with marinara', 
+          price: 14, 
+          isShared: true, 
+          categoryId: cat1.id, 
+          restaurantId 
+        },
+        { 
+          id: 'item3', 
+          name: 'Burrata', 
+          description: 'Creamy burrata with heirloom tomatoes', 
+          price: 16, 
+          isShared: true, 
+          categoryId: cat1.id, 
+          restaurantId 
+        },
+        { 
+          id: 'item4', 
+          name: 'Margherita', 
+          description: 'Tomato, mozzarella, basil', 
+          price: 18, 
+          isShared: true, 
+          categoryId: cat2.id, 
+          restaurantId 
+        },
+        { 
+          id: 'item5', 
+          name: 'Diavola', 
+          description: 'Spicy salami, tomato, mozzarella', 
+          price: 20, 
+          isShared: true, 
+          categoryId: cat2.id, 
+          restaurantId 
+        },
+        { 
+          id: 'item6', 
+          name: 'Quattro Formaggi', 
+          description: 'Four cheese blend', 
+          price: 22, 
+          isShared: true, 
+          categoryId: cat2.id, 
+          restaurantId 
+        }
+      ],
+      skipDuplicates: true
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Menu setup complete',
+      categories: [cat1, cat2],
+      itemsCreated: items.count
+    });
+    
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error setting up menu:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== ORDER ENDPOINTS ====================
 
 // Get orders for a restaurant
 app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
@@ -276,28 +555,6 @@ app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
     const err = error as Error;
     console.error('Error fetching orders:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
-  }
-});
-
-// Update order status
-app.patch('/api/order/:orderId/status', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const { status } = req.body;
-    
-    const order = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: status.toUpperCase() },
-      include: { restaurant: true }
-    });
-    
-    io.to(`restaurant:${order.restaurantId}`).emit('order-updated', order);
-    
-    res.json(order);
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error updating order:', err);
-    res.status(500).json({ error: 'Failed to update order' });
   }
 });
 
@@ -456,6 +713,28 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+// Update order status
+app.patch('/api/order/:orderId/status', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: status.toUpperCase() },
+      include: { restaurant: true }
+    });
+    
+    io.to(`restaurant:${order.restaurantId}`).emit('order-updated', order);
+    
+    res.json(order);
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error updating order:', err);
+    res.status(500).json({ error: 'Failed to update order' });
+  }
+});
+
 // Test endpoint to create an order
 app.post('/api/test/create-order', async (req, res) => {
   try {
@@ -492,139 +771,7 @@ app.post('/api/test/create-order', async (req, res) => {
   }
 });
 
-// Debug endpoint to set up menu items
-app.post('/api/debug/setup-menu', async (req, res) => {
-  try {
-    const { restaurantId } = req.body;
-    
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId }
-    });
-    
-    if (!restaurant) {
-      return res.status(404).json({ error: 'Restaurant not found' });
-    }
-    
-    const cat1 = await prisma.menuCategory.upsert({
-      where: { id: 'cat1' },
-      update: {},
-      create: {
-        id: 'cat1',
-        name: 'Antipasti',
-        sortOrder: 0,
-        restaurantId
-      }
-    });
-    
-    const cat2 = await prisma.menuCategory.upsert({
-      where: { id: 'cat2' },
-      update: {},
-      create: {
-        id: 'cat2',
-        name: 'Pizza',
-        sortOrder: 1,
-        restaurantId
-      }
-    });
-    
-    const items = await prisma.menuItem.createMany({
-      data: [
-        { 
-          id: 'item1', 
-          name: 'Arancini', 
-          description: 'Crispy rice balls with mozzarella', 
-          price: 12, 
-          isShared: true, 
-          categoryId: cat1.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item2', 
-          name: 'Calamari', 
-          description: 'Fried squid with marinara', 
-          price: 14, 
-          isShared: true, 
-          categoryId: cat1.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item3', 
-          name: 'Burrata', 
-          description: 'Creamy burrata with heirloom tomatoes', 
-          price: 16, 
-          isShared: true, 
-          categoryId: cat1.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item4', 
-          name: 'Margherita', 
-          description: 'Tomato, mozzarella, basil', 
-          price: 18, 
-          isShared: true, 
-          categoryId: cat2.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item5', 
-          name: 'Diavola', 
-          description: 'Spicy salami, tomato, mozzarella', 
-          price: 20, 
-          isShared: true, 
-          categoryId: cat2.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item6', 
-          name: 'Quattro Formaggi', 
-          description: 'Four cheese blend', 
-          price: 22, 
-          isShared: true, 
-          categoryId: cat2.id, 
-          restaurantId 
-        }
-      ],
-      skipDuplicates: true
-    });
-    
-    res.json({ 
-      success: true, 
-      message: 'Menu setup complete',
-      categories: [cat1, cat2],
-      itemsCreated: items.count
-    });
-    
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error setting up menu:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get menu for a restaurant
-app.get('/api/restaurant/:restaurantId/menu', async (req, res) => {
-  try {
-    const { restaurantId } = req.params;
-    
-    const categories = await prisma.menuCategory.findMany({
-      where: { restaurantId },
-      include: {
-        items: {
-          orderBy: { name: 'asc' }
-        }
-      },
-      orderBy: { sortOrder: 'asc' }
-    });
-    
-    res.json(categories);
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error fetching menu:', err);
-    res.status(500).json({ error: 'Failed to fetch menu' });
-  }
-});
-
-// Socket.io connection handling
+// ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
   
@@ -643,124 +790,17 @@ io.on('connection', (socket) => {
   });
 });
 
-// Create a new restaurant (called from signup) - SINGLE VERSION
-app.post('/api/restaurants', async (req, res) => {
-  try {
-    const { name, email, supabaseUserId } = req.body;
-    
-    console.log('📝 Creating restaurant:', { name, email, supabaseUserId });
-    
-    if (!name || !email || !supabaseUserId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        received: { name, email, supabaseUserId }
-      });
-    }
-    
-    // Check if restaurant already exists
-    const existing = await prisma.restaurant.findFirst({
-      where: {
-        OR: [
-          { email: email },
-          { supabaseUserId: supabaseUserId }
-        ]
-      }
-    });
-    
-    if (existing) {
-      console.log('⚠️ Restaurant already exists:', existing.id);
-      return res.json(existing);
-    }
-    
-    // Create new restaurant with default tables
-    const restaurant = await prisma.restaurant.create({
-      data: {
-        name: name,
-        email: email,
-        supabaseUserId: supabaseUserId,
-        tables: {
-          create: [
-            { number: 1, qrCode: `table_1_${Date.now()}` },
-            { number: 2, qrCode: `table_2_${Date.now()}` },
-            { number: 3, qrCode: `table_3_${Date.now()}` },
-            { number: 4, qrCode: `table_4_${Date.now()}` },
-            { number: 5, qrCode: `table_5_${Date.now()}` },
-          ]
-        }
-      },
-      include: {
-        tables: true
-      }
-    });
-    
-    // Create user record
-    try {
-      await prisma.user.upsert({
-        where: { email: email },
-        update: {},
-        create: {
-          id: supabaseUserId,
-          email: email,
-          name: name,
-          supabaseId: supabaseUserId
-        }
-      });
-    } catch (userError) {
-      console.log('⚠️ User creation issue:', userError);
-    }
-    
-    console.log('✅ Restaurant created:', restaurant.id);
-    res.status(201).json(restaurant);
-    
-  } catch (error) {
-    console.error('❌ Error creating restaurant:', error);
-    res.status(500).json({ 
-      error: 'Failed to create restaurant',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Get restaurant by ID
-app.get('/api/restaurants/:restaurantId', async (req, res) => {
-  try {
-    const { restaurantId } = req.params;
-    
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        logo: true,
-        timezone: true
-      }
-    });
-    
-    if (!restaurant) {
-      return res.status(404).json({ error: 'Restaurant not found' });
-    }
-    
-    res.json(restaurant);
-  } catch (error) {
-    console.error('Error fetching restaurant:', error);
-    res.status(500).json({ error: 'Failed to fetch restaurant' });
-  }
-});
-
 // Make io available to routes
 app.set('io', io);
 
-// Graceful shutdown
+// ==================== GRACEFUL SHUTDOWN ====================
 process.on('SIGINT', async () => {
   await prisma.$disconnect()
   console.log('Server shutting down')
   process.exit(0)
 });
 
-// Start server
+// ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`🚀 Drift API running on http://localhost:${PORT}`);
