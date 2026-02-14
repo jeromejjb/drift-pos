@@ -50,7 +50,7 @@ export function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
     
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001');
+    const socket = io(import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com');
     socket.emit('join-restaurant', restaurantId);
     
     socket.on('order-updated', () => {
@@ -66,9 +66,10 @@ export function DashboardPage() {
     try {
       setRefreshing(true);
       
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
       const [statsRes, ordersRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/restaurant/${restaurantId}/stats`),
-        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/restaurant/${restaurantId}/orders`)
+        fetch(`${apiUrl}/api/restaurant/${restaurantId}/stats`),
+        fetch(`${apiUrl}/api/restaurant/${restaurantId}/orders`)
       ]);
       
       const statsData = await statsRes.json();
