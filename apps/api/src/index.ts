@@ -908,38 +908,61 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
     res.status(500).json({ error: 'Failed to update restaurant' });
   }
 });
-
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
 
+// Define allowed origins for CORS (make it available for logging)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'https://drift-diner.onrender.com',
+  'https://drift-restaurant.onrender.com',
+  'https://drift-landing.onrender.com',
+];
+
 // Log startup info
-console.log('🔧 Configuration:');
+console.log('\n🔧 ==================== CONFIGURATION ====================');
 console.log(`📌 PORT: ${PORT}`);
 console.log(`🔌 DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
 console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-console.log(`✅ CORS origins: ${corsOrigins.join(', ')}`);
+console.log(`✅ CORS allowed origins: ${allowedOrigins.length}`);
+allowedOrigins.forEach((origin, i) => console.log(`   ${i + 1}. ${origin}`));
+console.log('🔧 ======================================================\n');
 
 // Bind to 0.0.0.0 to accept connections from anywhere (required for Render)
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log('\n✅ ==================== SERVER STARTED ====================');
-  console.log(`🚀 Drift API running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🚀 Drift API running on http://0.0.0.0:${PORT}`);
+  console.log(`📊 Health check: http://0.0.0.0:${PORT}/health`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 CORS enabled for ${corsOrigins.length} origins`);
+  console.log(`🌐 Accepting connections from configured CORS origins`);
   console.log('✅ ======================================================\n');
-}).on('error', (err) => {
+}).on('error', (err: any) => {
   console.error('\n❌ ==================== SERVER FAILED ====================');
-  console.error('Failed to start server:', err);
+  console.error('Failed to start server:', err.message);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use`);
+  }
   console.error('❌ ======================================================\n');
   process.exit(1);
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM, shutting down gracefully...');
+  console.log('\n📦 Received SIGTERM, shutting down gracefully...');
   await prisma.$disconnect();
   httpServer.close(() => {
-    console.log('Server closed');
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('\n📦 Received SIGINT, shutting down gracefully...');
+  await prisma.$disconnect();
+  httpServer.close(() => {
+    console.log('✅ Server closed');
     process.exit(0);
   });
 });
