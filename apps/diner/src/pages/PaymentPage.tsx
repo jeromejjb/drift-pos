@@ -53,8 +53,9 @@ export function PaymentPage() {
   const tip = (subtotal * tipPercent) / 100;
   const total = subtotal + tax + tip;
 
-  const handlePayment = async (method: string) => {
-    setProcessing(true);
+    // In handlePayment function, prefix unused parameter
+const handlePayment = async (_method: string) => {
+  setProcessing(true);
     
     try {
       // Validate all required fields

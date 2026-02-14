@@ -1,8 +1,6 @@
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Input } from '../components/ui/Input';
-
 export function BrandGuide() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">

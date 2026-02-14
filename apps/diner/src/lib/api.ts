@@ -54,9 +54,13 @@ export async function getRestaurantByTableId(tableId: string): Promise<Restauran
   }
 }
 
-export async function getMenuByRestaurantId(restaurantId: string): Promise<Category[]> {
-  // TODO: Create proper menu endpoint
+export async function getMenuByRestaurantId(_restaurantId: string): Promise<Category[]> {
+  // Prefix with underscore to indicate intentionally unused
+  // TODO: Implement actual API call using _restaurantId
+  
   // For now, return mock data
+  // In the future, you'll use: const response = await fetch(`${API_URL}/api/restaurant/${_restaurantId}/menu`);
+  
   return [
     {
       id: 'cat1',
@@ -77,4 +81,13 @@ export async function getMenuByRestaurantId(restaurantId: string): Promise<Categ
       ]
     }
   ];
+}
+
+// Optional: Add a function to get menu with real API
+export async function getMenuByRestaurantIdReal(restaurantId: string): Promise<Category[]> {
+  const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/menu`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch menu');
+  }
+  return response.json();
 }
