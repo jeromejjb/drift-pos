@@ -10,6 +10,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import QRCode from 'qrcode';
 
+// Add this near the top after imports
+console.log('🚀 Starting Drift API...');
+console.log('📊 DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+
 // Load environment variables
 dotenv.config();
 
@@ -906,18 +911,35 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
 
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Drift API running on http://localhost:${PORT}`);
+
+// Log startup info
+console.log('🔧 Configuration:');
+console.log(`📌 PORT: ${PORT}`);
+console.log(`🔌 DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
+console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+console.log(`✅ CORS origins: ${corsOrigins.join(', ')}`);
+
+// Bind to 0.0.0.0 to accept connections from anywhere (required for Render)
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log('\n✅ ==================== SERVER STARTED ====================');
+  console.log(`🚀 Drift API running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🍕 Test endpoint: POST http://localhost:${PORT}/test/restaurant`);
-  console.log(`🔍 Table lookup: GET http://localhost:${PORT}/api/table/[tableId]/restaurant`);
-  console.log(`📋 Tables: GET http://localhost:${PORT}/api/restaurant/[restaurantId]/tables`);
-  console.log(`📦 Orders: GET http://localhost:${PORT}/api/restaurant/[restaurantId]/orders`);
-  console.log(`📊 Stats: GET http://localhost:${PORT}/api/restaurant/[restaurantId]/stats`);
-  console.log(`🔄 Update order: PATCH http://localhost:${PORT}/api/order/[orderId]/status`);
-  console.log(`📝 Create order: POST http://localhost:${PORT}/api/orders`);
-  console.log(`🎯 Setup menu: POST http://localhost:${PORT}/api/debug/setup-menu`);
-  console.log(`📋 Get menu: GET http://localhost:${PORT}/api/restaurant/[restaurantId]/menu`);
-  console.log(`🏪 Create restaurant: POST http://localhost:${PORT}/api/restaurants`);
-  console.log(`🔍 Get restaurant: GET http://localhost:${PORT}/api/restaurants/[restaurantId]`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS enabled for ${corsOrigins.length} origins`);
+  console.log('✅ ======================================================\n');
+}).on('error', (err) => {
+  console.error('\n❌ ==================== SERVER FAILED ====================');
+  console.error('Failed to start server:', err);
+  console.error('❌ ======================================================\n');
+  process.exit(1);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM, shutting down gracefully...');
+  await prisma.$disconnect();
+  httpServer.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
