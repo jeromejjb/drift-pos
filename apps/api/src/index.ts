@@ -907,10 +907,11 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
 
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
+const portNumber = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
 
 // Log startup info
 console.log('\n🔧 ==================== CONFIGURATION ====================');
-console.log(`📌 PORT: ${PORT}`);
+console.log(`📌 PORT: ${portNumber}`);
 console.log(`🔌 DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
 console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 console.log(`✅ CORS allowed origins: ${allowedOrigins.length}`);
@@ -918,10 +919,10 @@ allowedOrigins.forEach((origin, i) => console.log(`   ${i + 1}. ${origin}`));
 console.log('🔧 ======================================================\n');
 
 // Bind to 0.0.0.0 to accept connections from anywhere (required for Render)
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(portNumber, '0.0.0.0', () => {
   console.log('\n✅ ==================== SERVER STARTED ====================');
-  console.log(`🚀 Drift API running on port ${PORT}`);
-  console.log(`📊 Health check: http://0.0.0.0:${PORT}/health`);
+  console.log(`🚀 Drift API running on port ${portNumber}`);
+  console.log(`📊 Health check: http://0.0.0.0:${portNumber}/health`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Accepting connections from ${allowedOrigins.length} configured origins`);
   console.log('✅ ======================================================\n');
@@ -929,7 +930,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.error('\n❌ ==================== SERVER FAILED ====================');
   console.error('Failed to start server:', err.message);
   if ('code' in err && err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use`);
+    console.error(`Port ${portNumber} is already in use`);
   }
   console.error('❌ ======================================================\n');
   process.exit(1);
