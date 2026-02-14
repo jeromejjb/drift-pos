@@ -68,17 +68,21 @@ export function Layout({ children, title }: LayoutProps) {
     fetchRestaurantName();
   }, [restaurantId, API_URL]);
 
+  // IMPORTANT FIX: Define navItems WITHOUT leading slashes
   const navItems = [
-    { path: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
-    { path: '/tables', icon: Grid, label: 'Tables', description: 'Manage tables & QR codes' },
-    { path: '/orders', icon: List, label: 'Orders', description: 'Active & past orders' },
-    { path: '/menu', icon: Store, label: 'Menu', description: 'Edit your menu items' },
-    { path: '/pos', icon: Plus, label: 'Quick Order', description: 'Place orders manually' },
-    { path: '/settings', icon: Settings, label: 'Settings', description: 'Restaurant preferences' },
+    { path: 'dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
+    { path: 'tables', icon: Grid, label: 'Tables', description: 'Manage tables & QR codes' },
+    { path: 'orders', icon: List, label: 'Orders', description: 'Active & past orders' },
+    { path: 'menu', icon: Store, label: 'Menu', description: 'Edit your menu items' },
+    { path: 'pos', icon: Plus, label: 'Quick Order', description: 'Place orders manually' },
+    { path: 'settings', icon: Settings, label: 'Settings', description: 'Restaurant preferences' },
   ];
 
+  // FIXED navigation handler - builds path correctly with single slash
   const handleNavigation = (path: string) => {
+    // Build path with single slash: /dashboard/123, NOT //dashboard/123
     const fullPath = `/${path}/${restaurantId}`;
+    
     console.log('📍 Navigation clicked:', {
       from: location.pathname,
       to: fullPath,
@@ -86,8 +90,13 @@ export function Layout({ children, title }: LayoutProps) {
       fullUrl: window.location.origin + fullPath
     });
     
-    // Prevent default and navigate
+    // Use React Router navigate - this keeps you within the SPA
     navigate(fullPath);
+  };
+
+  // Helper to check if a nav item is active
+  const isActivePath = (path: string) => {
+    return location.pathname === `/${path}/${restaurantId}`;
   };
 
   return (
@@ -123,7 +132,7 @@ export function Layout({ children, title }: LayoutProps) {
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === `/${item.path}/${restaurantId}`;
+            const isActive = isActivePath(item.path);
             
             return (
               <motion.button
