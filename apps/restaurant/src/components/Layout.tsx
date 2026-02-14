@@ -37,15 +37,27 @@ export function Layout({ children, title }: LayoutProps) {
   // Extract restaurantId from current path
   const restaurantId = location.pathname.split('/')[2] || '';
 
+  // Debug logging
+  useEffect(() => {
+    console.log('📌 Layout mounted');
+    console.log('📍 Current pathname:', location.pathname);
+    console.log('🔍 Extracted restaurantId:', restaurantId);
+    console.log('🌐 Full URL:', window.location.href);
+  }, [location, restaurantId]);
+
   // Fetch restaurant details
   useEffect(() => {
     const fetchRestaurantName = async () => {
       if (restaurantId) {
         try {
+          console.log('📡 Fetching restaurant name for ID:', restaurantId);
           const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
           if (response.ok) {
             const data = await response.json();
             setRestaurantName(data.name);
+            console.log('✅ Restaurant name:', data.name);
+          } else {
+            console.log('❌ Restaurant fetch failed:', response.status);
           }
         } catch (error) {
           console.error('Error fetching restaurant name:', error);
@@ -64,6 +76,19 @@ export function Layout({ children, title }: LayoutProps) {
     { path: '/pos', icon: Plus, label: 'Quick Order', description: 'Place orders manually' },
     { path: '/settings', icon: Settings, label: 'Settings', description: 'Restaurant preferences' },
   ];
+
+  const handleNavigation = (path: string) => {
+    const fullPath = `/${path}/${restaurantId}`;
+    console.log('📍 Navigation clicked:', {
+      from: location.pathname,
+      to: fullPath,
+      restaurantId,
+      fullUrl: window.location.origin + fullPath
+    });
+    
+    // Prevent default and navigate
+    navigate(fullPath);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,7 +130,10 @@ export function Layout({ children, title }: LayoutProps) {
                 key={item.path}
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate(`/${item.path}/${restaurantId}`)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigation(item.path);
+                }}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl
                   transition-all duration-200
@@ -150,7 +178,7 @@ export function Layout({ children, title }: LayoutProps) {
           </div>
           
           <button
-            onClick={() => navigate(`/tables/${restaurantId}`)}
+            onClick={() => handleNavigation('tables')}
             className="p-2 hover:bg-gray-100 rounded-lg"
           >
             <QrCode className="w-5 h-5" />
@@ -207,7 +235,7 @@ export function Layout({ children, title }: LayoutProps) {
                       <button
                         key={item.path}
                         onClick={() => {
-                          navigate(`/${item.path}/${restaurantId}`);
+                          handleNavigation(item.path);
                           setMobileMenuOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-600"
