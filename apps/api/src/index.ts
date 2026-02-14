@@ -33,17 +33,20 @@ const adapter = new PrismaPg(pool);
 // Initialize Prisma Client WITH the adapter (required for Prisma 7)
 const prisma = new PrismaClient({ adapter });
 
+// Define allowed origins for CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'https://drift-diner.onrender.com',
+  'https://drift-restaurant.onrender.com',
+  'https://drift-landing.onrender.com',
+];
+
 // Setup Socket.io with CORS for production
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      'https://drift-diner.onrender.com',
-      'https://drift-restaurant.onrender.com',
-      'https://drift-landing.onrender.com',
-    ],
+    origin: allowedOrigins,
     credentials: true
   }
 });
@@ -55,14 +58,7 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175',
-    'https://drift-diner.onrender.com',
-    'https://drift-restaurant.onrender.com',
-    'https://drift-landing.onrender.com',
-  ],
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -877,7 +873,7 @@ app.patch('/api/users/:userId', async (req, res) => {
 
 // ==================== RESTAURANT UPDATE ENDPOINT ====================
 
-// Update restaurant by ID (add this after the existing GET endpoint)
+// Update restaurant by ID
 app.patch('/api/restaurants/:restaurantId', async (req, res) => {
   try {
     const { restaurantId } = req.params;
@@ -908,18 +904,9 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
     res.status(500).json({ error: 'Failed to update restaurant' });
   }
 });
+
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
-
-// Define allowed origins for CORS (make it available for logging)
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-  'https://drift-diner.onrender.com',
-  'https://drift-restaurant.onrender.com',
-  'https://drift-landing.onrender.com',
-];
 
 // Log startup info
 console.log('\n🔧 ==================== CONFIGURATION ====================');
@@ -933,15 +920,15 @@ console.log('🔧 ======================================================\n');
 // Bind to 0.0.0.0 to accept connections from anywhere (required for Render)
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log('\n✅ ==================== SERVER STARTED ====================');
-  console.log(`🚀 Drift API running on http://0.0.0.0:${PORT}`);
+  console.log(`🚀 Drift API running on port ${PORT}`);
   console.log(`📊 Health check: http://0.0.0.0:${PORT}/health`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 Accepting connections from configured CORS origins`);
+  console.log(`🌐 Accepting connections from ${allowedOrigins.length} configured origins`);
   console.log('✅ ======================================================\n');
-}).on('error', (err: any) => {
+}).on('error', (err: Error) => {
   console.error('\n❌ ==================== SERVER FAILED ====================');
   console.error('Failed to start server:', err.message);
-  if (err.code === 'EADDRINUSE') {
+  if ('code' in err && err.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is already in use`);
   }
   console.error('❌ ======================================================\n');
