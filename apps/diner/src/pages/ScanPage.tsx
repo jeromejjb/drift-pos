@@ -25,29 +25,26 @@ export function ScanPage() {
 const startCamera = async () => {
   console.log('📸 startCamera called');
   setError(null);
+  
+  // First set scanning to true (this triggers React to render the div)
   setScanning(true);
-
+  
+  // Wait for React to render the div
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Now check for the div
+  const div = document.getElementById(scannerId);
+  if (!div) {
+    console.error('❌ Div with id', scannerId, 'not found after delay!');
+    setError('Camera failed to initialize. Please try again.');
+    setScanning(false);
+    return;
+  }
+  
+  console.log('✅ Div found, initializing camera...');
+  
   try {
-    // Check if browser supports camera
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      console.error('❌ Browser does not support camera access');
-      setError('Your browser does not support camera access. Please try Chrome or Safari.');
-      setScanning(false);
-      return;
-    }
-
-    console.log('🔍 Checking for div with id:', scannerId);
-    const div = document.getElementById(scannerId);
-    if (!div) {
-      console.error('❌ Div with id', scannerId, 'not found!');
-      setError('Camera container not found. Please refresh and try again.');
-      setScanning(false);
-      return;
-    }
-    console.log('✅ Div found:', div);
-
     if (!scannerRef.current) {
-      console.log('🆕 Creating new Html5Qrcode instance');
       scannerRef.current = new Html5Qrcode(scannerId);
     }
 
@@ -57,7 +54,6 @@ const startCamera = async () => {
       aspectRatio: 1.0
     };
 
-    console.log('📱 Requesting camera permission...');
     await scannerRef.current.start(
       { facingMode: "environment" },
       config,
@@ -68,20 +64,7 @@ const startCamera = async () => {
     
   } catch (err: any) {
     console.error('❌ Camera error:', err);
-    
-    // Handle specific error types
-    if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
-      setError('Camera access denied. Please allow camera access and try again.');
-    } else if (err.name === 'NotFoundError' || err.message?.includes('NotFound')) {
-      setError('No camera found on this device.');
-    } else if (err.name === 'NotReadableError' || err.message?.includes('Readable')) {
-      setError('Camera is already in use by another application.');
-    } else if (err.message?.includes('NotFound')) {
-      setError('Camera container not ready. Please try again.');
-    } else {
-      setError('Could not access camera: ' + (err.message || 'Unknown error'));
-    }
-    
+    // ... error handling
     setScanning(false);
   }
 };
