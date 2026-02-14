@@ -22,33 +22,69 @@ export function ScanPage() {
     };
   }, []);
 
-  const startCamera = async () => {
-    setError(null);
-    setScanning(true);
+const startCamera = async () => {
+  console.log('📸 startCamera called');
+  setError(null);
+  setScanning(true);
 
-    try {
-      if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(scannerId);
-      }
-
-      const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-      };
-
-      await scannerRef.current.start(
-        { facingMode: "environment" },
-        config,
-        onScanSuccess,
-        onScanError
-      );
-    } catch (err) {
-      console.error('Camera error:', err);
-      setError('Could not access camera. Please make sure you have granted camera permissions.');
+  try {
+    // Check if browser supports camera
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error('❌ Browser does not support camera access');
+      setError('Your browser does not support camera access. Please try Chrome or Safari.');
       setScanning(false);
+      return;
     }
-  };
+
+    console.log('🔍 Checking for div with id:', scannerId);
+    const div = document.getElementById(scannerId);
+    if (!div) {
+      console.error('❌ Div with id', scannerId, 'not found!');
+      setError('Camera container not found. Please refresh and try again.');
+      setScanning(false);
+      return;
+    }
+    console.log('✅ Div found:', div);
+
+    if (!scannerRef.current) {
+      console.log('🆕 Creating new Html5Qrcode instance');
+      scannerRef.current = new Html5Qrcode(scannerId);
+    }
+
+    const config = { 
+      fps: 10, 
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0
+    };
+
+    console.log('📱 Requesting camera permission...');
+    await scannerRef.current.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess,
+      onScanError
+    );
+    console.log('✅ Camera started successfully');
+    
+  } catch (err: any) {
+    console.error('❌ Camera error:', err);
+    
+    // Handle specific error types
+    if (err.name === 'NotAllowedError' || err.message?.includes('Permission')) {
+      setError('Camera access denied. Please allow camera access and try again.');
+    } else if (err.name === 'NotFoundError' || err.message?.includes('NotFound')) {
+      setError('No camera found on this device.');
+    } else if (err.name === 'NotReadableError' || err.message?.includes('Readable')) {
+      setError('Camera is already in use by another application.');
+    } else if (err.message?.includes('NotFound')) {
+      setError('Camera container not ready. Please try again.');
+    } else {
+      setError('Could not access camera: ' + (err.message || 'Unknown error'));
+    }
+    
+    setScanning(false);
+  }
+};
 
   const stopCamera = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {
