@@ -1,27 +1,23 @@
-// apps/landing/src/lib/supabase.ts
+// apps/landing/src/lib/supabase.ts (and same for restaurant)
 import { createClient } from '@supabase/supabase-js'
 
-// Try multiple ways to get env vars (Vite specific)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Log what we found (for debugging)
-console.log('🔍 Supabase URL found:', supabaseUrl ? '✅' : '❌')
-console.log('🔍 Supabase Key found:', supabaseAnonKey ? '✅' : '❌')
-
-let supabase: ReturnType<typeof createClient> | null = null;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '%c⚠️ Supabase environment variables are missing!\n' +
-    'Please create a .env file in apps/landing with:\n' +
-    'VITE_SUPABASE_URL=your-project-url\n' +
-    'VITE_SUPABASE_ANON_KEY=your-anon-key',
-    'color: orange; font-weight: bold;'
+// Validate key format (anon keys start with 'eyJ')
+if (supabaseAnonKey && !supabaseAnonKey.startsWith('eyJ')) {
+  console.error(
+    '❌ Invalid Supabase anon key format. ' +
+    'Make sure you are using the anon public key, not the service_role key.'
   )
-  // supabase remains null
-} else {
-  supabase = createClient(supabaseUrl, supabaseAnonKey)
 }
 
-export { supabase };
+console.log('🔧 Supabase config:', {
+  url: supabaseUrl ? '✅' : '❌',
+  key: supabaseAnonKey ? '✅' : '❌',
+  keyPrefix: supabaseAnonKey?.substring(0, 10)
+})
+
+export const supabase = supabaseUrl && supabaseAnonKey?.startsWith('eyJ')
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null
