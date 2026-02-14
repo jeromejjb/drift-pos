@@ -1,5 +1,5 @@
 // apps/restaurant/src/config/tabs.ts
-import { Icons, type IconName } from '../components/ui/icons';
+import { type IconName } from '../components/ui/icons';
 
 export interface TabConfig {
   id: string;

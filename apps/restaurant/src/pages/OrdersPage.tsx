@@ -7,7 +7,6 @@ import {
   Coffee, 
   CheckCircle, 
   Search,
-  Filter
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
