@@ -32,6 +32,8 @@ export function Layout({ children, title }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [restaurantName, setRestaurantName] = useState('');
 
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
+
   // Extract restaurantId from current path
   const restaurantId = location.pathname.split('/')[2] || '';
 
@@ -40,7 +42,7 @@ export function Layout({ children, title }: LayoutProps) {
     const fetchRestaurantName = async () => {
       if (restaurantId) {
         try {
-          const response = await fetch(`/api/restaurants/${restaurantId}`);
+          const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
           if (response.ok) {
             const data = await response.json();
             setRestaurantName(data.name);
@@ -52,7 +54,7 @@ export function Layout({ children, title }: LayoutProps) {
     };
 
     fetchRestaurantName();
-  }, [restaurantId]);
+  }, [restaurantId, API_URL]);
 
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },

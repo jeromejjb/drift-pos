@@ -13,6 +13,8 @@ export function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
   
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
+
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -45,7 +47,7 @@ export function SettingsPage() {
 
   const fetchRestaurantDetails = async (restaurantId: string) => {
     try {
-      const response = await fetch(`/api/restaurants/${restaurantId}`);
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
       if (response.ok) {
         const data = await response.json();
         setRestaurant({
@@ -66,13 +68,19 @@ export function SettingsPage() {
     setSaveError('');
     
     try {
-      // In a real app, this would call your API
-      // For now, simulate success
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call the API to update user profile
+      const response = await fetch(`${API_URL}/api/users/${user?.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
       
-      // Mock success
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      if (response.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        throw new Error('Failed to save');
+      }
     } catch (error) {
       setSaveError('Failed to save changes. Please try again.');
     } finally {
@@ -86,10 +94,19 @@ export function SettingsPage() {
     setSaveError('');
     
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      // Call the API to update restaurant details
+      const response = await fetch(`${API_URL}/api/restaurants/${user?.restaurantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(restaurant)
+      });
+      
+      if (response.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        throw new Error('Failed to save');
+      }
     } catch (error) {
       setSaveError('Failed to save restaurant details.');
     } finally {
