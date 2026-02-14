@@ -12,8 +12,20 @@ export function UserMenu() {
 
   const handleSignOut = async () => {
     setSigningOut(true);
-    await supabase.auth.signOut();
-    window.location.href = 'https://drift-landing.onrender.com';
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+      localStorage.removeItem('drift-restaurant-id');
+      localStorage.removeItem('drift-user-email');
+      localStorage.removeItem('drift-dev-mode');
+      window.location.href = 'https://drift-landing.onrender.com';
+    } catch (error) {
+      console.error('Error signing out:', error);
+      window.location.href = 'https://drift-landing.onrender.com';
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   if (!user) return null;
@@ -66,7 +78,7 @@ export function UserMenu() {
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
           >
             {signingOut ? (
               <>
