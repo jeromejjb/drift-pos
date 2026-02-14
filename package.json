@@ -1,0 +1,18 @@
+{
+  "name": "drift",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/diner & npm run dev --workspace=apps/restaurant & npm run dev --workspace=apps/api"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3"
+  },
+  "devDependencies": {
+    "supabase": "^2.76.8"
+  }
+}

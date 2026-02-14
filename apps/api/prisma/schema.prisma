@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Restaurant {
+  id            String         @id @default(cuid())
+  name          String
+  address       String?
+  logo          String?
+  phone         String?
+  stripeAccount String?         @unique(map: "restaurants_stripe_account_unique")
+  timezone      String         @default("America/New_York")
+  supabaseUserId String?        @unique
+  email          String?
+  
+  tables        Table[]
+  categories    MenuCategory[]
+  menuItems     MenuItem[]
+  orders        Order[]
+  
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@unique([stripeAccount], map: "restaurants_stripe_account_idx")
+  @@index([name], map: "restaurants_name_idx")
+  @@index([createdAt], map: "restaurants_created_at_idx")
+  @@map("restaurants")
+}
+
+model Table {
+  id           String     @id @default(cuid())
+  number       Int
+  qrCode       String     @unique(map: "tables_qr_code_unique")
+  section      String?
+  status       TableStatus @default(AVAILABLE)
+  
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders       Order[]
+  
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([restaurantId, number], map: "tables_restaurant_number_unique")
+  @@index([restaurantId], map: "tables_restaurant_id_idx")
+  @@index([status], map: "tables_status_idx")
+  @@map("tables")
+}
+
+model MenuCategory {
+  id           String     @id @default(cuid())
+  name         String
+  sortOrder    Int        @default(0)
+  description  String?
+  
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items        MenuItem[]
+  
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, name], map: "categories_restaurant_name_unique")
+  @@index([restaurantId], map: "categories_restaurant_id_idx")
+  @@index([sortOrder], map: "categories_sort_order_idx")
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id           String       @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  isShared     Boolean      @default(false)
+  isAvailable  Boolean      @default(true)
+  image        String?
+  
+  categoryId   String
+  category     MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+  
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, categoryId, name], map: "items_restaurant_category_name_unique")
+  @@index([restaurantId], map: "items_restaurant_id_idx")
+  @@index([categoryId], map: "items_category_id_idx")
+  @@index([isAvailable], map: "items_available_idx")
+  @@index([price], map: "items_price_idx")
+  @@map("menu_items")
+}
+
+model Order {
+  id           String        @id @default(cuid())
+  status       OrderStatus   @default(PENDING)
+  total        Float
+  tipAmount    Float?        @default(0)
+  guestCount   Int?
+  
+  restaurantId String
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
+  tableId      String
+  table        Table         @relation(fields: [tableId], references: [id])
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  items        OrderItem[]
+  transactions Transaction[]
+  
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  completedAt  DateTime?     @map("completed_at")
+
+  @@index([restaurantId], map: "orders_restaurant_id_idx")
+  @@index([tableId], map: "orders_table_id_idx")
+  @@index([userId], map: "orders_user_id_idx")
+  @@index([status], map: "orders_status_idx")
+  @@index([createdAt], map: "orders_created_at_idx")
+  @@index([restaurantId, status], map: "orders_restaurant_status_idx")
+  @@index([restaurantId, createdAt], map: "orders_restaurant_created_idx")
+  @@index([restaurantId, status, createdAt], map: "orders_restaurant_status_created_idx")
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Int
+  price      Float    @default(0)
+  specialInstructions String?
+  
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  
+  isShared   Boolean  @default(false)
+  isClaimed  Boolean  @default(false)
+  claimedBy  String?
+  claimedAt  DateTime?
+  
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([orderId], map: "order_items_order_id_idx")
+  @@index([menuItemId], map: "order_items_menu_item_id_idx")
+  @@index([userId], map: "order_items_user_id_idx")
+  @@index([isClaimed], map: "order_items_claimed_idx")
+  @@map("order_items")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  amount          Float
+  currency        String            @default("usd")
+  status          TransactionStatus @default(PENDING)
+  stripePaymentId String?           @unique(map: "transactions_payment_id_unique")
+  stripeRefundId  String?
+  
+  orderId         String
+  order           Order             @relation(fields: [orderId], references: [id])
+  userId          String
+  user            User              @relation(fields: [userId], references: [id])
+  
+  type            TransactionType   @default(PAYMENT)
+  
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  succeededAt     DateTime?
+
+  @@unique([stripePaymentId], map: "transactions_payment_id_idx")
+  @@index([orderId], map: "transactions_order_id_idx")
+  @@index([userId], map: "transactions_user_id_idx")
+  @@index([status], map: "transactions_status_idx")
+  @@index([createdAt], map: "transactions_created_at_idx")
+  @@index([type], map: "transactions_type_idx")
+  @@map("transactions")
+}
+
+model User {
+  id               String        @id @default(cuid())
+  name             String?
+  email            String?       @unique(map: "users_email_unique")
+  phone            String?       @unique(map: "users_phone_unique")
+  stripeCustomerId String?       @unique(map: "users_stripe_customer_unique")
+  supabaseId       String?       @unique
+  
+  orders           Order[]
+  transactions     Transaction[]
+  orderItems       OrderItem[]
+  
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  lastLoginAt      DateTime?
+
+  @@unique([email], map: "users_email_idx")
+  @@unique([phone], map: "users_phone_idx")
+  @@unique([stripeCustomerId], map: "users_stripe_customer_idx")
+  @@unique([supabaseId], map: "users_supabase_id_idx")
+  @@index([createdAt], map: "users_created_at_idx")
+  @@map("users")
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+  PARTIAL_REFUND
+  P2P
+}

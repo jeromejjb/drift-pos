@@ -1,0 +1,66 @@
+# drift/render.yaml
+services:
+  # PostgreSQL Database
+  - type: postgresql
+    name: drift-db
+    plan: free
+    ipAllowList: [] # Allow only internal connections
+    database: drift
+    user: drift_user
+
+  # API Backend
+  - type: web
+    name: drift-api
+    runtime: node
+    plan: free
+    buildCommand: cd apps/api && npm install && npx prisma generate
+    startCommand: cd apps/api && npm start
+    preDeployCommand: cd apps/api && npx prisma migrate deploy
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: drift-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DINER_URL
+        value: https://drift-diner.onrender.com
+      - key: RESTAURANT_URL
+        value: https://drift-restaurant.onrender.com
+
+  # Diner Frontend
+  - type: static
+    name: drift-diner
+    buildCommand: cd apps/diner && npm install && npm run build
+    publishPath: apps/diner/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://drift-api.onrender.com
+
+  # Restaurant Frontend
+  - type: static
+    name: drift-restaurant
+    buildCommand: cd apps/restaurant && npm install && npm run build
+    publishPath: apps/restaurant/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://drift-api.onrender.com
+      - key: VITE_SUPABASE_URL
+        sync: false  # Set manually in dashboard
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false  # Set manually in dashboard
+
+  # Landing Page
+  - type: static
+    name: drift-landing
+    buildCommand: cd apps/landing && npm install && npm run build
+    publishPath: apps/landing/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://drift-api.onrender.com
+      - key: VITE_SUPABASE_URL
+        sync: false  # Set manually in dashboard
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false  # Set manually in dashboard
