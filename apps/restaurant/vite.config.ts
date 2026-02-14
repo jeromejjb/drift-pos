@@ -1,35 +1,34 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss() as any,  // Add 'as any' to fix type error
-  ],
-  server: {
-    port: 5173,
-    strictPort: false, // Allow fallback to next available port
-    host: true, // Expose to network for mobile testing
-  },
-  preview: {
-    port: 5173,
-    host: true,
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['lucide-react'],
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode`
+  const env = loadEnv(mode, process.cwd(), '')
+  
+  return {
+    plugins: [
+      react(),
+      tailwindcss() as any,
+    ],
+    define: {
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://drift-api.onrender.com')
+    },
+    server: {
+      port: 5174,
+      host: true,
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            ui: ['lucide-react', 'framer-motion'],
+          },
         },
       },
     },
-  },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'lucide-react'],
-  },
+  }
 })
