@@ -1,21 +1,20 @@
-# drift/render.yaml
 services:
   # PostgreSQL Database
-  - type: postgresql
+  - type: pserv
     name: drift-db
     plan: free
-    ipAllowList: [] # Allow only internal connections
-    database: drift
-    user: drift_user
+    region: oregon
 
-  # API Backend
+  # API Backend - Web Service
   - type: web
     name: drift-api
     runtime: node
     plan: free
-    buildCommand: cd apps/api && npm install && npx prisma generate
-    startCommand: cd apps/api && npm start
-    preDeployCommand: cd apps/api && npx prisma migrate deploy
+    region: oregon
+    rootDir: apps/api
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    preDeployCommand: npx prisma migrate deploy
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -29,38 +28,49 @@ services:
         value: https://drift-diner.onrender.com
       - key: RESTAURANT_URL
         value: https://drift-restaurant.onrender.com
+      - key: LANDING_URL
+        value: https://drift-landing.onrender.com
 
-  # Diner Frontend
+  # Diner Frontend - Static Site
   - type: static
     name: drift-diner
-    buildCommand: cd apps/diner && npm install && npm run build
-    publishPath: apps/diner/dist
+    plan: free
+    region: oregon
+    rootDir: apps/diner
+    buildCommand: npm install && npm run build
+    publishPath: dist
     envVars:
       - key: VITE_API_URL
         value: https://drift-api.onrender.com
 
-  # Restaurant Frontend
+  # Restaurant Frontend - Static Site
   - type: static
     name: drift-restaurant
-    buildCommand: cd apps/restaurant && npm install && npm run build
-    publishPath: apps/restaurant/dist
+    plan: free
+    region: oregon
+    rootDir: apps/restaurant
+    buildCommand: npm install && npm run build
+    publishPath: dist
     envVars:
       - key: VITE_API_URL
         value: https://drift-api.onrender.com
       - key: VITE_SUPABASE_URL
-        sync: false  # Set manually in dashboard
+        value: https://kywpomnuqfypfgxagnib.supabase.co  # Replace with actual value
       - key: VITE_SUPABASE_ANON_KEY
-        sync: false  # Set manually in dashboard
+        value: sb_secret_gtes5uYZz-itbhcAd2oTmw_5uoJR6-D  # Replace with actual value
 
-  # Landing Page
+  # Landing Page - Static Site
   - type: static
     name: drift-landing
-    buildCommand: cd apps/landing && npm install && npm run build
-    publishPath: apps/landing/dist
+    plan: free
+    region: oregon
+    rootDir: apps/landing
+    buildCommand: npm install && npm run build
+    publishPath: dist
     envVars:
       - key: VITE_API_URL
         value: https://drift-api.onrender.com
       - key: VITE_SUPABASE_URL
-        sync: false  # Set manually in dashboard
+        value: https://kywpomnuqfypfgxagnib.supabase.co  # Replace with actual value
       - key: VITE_SUPABASE_ANON_KEY
-        sync: false  # Set manually in dashboard
+        value: sb_secret_gtes5uYZz-itbhcAd2oTmw_5uoJR6-D  # Replace with actual value
