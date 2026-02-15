@@ -1,4 +1,4 @@
-import { Smartphone, Users, CreditCard, Clock, ShoppingBag, Coffee, Store, Pizza } from 'lucide-react';
+import { Smartphone, Users, CreditCard, Clock, ShoppingBag, Store } from 'lucide-react';
 
 const features = [
   {
@@ -66,7 +66,7 @@ export function Features() {
               <h3 className="text-xl font-light text-gray-900 mb-2">{feature.title}</h3>
               <p className="text-gray-400 text-sm mb-4 leading-relaxed">{feature.description}</p>
               
-              {/* Use case tags - shows breadth without being limiting */}
+              {/* Use case tags */}
               <div className="flex flex-wrap gap-2 mt-4">
                 {feature.useCases.slice(0, 2).map((useCase, idx) => (
                   <span key={idx} className="text-xs text-gray-300">
