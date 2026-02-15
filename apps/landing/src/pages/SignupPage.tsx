@@ -13,7 +13,7 @@ export function SignupPage() {
     agreeTerms: false
   });
 
-  // 🔥 HARDCODED PRODUCTION URLS - NO MORE ENV VARS!
+  // Production URLs - hardcoded for reliability
   const API_URL = 'https://drift-api-7vs7.onrender.com';
   const RESTAURANT_URL = 'https://drift-restaurant.onrender.com';
 
@@ -23,7 +23,7 @@ export function SignupPage() {
     setError('');
     
     try {
-      console.log('🚀 Using PRODUCTION URLs:', { API_URL, RESTAURANT_URL });
+      console.log('🚀 Signup started with:', { email: formData.email });
       
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
@@ -44,30 +44,26 @@ export function SignupPage() {
         throw new Error(data.error || 'Failed to create account');
       }
 
-      // Save auth info
+      // Save auth info for later (after onboarding)
       localStorage.setItem('drift-token', data.token);
       localStorage.setItem('drift-restaurant-id', data.restaurantId);
       localStorage.setItem('drift-user-email', formData.email);
 
-      // Direct to onboarding with restaurant ID - USING HARDCODED URL
+      // DIRECT to onboarding - NO LOGIN PAGE
       const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}`;
-      console.log('🚀 Redirecting to:', redirectUrl);
+      console.log('🚀 Redirecting to onboarding:', redirectUrl);
       
+      // Use window.location for full page redirect
       window.location.href = redirectUrl;
       
     } catch (err) {
-      console.error('Signup error:', err);
+      console.error('❌ Signup error:', err);
       setError(err instanceof Error ? err.message : 'Failed to create account');
       setLoading(false);
     }
   };
 
-  console.log('🔧 SignupPage loaded with hardcoded URLs:');
-  console.log('API_URL:', API_URL);
-  console.log('RESTAURANT_URL:', RESTAURANT_URL);
-
   return (
-    // ... rest of your JSX remains exactly the same
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel - Professional features */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 to-gray-800 relative overflow-hidden p-16 text-white flex-col justify-between">

@@ -51,9 +51,8 @@ export function OnboardingPage() {
     console.log('Full URL:', window.location.href);
     
     if (!id) {
-      console.log('❌ No restaurantId found in URL');
+      console.log('❌ No restaurantId found - showing error');
       // Show error instead of redirecting
-      setError('No restaurant ID provided. Please go back to signup.');
       return;
     }
     
@@ -71,7 +70,7 @@ export function OnboardingPage() {
         console.error('Error loading saved progress:', e);
       }
     }
-  }, [searchParams]); // Remove navigate from dependencies
+  }, [searchParams]);
 
   useEffect(() => {
     if (restaurantId) {
@@ -104,6 +103,7 @@ export function OnboardingPage() {
   const CurrentStepComponent = steps[currentStep].component;
   const progress = ((currentStep + 1) / steps.length) * 100;
 
+  // If no restaurantId yet, show error
   if (!restaurantId) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -125,7 +125,6 @@ export function OnboardingPage() {
   }
 
   return (
-    // ... rest of your JSX remains the same
     <div className="min-h-screen bg-gray-50">
       {/* Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-gray-200 z-50">
@@ -229,8 +228,4 @@ export function OnboardingPage() {
       </div>
     </div>
   );
-}
-
-function setError(arg0: string) {
-  throw new Error('Function not implemented.');
 }
