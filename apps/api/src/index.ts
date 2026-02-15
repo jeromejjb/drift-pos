@@ -772,9 +772,15 @@ app.post('/api/test/create-order', async (req, res) => {
   }
 });
 
-// ==================== DEMO SCHEDULING ENDPOINTS ====================
 
-// Submit a demo request
+
+// ==================== DEMO SCHEDULING ENDPOINTS ====================
+// Production-ready endpoints for managing demo requests
+
+/**
+ * Submit a new demo request
+ * POST /api/demo/schedule
+ */
 app.post('/api/demo/schedule', async (req, res) => {
   try {
     const { 
@@ -801,129 +807,471 @@ app.post('/api/demo/schedule', async (req, res) => {
     if (!name || !email || !restaurant || !date || !time) {
       return res.status(400).json({ 
         error: 'Missing required fields',
-        required: ['name', 'email', 'restaurant', 'date', 'time'],
-        received: { name, email, restaurant, date, time }
+        required: ['name', 'email', 'restaurant', 'date', 'time']
       });
     }
 
-    // OPTION 1: Save to database (if you have a DemoRequest model)
-    /*
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        error: 'Invalid email format'
+      });
+    }
+
+    // Validate date is in the future
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      return res.status(400).json({ 
+        error: 'Selected date must be in the future'
+      });
+    }
+
+    // Check for duplicate requests (same email within last 24 hours)
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    const existingRequest = await prisma.demoRequest.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        createdAt: {
+          gte: oneDayAgo
+        }
+      }
+    });
+
+    if (existingRequest) {
+      return res.status(429).json({ 
+        error: 'A demo request from this email was already submitted recently. We\'ll be in touch soon!'
+      });
+    }
+
+    // Save to database
     const demoRequest = await prisma.demoRequest.create({
       data: {
-        name,
-        email,
-        phone,
-        restaurantName: restaurant,
-        role,
-        teamSize,
-        preferredDate: new Date(date),
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        phone: phone?.trim() || null,
+        restaurantName: restaurant.trim(),
+        role: role || null,
+        teamSize: teamSize || null,
+        preferredDate: selectedDate,
         preferredTime: time,
-        message,
+        message: message?.trim() || null,
         status: 'PENDING'
       }
     });
-    */
 
-    // OPTION 2: Send email notification (using your email service)
-    // You can integrate with SendGrid, Resend, AWS SES, etc.
-    
-    // For now, just log it and return success
-    console.log('✅ Demo request logged:', {
-      name,
-      email,
-      restaurant,
-      date,
-      time
-    });
+    console.log('✅ Demo request saved with ID:', demoRequest.id);
 
-    // OPTION 3: Send to Slack (uncomment and add webhook URL)
-    /*
+    // Send notification to Slack (if configured)
     if (process.env.SLACK_WEBHOOK_URL) {
-      await fetch(process.env.SLACK_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: `🚀 New Demo Request from ${restaurant}`,
+      try {
+        const slackMessage = {
+          text: `🚀 New Demo Request: ${restaurant}`,
           blocks: [
+            {
+              type: 'header',
+              text: {
+                type: 'plain_text',
+                text: '📅 New Demo Request',
+                emoji: true
+              }
+            },
             {
               type: 'section',
               fields: [
                 { type: 'mrkdwn', text: `*Name:*\n${name}` },
-                { type: 'mrkdwn', text: `*Email:*\n${email}` },
-                { type: 'mrkdwn', text: `*Restaurant:*\n${restaurant}` },
-                { type: 'mrkdwn', text: `*Date:*\n${date} at ${time}` },
-                { type: 'mrkdwn', text: `*Role:*\n${role || 'Not specified'}` },
-                { type: 'mrkdwn', text: `*Team Size:*\n${teamSize || 'Not specified'}` }
+                { type: 'mrkdwn', text: `*Email:*\n${email}` }
               ]
             },
             {
               type: 'section',
-              text: { type: 'mrkdwn', text: `*Message:*\n${message || 'No message'}` }
+              fields: [
+                { type: 'mrkdwn', text: `*Restaurant:*\n${restaurant}` },
+                { type: 'mrkdwn', text: `*Date:*\n${date} at ${time}` }
+              ]
             }
           ]
-        })
-      });
-    }
-    */
+        };
 
-    // OPTION 4: Send email (example with console.log)
-    console.log(`
-📧 ===== DEMO REQUEST =====
-Name: ${name}
-Email: ${email}
-Phone: ${phone || 'Not provided'}
-Restaurant: ${restaurant}
-Role: ${role || 'Not specified'}
-Team Size: ${teamSize || 'Not specified'}
-Preferred: ${date} at ${time}
-Message: ${message || 'No message'}
-=========================
-    `);
+        await fetch(process.env.SLACK_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(slackMessage)
+        });
+      } catch (slackError) {
+        // Don't fail the request if Slack notification fails
+        console.error('⚠️ Slack notification failed:', slackError);
+      }
+    }
 
     res.status(201).json({ 
       success: true, 
-      message: 'Demo scheduled successfully',
-      data: {
-        name,
-        email,
-        restaurant,
-        date,
-        time
-      }
+      message: 'Demo scheduled successfully! We\'ll contact you within 24 hours.',
+      id: demoRequest.id
     });
 
   } catch (error) {
     console.error('❌ Error scheduling demo:', error);
+    
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return res.status(500).json({ 
+        error: 'Database error occurred',
+        code: error.code
+      });
+    }
+    
     res.status(500).json({ 
-      error: 'Failed to schedule demo',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to schedule demo. Please try again later.'
     });
   }
 });
 
-// Get all demo requests (admin only - add auth later)
+/**
+ * Get all demo requests (paginated)
+ * GET /api/demo/requests
+ */
 app.get('/api/demo/requests', async (req, res) => {
   try {
-    // This would require authentication in production
-    // For now, just return a message
-    res.json({ 
-      message: 'Demo requests endpoint - add authentication first',
-      note: 'This should be protected in production'
-    });
+    const { status, limit = '50', page = '1' } = req.query;
     
-    // When you have a DemoRequest model:
-    /*
+    const pageSize = Math.min(parseInt(limit as string), 100); // Max 100 per page
+    const pageNumber = Math.max(parseInt(page as string), 1);
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Build where clause
+    const where: any = {};
+    if (status) {
+      where.status = status;
+    }
+
+    // Get total count
+    const totalCount = await prisma.demoRequest.count({ where });
+
+    // Fetch requests
     const requests = await prisma.demoRequest.findMany({
-      orderBy: { createdAt: 'desc' }
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: pageSize,
+      skip
     });
-    res.json(requests);
-    */
+
+    res.json({
+      data: requests,
+      pagination: {
+        total: totalCount,
+        page: pageNumber,
+        limit: pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: pageNumber < Math.ceil(totalCount / pageSize),
+        hasPrevPage: pageNumber > 1
+      }
+    });
+
   } catch (error) {
-    console.error('Error fetching demo requests:', error);
+    console.error('❌ Error fetching demo requests:', error);
     res.status(500).json({ error: 'Failed to fetch demo requests' });
   }
 });
 
+/**
+ * Get demo request by ID
+ * GET /api/demo/requests/:id
+ */
+app.get('/api/demo/requests/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const request = await prisma.demoRequest.findUnique({
+      where: { id }
+    });
+    
+    if (!request) {
+      return res.status(404).json({ error: 'Demo request not found' });
+    }
+    
+    res.json(request);
+
+  } catch (error) {
+    console.error('❌ Error fetching demo request:', error);
+    res.status(500).json({ error: 'Failed to fetch demo request' });
+  }
+});
+
+/**
+ * Update demo request status
+ * PATCH /api/demo/requests/:id/status
+ */
+app.patch('/api/demo/requests/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    // Validate status
+    const validStatuses = ['PENDING', 'CONTACTED', 'COMPLETED', 'CANCELLED'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Invalid status',
+        validStatuses
+      });
+    }
+    
+    // Check if request exists
+    const existing = await prisma.demoRequest.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Demo request not found' });
+    }
+
+    // Update status
+    const request = await prisma.demoRequest.update({
+      where: { id },
+      data: { 
+        status,
+        updatedAt: new Date()
+      }
+    });
+
+    console.log(`✅ Demo request ${id} status updated to: ${status}`);
+    res.json(request);
+
+  } catch (error) {
+    console.error('❌ Error updating demo request:', error);
+    res.status(500).json({ error: 'Failed to update demo request' });
+  }
+});
+
+/**
+ * Get demo request statistics
+ * GET /api/demo/stats
+ */
+app.get('/api/demo/stats', async (req, res) => {
+  try {
+    // Get counts by status
+    const statusCounts = await prisma.demoRequest.groupBy({
+      by: ['status'],
+      _count: true
+    });
+
+    // Get today's requests
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayCount = await prisma.demoRequest.count({
+      where: {
+        createdAt: {
+          gte: today
+        }
+      }
+    });
+
+    // Get this week's requests
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    const weekCount = await prisma.demoRequest.count({
+      where: {
+        createdAt: {
+          gte: weekAgo
+        }
+      }
+    });
+
+    // Get this month's requests
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+    
+    const monthCount = await prisma.demoRequest.count({
+      where: {
+        createdAt: {
+          gte: monthAgo
+        }
+      }
+    });
+
+    // Format status counts
+    const byStatus = statusCounts.reduce((acc: any, curr) => {
+      acc[curr.status] = curr._count;
+      return acc;
+    }, {});
+
+    res.json({
+      total: await prisma.demoRequest.count(),
+      today: todayCount,
+      thisWeek: weekCount,
+      thisMonth: monthCount,
+      byStatus: {
+        pending: byStatus.PENDING || 0,
+        contacted: byStatus.CONTACTED || 0,
+        completed: byStatus.COMPLETED || 0,
+        cancelled: byStatus.CANCELLED || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching demo stats:', error);
+    res.status(500).json({ error: 'Failed to fetch demo statistics' });
+  }
+});
+
+/**
+ * Delete demo request
+ * DELETE /api/demo/requests/:id
+ */
+app.delete('/api/demo/requests/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if request exists
+    const existing = await prisma.demoRequest.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Demo request not found' });
+    }
+
+    // Delete from database
+    await prisma.demoRequest.delete({
+      where: { id }
+    });
+
+    console.log(`✅ Demo request ${id} deleted`);
+    res.json({ success: true, message: 'Demo request deleted' });
+
+  } catch (error) {
+    console.error('❌ Error deleting demo request:', error);
+    
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ error: 'Demo request not found' });
+    }
+    
+    res.status(500).json({ error: 'Failed to delete demo request' });
+  }
+});
+
+/**
+ * Export demo requests as CSV
+ * GET /api/demo/export/csv
+ */
+app.get('/api/demo/export/csv', async (req, res) => {
+  try {
+    const { status, startDate, endDate } = req.query;
+    
+    // Build where clause
+    const where: any = {};
+    if (status) where.status = status;
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate as string);
+      if (endDate) where.createdAt.lte = new Date(endDate as string);
+    }
+
+    // Fetch all requests (no pagination for export)
+    const requests = await prisma.demoRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Create CSV header
+    const csvRows = [];
+    csvRows.push([
+      'ID',
+      'Name',
+      'Email',
+      'Phone',
+      'Restaurant',
+      'Role',
+      'Team Size',
+      'Preferred Date',
+      'Preferred Time',
+      'Message',
+      'Status',
+      'Created At'
+    ].join(','));
+
+    // Add data rows
+    for (const req of requests) {
+      csvRows.push([
+        req.id,
+        `"${req.name}"`,
+        req.email,
+        req.phone || '',
+        `"${req.restaurantName}"`,
+        req.role || '',
+        req.teamSize || '',
+        req.preferredDate.toISOString().split('T')[0],
+        req.preferredTime,
+        `"${(req.message || '').replace(/"/g, '""')}"`,
+        req.status,
+        req.createdAt.toISOString()
+      ].join(','));
+    }
+
+    const csv = csvRows.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=demo-requests.csv');
+    res.send(csv);
+
+  } catch (error) {
+    console.error('❌ Error exporting demo requests:', error);
+    res.status(500).json({ error: 'Failed to export demo requests' });
+  }
+});
+
+/**
+ * Bulk update demo request statuses
+ * POST /api/demo/requests/bulk/status
+ */
+app.post('/api/demo/requests/bulk/status', async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Invalid or missing ids array' });
+    }
+
+    // Validate status
+    const validStatuses = ['PENDING', 'CONTACTED', 'COMPLETED', 'CANCELLED'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Invalid status',
+        validStatuses
+      });
+    }
+
+    // Update all matching requests
+    const result = await prisma.demoRequest.updateMany({
+      where: {
+        id: {
+          in: ids
+        }
+      },
+      data: {
+        status,
+        updatedAt: new Date()
+      }
+    });
+
+    console.log(`✅ Bulk updated ${result.count} demo requests to status: ${status}`);
+    res.json({ 
+      success: true, 
+      count: result.count,
+      message: `Updated ${result.count} requests`
+    });
+
+  } catch (error) {
+    console.error('❌ Error bulk updating demo requests:', error);
+    res.status(500).json({ error: 'Failed to bulk update demo requests' });
+  }
+});
 
 // ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
