@@ -46,11 +46,22 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showQuickOrder, setShowQuickOrder] = useState(false);
+  const [restaurantName, setRestaurantName] = useState('');
+
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   useEffect(() => {
     fetchDashboardData();
+    fetchRestaurantDetails();
     
-    const socket = io(import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com');
+    const socket = io(API_URL);
     socket.emit('join-restaurant', restaurantId);
     
     socket.on('order-updated', () => {
@@ -62,14 +73,25 @@ export function DashboardPage() {
     };
   }, [restaurantId]);
 
+  const fetchRestaurantDetails = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setRestaurantName(data.name);
+      }
+    } catch (error) {
+      console.error('Error fetching restaurant:', error);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       setRefreshing(true);
       
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
       const [statsRes, ordersRes] = await Promise.all([
-        fetch(`${apiUrl}/api/restaurant/${restaurantId}/stats`),
-        fetch(`${apiUrl}/api/restaurant/${restaurantId}/orders`)
+        fetch(`${API_URL}/api/restaurant/${restaurantId}/stats`),
+        fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`)
       ]);
       
       const statsData = await statsRes.json();
@@ -144,8 +166,8 @@ export function DashboardPage() {
       {/* Welcome header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-light">Good evening,</h2>
-          <p className="text-gray-400">Your Restaurant</p>
+          <h2 className="text-2xl font-light">{getGreeting()},</h2>
+          <p className="text-gray-400">{restaurantName || 'Your Restaurant'}</p>
         </div>
         <button 
           onClick={fetchDashboardData}

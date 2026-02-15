@@ -905,6 +905,104 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
   }
 });
 
+// ==================== MENU MANAGEMENT ENDPOINTS ====================
+
+// Create a new menu item
+app.post('/api/menu/items', async (req, res) => {
+  try {
+    const { name, description, price, categoryId, restaurantId, isAvailable } = req.body;
+    
+    console.log('📝 Creating menu item:', { name, categoryId, restaurantId });
+    
+    if (!name || !price || !categoryId || !restaurantId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        received: { name, price, categoryId, restaurantId }
+      });
+    }
+    
+    const menuItem = await prisma.menuItem.create({
+      data: {
+        name,
+        description,
+        price: parseFloat(price),
+        categoryId,
+        restaurantId,
+        isAvailable: isAvailable ?? true
+      }
+    });
+    
+    console.log('✅ Menu item created:', menuItem.id);
+    res.status(201).json(menuItem);
+    
+  } catch (error) {
+    console.error('❌ Error creating menu item:', error);
+    res.status(500).json({ 
+      error: 'Failed to create menu item',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Update a menu item
+app.patch('/api/menu/items/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { name, description, price, isAvailable } = req.body;
+    
+    const menuItem = await prisma.menuItem.update({
+      where: { id: itemId },
+      data: {
+        name,
+        description,
+        price: price ? parseFloat(price) : undefined,
+        isAvailable
+      }
+    });
+    
+    res.json(menuItem);
+  } catch (error) {
+    console.error('Error updating menu item:', error);
+    res.status(500).json({ error: 'Failed to update menu item' });
+  }
+});
+
+// Delete a menu item
+app.delete('/api/menu/items/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    await prisma.menuItem.delete({
+      where: { id: itemId }
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting menu item:', error);
+    res.status(500).json({ error: 'Failed to delete menu item' });
+  }
+});
+
+// Create a new category
+app.post('/api/menu/categories', async (req, res) => {
+  try {
+    const { name, restaurantId } = req.body;
+    
+    const category = await prisma.menuCategory.create({
+      data: {
+        name,
+        restaurantId,
+        sortOrder: 0
+      }
+    });
+    
+    res.json(category);
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
 const portNumber = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
