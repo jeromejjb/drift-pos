@@ -45,17 +45,21 @@ export function OnboardingPage() {
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
   useEffect(() => {
+    // Get restaurantId from URL
     const id = searchParams.get('restaurantId');
     console.log('📦 Onboarding page loaded with restaurantId:', id);
+    console.log('Full URL:', window.location.href);
     
     if (!id) {
-      console.log('❌ No restaurantId found - this should not happen from signup');
-      // Instead of redirecting to login, show an error
+      console.log('❌ No restaurantId found in URL');
+      // Show error instead of redirecting
+      setError('No restaurant ID provided. Please go back to signup.');
       return;
     }
     
     setRestaurantId(id);
 
+    // Load saved progress from localStorage
     const saved = localStorage.getItem(`onboarding-${id}`);
     if (saved) {
       try {
@@ -67,7 +71,7 @@ export function OnboardingPage() {
         console.error('Error loading saved progress:', e);
       }
     }
-  }, [searchParams]);
+  }, [searchParams]); // Remove navigate from dependencies
 
   useEffect(() => {
     if (restaurantId) {
@@ -107,7 +111,7 @@ export function OnboardingPage() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">⚠️</span>
           </div>
-          <h2 className="text-2xl font-light mb-2">Something went wrong</h2>
+          <h2 className="text-2xl font-light mb-2">Missing Restaurant ID</h2>
           <p className="text-gray-400 mb-4">No restaurant ID provided. Please go back to signup.</p>
           <button
             onClick={() => window.location.href = 'https://drift-landing.onrender.com/signup'}
@@ -121,6 +125,7 @@ export function OnboardingPage() {
   }
 
   return (
+    // ... rest of your JSX remains the same
     <div className="min-h-screen bg-gray-50">
       {/* Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-gray-200 z-50">
@@ -224,4 +229,8 @@ export function OnboardingPage() {
       </div>
     </div>
   );
+}
+
+function setError(arg0: string) {
+  throw new Error('Function not implemented.');
 }
