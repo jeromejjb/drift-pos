@@ -4,27 +4,27 @@ export function HowItWorks() {
   const steps = [
     {
       icon: <QrCode className="w-8 h-8" />,
-      title: "1. Scan & connect",
-      description: "Customers scan a QR code at their table, bar, or counter. No app download required — just open their camera and they're in.",
+      title: "Scan & connect",
+      description: "Customers scan a QR code at their table, bar, or counter. No app download required.",
       details: "Works with any smartphone. No accounts, no passwords."
     },
     {
       icon: <Smartphone className="w-8 h-8" />,
-      title: "2. Browse & order",
-      description: "Customers see your full menu, customize items, and place orders directly from their phone. Real-time updates to your kitchen.",
-      details: "Special requests, modifiers, and quantities all handled instantly."
+      title: "Browse & order",
+      description: "Customers see your full menu and place orders directly from their phone.",
+      details: "Special requests and modifiers handled instantly."
     },
     {
       icon: <Users className="w-8 h-8" />,
-      title: "3. Split or claim",
-      description: "Groups can split bills by item, equally, or custom amounts. Perfect for friends sharing appetizers or couples dining together.",
-      details: "Each person pays for exactly what they ordered — no awkward math."
+      title: "Split or claim",
+      description: "Groups can split bills by item, equally, or custom amounts.",
+      details: "Each person pays for exactly what they ordered."
     },
     {
       icon: <CreditCard className="w-8 h-8" />,
-      title: "4. Pay & go",
-      description: "One tap pays the bill. Tips included. Customers get a digital receipt via text or email. No waiting for the check.",
-      details: "Secure payments processed instantly. Lower fees than traditional POS."
+      title: "Pay & go",
+      description: "One tap pays the bill. Digital receipt via text or email.",
+      details: "Secure payments processed instantly."
     }
   ];
 
@@ -46,41 +46,29 @@ export function HowItWorks() {
           </p>
         </div>
 
-        {/* Steps */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
+        {/* Steps Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-20">
           {steps.map((step, index) => (
             <div key={index} className="relative">
-              {/* Connector line (except last) */}
-              {index < steps.length - 1 && (
-                <div className="hidden lg:block absolute top-12 left-[60%] w-full h-0.5">
-                  <div className="relative">
-                    <div className="absolute top-0 left-0 w-16 h-0.5 bg-gray-200">
-                      <ArrowRight className="absolute -right-2 -top-2 w-4 h-4 text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Step number indicator */}
+              <div className="text-5xl font-light text-gray-100 absolute -top-6 -left-2 -z-10">
+                0{index + 1}
+              </div>
               
-              <div className="text-center">
-                {/* Icon circle */}
-                <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
-                  <div className="text-gray-700">
-                    {step.icon}
-                  </div>
+              <div>
+                {/* Icon */}
+                <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mb-6 text-white">
+                  {step.icon}
                 </div>
                 
-                {/* Step title */}
+                {/* Content */}
                 <h3 className="text-xl font-light text-gray-900 mb-3">
                   {step.title}
                 </h3>
-                
-                {/* Main description */}
                 <p className="text-gray-500 text-sm mb-3 leading-relaxed">
                   {step.description}
                 </p>
-                
-                {/* Additional detail */}
-                <p className="text-xs text-gray-400 italic">
+                <p className="text-xs text-gray-400">
                   {step.details}
                 </p>
               </div>
@@ -88,91 +76,61 @@ export function HowItWorks() {
           ))}
         </div>
 
-        {/* Visual demo section */}
+        {/* Demo preview */}
         <div className="bg-gray-50 rounded-3xl p-8 md:p-12">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            {/* Left side - customer view */}
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full mb-6 border border-gray-200">
-                <Smartphone className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-medium text-gray-600">Customer experience</span>
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            {/* Left side - phone mockup */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white text-xs">
+                  📱
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Customer view</div>
+                  <div className="text-xs text-gray-400">What your customers see</div>
+                </div>
               </div>
-              
-              <h4 className="text-2xl font-light text-gray-900 mb-4">
-                What your customers see
-              </h4>
-              
-              <ul className="space-y-4">
+              <div className="space-y-3">
                 {[
-                  'Clean menu with photos and descriptions',
-                  'Real-time order status updates',
-                  'Easy bill splitting with friends',
-                  'Digital receipts via text or email'
+                  'Menu with photos',
+                  'Real-time order status',
+                  'Easy bill splitting',
+                  'Digital receipt'
                 ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="text-green-500 text-lg">✓</span>
-                    <span className="text-gray-500 text-sm">{item}</span>
-                  </li>
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-green-500 text-sm">✓</span>
+                    <span className="text-xs text-gray-600">{item}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
 
-            {/* Right side - business view */}
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full mb-6 border border-gray-200">
-                <Users className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-medium text-gray-600">Business dashboard</span>
+            {/* Right side - business dashboard */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white text-xs">
+                  📊
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Business dashboard</div>
+                  <div className="text-xs text-gray-400">What you get</div>
+                </div>
               </div>
-              
-              <h4 className="text-2xl font-light text-gray-900 mb-4">
-                What you get
-              </h4>
-              
-              <ul className="space-y-4">
+              <div className="space-y-3">
                 {[
-                  'Real-time order notifications',
-                  'Kitchen display system integration',
-                  'Customer insights and analytics',
-                  'Lower transaction fees than traditional POS'
+                  'Real-time notifications',
+                  'Kitchen display',
+                  'Customer insights',
+                  'Lower fees'
                 ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="text-green-500 text-lg">✓</span>
-                    <span className="text-gray-500 text-sm">{item}</span>
-                  </li>
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-green-500 text-sm">✓</span>
+                    <span className="text-xs text-gray-600">{item}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
-
-          {/* Stats preview */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 pt-8 border-t border-gray-200">
-            <div className="text-center">
-              <div className="text-2xl font-light text-gray-900">15 sec</div>
-              <div className="text-xs text-gray-400">Average scan to order</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-light text-gray-900">98%</div>
-              <div className="text-xs text-gray-400">Customers prefer digital</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-light text-gray-900">30%</div>
-              <div className="text-xs text-gray-400">Faster table turnover</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-light text-gray-900">24/7</div>
-              <div className="text-xs text-gray-400">Orders anytime</div>
-            </div>
-          </div>
-        </div>
-
-        {/* FAQ teaser */}
-        <div className="text-center mt-16">
-          <p className="text-sm text-gray-400">
-            Have more questions?{' '}
-            <a href="#faq" className="text-gray-900 border-b border-gray-300 hover:border-gray-900 transition-colors">
-              Check our FAQ
-            </a>
-          </p>
         </div>
       </div>
     </section>
