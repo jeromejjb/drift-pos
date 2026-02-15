@@ -60,6 +60,10 @@ export function SignupPage() {
     }
   };
 
+  console.log('🔧 SignupPage loaded');
+console.log('VITE_RESTAURANT_URL:', import.meta.env.VITE_RESTAURANT_URL);
+console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel - Professional features */}

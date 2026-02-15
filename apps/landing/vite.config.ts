@@ -16,10 +16,15 @@ export default defineConfig(({ mode }) => {
         closeBundle: () => {
           const source = resolve(__dirname, 'public/_redirects');
           const dest = resolve(__dirname, 'dist/_redirects');
-          
+          console.log('📁 Copying _redirects from:', source);
           if (existsSync(source)) {
             copyFileSync(source, dest);
             console.log('✅ _redirects copied to dist');
+            // Verify content
+            const content = require('fs').readFileSync(dest, 'utf8');
+            console.log('📄 Content:', content.trim());
+          } else {
+            console.log('❌ _redirects not found in public folder');
           }
         }
       }
