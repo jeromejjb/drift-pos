@@ -7,14 +7,15 @@ export function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    businessName: '', // Changed from restaurantName to be more generic
+    businessName: '',
     email: '',
     password: '',
     agreeTerms: false
   });
 
-  // Use environment variable for API URL
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  // 🔥 HARDCODED PRODUCTION URLS - NO MORE ENV VARS!
+  const API_URL = 'https://drift-api-7vs7.onrender.com';
+  const RESTAURANT_URL = 'https://drift-restaurant.onrender.com';
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,17 +23,18 @@ export function SignupPage() {
     setError('');
     
     try {
-      // Call the auth/register endpoint instead of restaurants directly
+      console.log('🚀 Using PRODUCTION URLs:', { API_URL, RESTAURANT_URL });
+      
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.businessName, // User's name (you might want to add a name field)
+          name: formData.businessName,
           email: formData.email,
           password: formData.password,
-          restaurantName: formData.businessName // Business name for the restaurant
+          restaurantName: formData.businessName
         }),
       });
 
@@ -47,11 +49,11 @@ export function SignupPage() {
       localStorage.setItem('drift-restaurant-id', data.restaurantId);
       localStorage.setItem('drift-user-email', formData.email);
 
-      // Get the restaurant app URL from env or default
-      const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'http://localhost:5174';
+      // Direct to onboarding with restaurant ID - USING HARDCODED URL
+      const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}`;
+      console.log('🚀 Redirecting to:', redirectUrl);
       
-      // Direct to onboarding with restaurant ID
-      window.location.href = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}`;
+      window.location.href = redirectUrl;
       
     } catch (err) {
       console.error('Signup error:', err);
@@ -60,11 +62,12 @@ export function SignupPage() {
     }
   };
 
-  console.log('🔧 SignupPage loaded');
-console.log('VITE_RESTAURANT_URL:', import.meta.env.VITE_RESTAURANT_URL);
-console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+  console.log('🔧 SignupPage loaded with hardcoded URLs:');
+  console.log('API_URL:', API_URL);
+  console.log('RESTAURANT_URL:', RESTAURANT_URL);
 
   return (
+    // ... rest of your JSX remains exactly the same
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel - Professional features */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 to-gray-800 relative overflow-hidden p-16 text-white flex-col justify-between">
