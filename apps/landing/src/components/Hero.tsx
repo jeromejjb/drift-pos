@@ -14,60 +14,56 @@ export function Hero() {
   };
 
   return (
-    <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-white to-gray-50">
-      <div className="container max-w-6xl mx-auto text-center">
-        {/* Professional badge */}
-        <div className="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full mb-8 animate-fade-in">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <span className="text-sm font-medium text-gray-600">
-            Professional payment infrastructure for restaurants
+    <section className="pt-24 pb-16 px-4">
+      <div className="container max-w-5xl mx-auto">
+        {/* Brand mark - subtle and professional */}
+        <div className="text-center mb-16">
+          <span className="text-sm font-medium text-gray-400 tracking-widest uppercase">
+            drift
           </span>
         </div>
 
-        {/* Main headline - proper spacing */}
-        <h1 className="text-5xl md:text-7xl font-light tracking-tight mb-6 animate-fade-in text-primary">
-          eat · drink · <span className="italic">drift</span>
-        </h1>
+        {/* Main headline - clean and bold */}
+        <div className="text-center mb-12">
+          <h1 className="text-6xl md:text-7xl lg:text-8xl font-light tracking-tight text-gray-900 mb-4">
+            eat · drink · <span className="italic font-normal">drift</span>
+          </h1>
+          
+          {/* Value proposition - single line, clean */}
+          <p className="text-xl md:text-2xl text-gray-500 max-w-3xl mx-auto">
+            The financial stack for modern restaurants
+          </p>
+        </div>
 
-        {/* Subheadline - proper spacing */}
-        <h2 className="text-3xl md:text-4xl font-light text-primary mb-4">
-          The complete financial stack for{' '}
-          <span className="bg-gradient-primary bg-clip-text text-transparent font-normal">
-            growing restaurants
-          </span>
-        </h2>
-        
-        {/* Description - fixed line breaks */}
-        <p className="text-xl text-gray-500 max-w-3xl mx-auto mb-8 animate-slide-up leading-relaxed">
-          From first order to final payment — handle everything in one place.
-        </p>
+        {/* Description - clean and simple */}
+        <div className="text-center mb-12">
+          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+            From first order to final payment — handle everything in one place.
+          </p>
+        </div>
 
-        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-12">
-          Start your 14-day trial today, no credit card required.
-        </p>
-        
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
-          <button 
+        {/* CTA Buttons - clean layout */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+          <button
             onClick={handleGetStarted}
-            className="btn-primary text-base px-8 py-4 cursor-pointer group"
+            className="inline-flex items-center justify-center px-8 py-4 bg-gray-900 text-white text-lg rounded-full hover:bg-gray-800 transition-colors min-w-[200px] group"
           >
-            <span className="flex items-center gap-2">
-              Start free trial →
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </span>
+            <span>Start free trial</span>
+            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
           </button>
-          <button 
+          <button
             onClick={handleLearnMore}
-            className="btn-secondary text-base px-8 py-4 cursor-pointer"
+            className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 text-lg rounded-full border border-gray-200 hover:border-gray-300 transition-colors min-w-[200px]"
           >
             See how it works
           </button>
         </div>
 
-        {/* Trial badge */}
-        <div className="mt-8 text-sm text-gray-400">
-          14-day free trial · No credit card needed · Cancel anytime
+        {/* Trust indicators - clean and minimal */}
+        <div className="text-center">
+          <p className="text-sm text-gray-400">
+            14-day free trial · No credit card required · Cancel anytime
+          </p>
         </div>
       </div>
     </section>
