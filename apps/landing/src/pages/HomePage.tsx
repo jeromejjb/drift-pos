@@ -11,35 +11,42 @@ import { Footer } from '../components/Footer';
 
 export function HomePage() {
   return (
-    <div className="drift-container overflow-hidden">
-      {/* Drift background layers for ambient effect */}
-      <div className="drift-layer-1 opacity-30"></div>
-      <div className="drift-layer-2 opacity-20"></div>
-      <div className="drift-layer-3 opacity-10"></div>
+    <div className="min-h-screen bg-white">
+      <Navbar />
+      <Hero />
       
-      {/* Main content with drift effects */}
-      <div className="relative z-10">
-        <Navbar />
-        <div className="animate-drift-smooth">
-          <Hero />
+      {/* Subtle separator */}
+      <div className="fin-divider max-w-7xl mx-auto" />
+      
+      <Features />
+      
+      {/* Professional metric highlight section */}
+      <div className="bg-gradient-surface py-16 my-8">
+        <div className="container max-w-7xl mx-auto px-4">
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="fin-metric-card text-center">
+              <div className="fin-stat">$2.5B+</div>
+              <div className="fin-stat-label">Processed annually</div>
+            </div>
+            <div className="fin-metric-card text-center">
+              <div className="fin-stat">99.9%</div>
+              <div className="fin-stat-label">Uptime SLA</div>
+            </div>
+            <div className="fin-metric-card text-center">
+              <div className="fin-stat">5,000+</div>
+              <div className="fin-stat-label">Restaurants</div>
+            </div>
+          </div>
         </div>
-        <div className="animate-drift-organic">
-          <Features />
-        </div>
-        <div className="animate-drift-float">
-          <RestaurantShowcase />
-        </div>
-        <div className="animate-drift-pulse">
-          <DinerShowcase />
-        </div>
-        <Testimonials />
-        <Pricing />
-        <FAQ />
-        <div className="drift-card border-0 rounded-none">
-          <CTA />
-        </div>
-        <Footer />
       </div>
+      
+      <RestaurantShowcase />
+      <DinerShowcase />
+      <Testimonials />
+      <Pricing />
+      <FAQ />
+      <CTA />
+      <Footer />
     </div>
   );
 }
