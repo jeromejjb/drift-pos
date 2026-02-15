@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
@@ -21,6 +21,28 @@ interface Category {
   items: MenuItem[];
 }
 
+// Fallback data for when API is down
+const FALLBACK_CATEGORIES: Category[] = [
+  {
+    id: 'cat1',
+    name: 'Antipasti',
+    items: [
+      { id: 'item1', name: 'Arancini', description: 'Crispy rice balls with mozzarella', price: 12, category: 'Antipasti', categoryId: 'cat1', isAvailable: true },
+      { id: 'item2', name: 'Calamari', description: 'Fried squid with marinara', price: 14, category: 'Antipasti', categoryId: 'cat1', isAvailable: true },
+      { id: 'item3', name: 'Burrata', description: 'Creamy burrata with tomatoes', price: 16, category: 'Antipasti', categoryId: 'cat1', isAvailable: true },
+    ]
+  },
+  {
+    id: 'cat2',
+    name: 'Pizza',
+    items: [
+      { id: 'item4', name: 'Margherita', description: 'Tomato, mozzarella, basil', price: 18, category: 'Pizza', categoryId: 'cat2', isAvailable: true },
+      { id: 'item5', name: 'Diavola', description: 'Spicy salami, tomato, mozzarella', price: 20, category: 'Pizza', categoryId: 'cat2', isAvailable: true },
+      { id: 'item6', name: 'Quattro Formaggi', description: 'Four cheese blend', price: 22, category: 'Pizza', categoryId: 'cat2', isAvailable: true },
+    ]
+  }
+];
+
 export function MenuPage() {
   const { restaurantId } = useParams();
   const navigate = useNavigate();
@@ -29,6 +51,7 @@ export function MenuPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [apiAvailable, setApiAvailable] = useState(true);
   
   const [newItem, setNewItem] = useState({
     name: '',
@@ -46,12 +69,28 @@ export function MenuPage() {
 
   const fetchMenu = async () => {
     try {
+      setLoading(true);
+      console.log('📡 Fetching menu for restaurant:', restaurantId);
+      
       const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/menu`);
-      if (!response.ok) throw new Error('Failed to fetch menu');
+      
+      if (!response.ok) {
+        console.log('⚠️ API unavailable, using fallback data');
+        setApiAvailable(false);
+        setCategories(FALLBACK_CATEGORIES);
+        setLoading(false);
+        return;
+      }
+      
       const data = await response.json();
-      setCategories(data);
+      console.log('✅ Menu data received:', data);
+      setCategories(data.length ? data : FALLBACK_CATEGORIES);
+      setApiAvailable(true);
     } catch (error) {
       console.error('Error fetching menu:', error);
+      console.log('⚠️ Using fallback data due to error');
+      setCategories(FALLBACK_CATEGORIES);
+      setApiAvailable(false);
     } finally {
       setLoading(false);
     }
@@ -60,6 +99,29 @@ export function MenuPage() {
   const handleAddItem = async () => {
     if (!newItem.name || !newItem.price || !newItem.categoryId) {
       alert('Please fill in all required fields');
+      return;
+    }
+
+    if (!apiAvailable) {
+      // Add to local state if API is down
+      const newItemObj: MenuItem = {
+        id: `temp-${Date.now()}`,
+        name: newItem.name,
+        description: newItem.description,
+        price: parseFloat(newItem.price),
+        category: categories.find(c => c.id === newItem.categoryId)?.name || '',
+        categoryId: newItem.categoryId,
+        isAvailable: newItem.isAvailable
+      };
+      
+      setCategories(categories.map(cat => 
+        cat.id === newItem.categoryId 
+          ? { ...cat, items: [...cat.items, newItemObj] }
+          : cat
+      ));
+      
+      setShowAddModal(false);
+      setNewItem({ name: '', description: '', price: '', categoryId: '', isAvailable: true });
       return;
     }
 
@@ -91,6 +153,18 @@ export function MenuPage() {
   const handleUpdateItem = async () => {
     if (!editingItem) return;
 
+    if (!apiAvailable) {
+      // Update locally
+      setCategories(categories.map(cat => ({
+        ...cat,
+        items: cat.items.map(item =>
+          item.id === editingItem.id ? editingItem : item
+        )
+      })));
+      setEditingItem(null);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/menu/items/${editingItem.id}`, {
         method: 'PATCH',
@@ -116,6 +190,15 @@ export function MenuPage() {
   const handleDeleteItem = async (itemId: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
+    if (!apiAvailable) {
+      // Delete locally
+      setCategories(categories.map(cat => ({
+        ...cat,
+        items: cat.items.filter(item => item.id !== itemId)
+      })));
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/menu/items/${itemId}`, {
         method: 'DELETE'
@@ -131,6 +214,17 @@ export function MenuPage() {
   };
 
   const toggleAvailability = async (itemId: string, currentStatus: boolean) => {
+    if (!apiAvailable) {
+      // Update locally
+      setCategories(categories.map(cat => ({
+        ...cat,
+        items: cat.items.map(item =>
+          item.id === itemId ? { ...item, isAvailable: !currentStatus } : item
+        )
+      })));
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/menu/items/${itemId}`, {
         method: 'PATCH',
@@ -168,6 +262,12 @@ export function MenuPage() {
 
   return (
     <Layout title="Menu">
+      {!apiAvailable && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+          ⚡ Running in demo mode with sample data. API connection unavailable.
+        </div>
+      )}
+
       <div className="mb-6 flex justify-between items-center">
         <h2 className="text-2xl font-light">Menu Items</h2>
         <Button onClick={() => setShowAddModal(true)}>

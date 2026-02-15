@@ -11,17 +11,35 @@ import { Footer } from '../components/Footer';
 
 export function HomePage() {
   return (
-    <div>
-      <Navbar />
-      <Hero />
-      <Features />
-      <RestaurantShowcase />
-      <DinerShowcase />
-      <Testimonials />
-      <Pricing />
-      <FAQ />
-      <CTA />
-      <Footer />
+    <div className="drift-container overflow-hidden">
+      {/* Drift background layers for ambient effect */}
+      <div className="drift-layer-1 opacity-30"></div>
+      <div className="drift-layer-2 opacity-20"></div>
+      <div className="drift-layer-3 opacity-10"></div>
+      
+      {/* Main content with drift effects */}
+      <div className="relative z-10">
+        <Navbar />
+        <div className="animate-drift-smooth">
+          <Hero />
+        </div>
+        <div className="animate-drift-organic">
+          <Features />
+        </div>
+        <div className="animate-drift-float">
+          <RestaurantShowcase />
+        </div>
+        <div className="animate-drift-pulse">
+          <DinerShowcase />
+        </div>
+        <Testimonials />
+        <Pricing />
+        <FAQ />
+        <div className="drift-card border-0 rounded-none">
+          <CTA />
+        </div>
+        <Footer />
+      </div>
     </div>
   );
 }

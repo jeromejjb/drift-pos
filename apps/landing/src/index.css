@@ -4,10 +4,45 @@
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
   
+  /* Base Animations */
   --animate-fade-in: fadeIn 0.5s ease-out;
   --animate-slide-up: slideUp 0.5s ease-out;
   --animate-slide-down: slideDown 0.2s ease-out;
-
+  
+  /* Innovative Drift Animations */
+  --animate-drift-smooth: smoothDrift 8s cubic-bezier(0.45, 0.05, 0.2, 0.99) infinite;
+  --animate-drift-organic: organicDrift 12s ease-in-out infinite;
+  --animate-drift-float: floatDrift 6s ease-in-out infinite;
+  --animate-drift-wave: waveDrift 10s linear infinite;
+  --animate-drift-glitch: glitchDrift 4s steps(2) infinite;
+  --animate-drift-pulse: pulseDrift 3s ease-in-out infinite;
+  --animate-drift-rotate: rotateDrift 20s linear infinite;
+  --animate-drift-shear: shearDrift 7s ease-in-out infinite;
+  --animate-drift-morph: morphDrift 15s ease-in-out infinite;
+  --animate-drift-particle: particleDrift 5s linear infinite;
+  
+  /* Modern Gradients for Drift Effects */
+  --gradient-drift-1: linear-gradient(45deg, #4158D0, #C850C0, #FFCC70);
+  --gradient-drift-2: radial-gradient(circle at 30% 50%, #667eea, #764ba2, #6b8cff);
+  --gradient-drift-3: conic-gradient(from 0deg, #ff6b6b, #4ecdc4, #45b7d1, #ff6b6b);
+  --gradient-drift-4: linear-gradient(135deg, #00d2ff, #3a7bd5, #00d2ff);
+  --gradient-drift-5: radial-gradient(ellipse at top, #e66465, transparent),
+                      radial-gradient(ellipse at bottom, #4d9f0c, transparent);
+  --gradient-drift-6: linear-gradient(60deg, #f79533, #f37055, #ef4e7b, #a166ab, #5073b8, #1098ad, #07b39b, #6fba82);
+  
+  /* Blur Effects */
+  --blur-sm: 4px;
+  --blur-md: 8px;
+  --blur-lg: 16px;
+  --blur-xl: 24px;
+  
+  /* 3D Transforms */
+  --perspective: perspective(1000px);
+  --perspective-lg: perspective(2000px);
+  --rotate-3d: rotateX(10deg) rotateY(5deg);
+  --rotate-3d-lg: rotateX(15deg) rotateY(10deg) rotateZ(2deg);
+  
+  /* Keyframes */
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -34,13 +69,208 @@
       transform: translateY(0);
     }
   }
+
+  @keyframes smoothDrift {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg) scale(1);
+      filter: blur(0) brightness(1);
+    }
+    25% {
+      transform: translate(2%, -1%) rotate(0.5deg) scale(1.02);
+      filter: blur(2px) brightness(1.1);
+    }
+    50% {
+      transform: translate(-2%, 1%) rotate(-0.5deg) scale(0.98);
+      filter: blur(1px) brightness(0.95);
+    }
+    75% {
+      transform: translate(1%, 2%) rotate(0.3deg) scale(1.01);
+      filter: blur(3px) brightness(1.05);
+    }
+  }
+
+  @keyframes organicDrift {
+    0%, 100% {
+      transform: translate(0, 0) skew(0deg, 0deg);
+    }
+    20% {
+      transform: translate(3%, -2%) skew(2deg, 1deg);
+    }
+    40% {
+      transform: translate(-2%, 3%) skew(-1deg, -2deg);
+    }
+    60% {
+      transform: translate(2%, 2%) skew(1deg, 2deg);
+    }
+    80% {
+      transform: translate(-3%, -1%) skew(-2deg, -1deg);
+    }
+  }
+
+  @keyframes floatDrift {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px) rotate(0deg);
+    }
+    25% {
+      transform: translateY(-15px) translateX(5px) rotate(2deg);
+    }
+    50% {
+      transform: translateY(5px) translateX(-10px) rotate(-2deg);
+    }
+    75% {
+      transform: translateY(-5px) translateX(10px) rotate(1deg);
+    }
+  }
+
+  @keyframes waveDrift {
+    0% {
+      transform: translateX(-100%) translateY(0) scale(1);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.8;
+    }
+    50% {
+      transform: translateX(0) translateY(-20px) scale(1.1);
+      opacity: 0.5;
+    }
+    90% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translateX(100%) translateY(0) scale(1);
+      opacity: 0;
+    }
+  }
+
+  @keyframes glitchDrift {
+    0%, 100% {
+      transform: translate(0);
+      filter: blur(0) brightness(1);
+      text-shadow: none;
+    }
+    20% {
+      transform: translate(-2px, 2px);
+      filter: blur(1px) brightness(1.2);
+      text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff;
+    }
+    40% {
+      transform: translate(2px, -2px);
+      filter: blur(2px) brightness(0.9);
+      text-shadow: -2px 0 #ff00ff, 2px 0 #00ffff;
+    }
+    60% {
+      transform: translate(-2px, -2px);
+      filter: blur(1px) brightness(1.1);
+      text-shadow: 3px 0 #00ffff, -3px 0 #ff00ff;
+    }
+    80% {
+      transform: translate(2px, 2px);
+      filter: blur(0) brightness(1.3);
+      text-shadow: -3px 0 #00ffff, 3px 0 #ff00ff;
+    }
+  }
+
+  @keyframes pulseDrift {
+    0%, 100% {
+      transform: scale(1);
+      filter: brightness(1) hue-rotate(0deg);
+    }
+    25% {
+      transform: scale(1.05);
+      filter: brightness(1.2) hue-rotate(45deg);
+    }
+    50% {
+      transform: scale(0.95);
+      filter: brightness(0.9) hue-rotate(90deg);
+    }
+    75% {
+      transform: scale(1.02);
+      filter: brightness(1.1) hue-rotate(180deg);
+    }
+  }
+
+  @keyframes rotateDrift {
+    from {
+      transform: rotate(0deg) scale(1);
+    }
+    25% {
+      transform: rotate(90deg) scale(1.1);
+    }
+    50% {
+      transform: rotate(180deg) scale(0.9);
+    }
+    75% {
+      transform: rotate(270deg) scale(1.05);
+    }
+    to {
+      transform: rotate(360deg) scale(1);
+    }
+  }
+
+  @keyframes shearDrift {
+    0%, 100% {
+      transform: skew(0deg, 0deg) scale(1);
+      border-radius: 50%;
+    }
+    25% {
+      transform: skew(5deg, 5deg) scale(1.1);
+      border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+    }
+    50% {
+      transform: skew(-5deg, -5deg) scale(0.9);
+      border-radius: 50% 50% 50% 50% / 60% 40% 60% 40%;
+    }
+    75% {
+      transform: skew(3deg, -3deg) scale(1.05);
+      border-radius: 40% 60% 40% 60% / 60% 40% 60% 40%;
+    }
+  }
+
+  @keyframes morphDrift {
+    0%, 100% {
+      border-radius: 50%;
+      filter: blur(0) contrast(1);
+    }
+    25% {
+      border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+      filter: blur(5px) contrast(1.5);
+    }
+    50% {
+      border-radius: 50% 50% 50% 50% / 60% 40% 60% 40%;
+      filter: blur(10px) contrast(0.8);
+    }
+    75% {
+      border-radius: 40% 60% 40% 60% / 60% 40% 60% 40%;
+      filter: blur(3px) contrast(1.2);
+    }
+  }
+
+  @keyframes particleDrift {
+    0% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+    25% {
+      transform: translate(100px, -50px) scale(1.5);
+      opacity: 0.8;
+    }
+    50% {
+      transform: translate(200px, 0) scale(2);
+      opacity: 0.5;
+    }
+    75% {
+      transform: translate(300px, 50px) scale(1.5);
+      opacity: 0.3;
+    }
+    100% {
+      transform: translate(400px, 0) scale(0);
+      opacity: 0;
+    }
+  }
 }
 
-/*
-  The default border color has changed to `currentColor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-*/
+/* Base Styles */
 @layer base {
   *,
   ::after,
@@ -49,9 +279,7 @@
   ::file-selector-button {
     border-color: var(--color-gray-200, currentColor);
   }
-}
 
-@layer base {
   html {
     font-family: var(--font-sans);
     scroll-behavior: smooth;
@@ -63,4 +291,314 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Drift Component Classes */
+@layer components {
+  /* Drift Container */
+  .drift-container {
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  /* Drift Layers */
+  .drift-layer-1 {
+    position: absolute;
+    inset: -50%;
+    background: var(--gradient-drift-1);
+    animation: smoothDrift 15s ease-in-out infinite;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+
+  .drift-layer-2 {
+    position: absolute;
+    inset: -30%;
+    background: var(--gradient-drift-2);
+    animation: organicDrift 20s ease-in-out infinite;
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+
+  .drift-layer-3 {
+    position: absolute;
+    inset: -70%;
+    background: var(--gradient-drift-3);
+    animation: floatDrift 12s ease-in-out infinite;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  /* Drift Cards */
+  .drift-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 1rem;
+    padding: 2rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .drift-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: var(--gradient-drift-6);
+    animation: rotateDrift 20s linear infinite;
+    opacity: 0.1;
+    z-index: -1;
+  }
+
+  .drift-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Drift Particles */
+  .drift-particles {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .drift-particle {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background: white;
+    border-radius: 50%;
+    animation: particleDrift 5s linear infinite;
+  }
+
+  .drift-particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+  .drift-particle:nth-child(2) { left: 30%; animation-delay: 1s; }
+  .drift-particle:nth-child(3) { left: 50%; animation-delay: 2s; }
+  .drift-particle:nth-child(4) { left: 70%; animation-delay: 3s; }
+  .drift-particle:nth-child(5) { left: 90%; animation-delay: 4s; }
+
+  /* Drift Text */
+  .drift-text {
+    background: var(--gradient-drift-1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: pulseDrift 3s ease-in-out infinite;
+    font-weight: bold;
+  }
+
+  .drift-text-glitch {
+    position: relative;
+    color: white;
+    animation: glitchDrift 4s steps(2) infinite;
+  }
+
+  .drift-text-glitch::before,
+  .drift-text-glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drift-text-glitch::before {
+    animation: glitchDrift 4s steps(2) infinite;
+    color: #ff00ff;
+    z-index: -1;
+  }
+
+  .drift-text-glitch::after {
+    animation: glitchDrift 4s steps(2) infinite reverse;
+    color: #00ffff;
+    z-index: -2;
+  }
+
+  /* Drift Buttons */
+  .drift-button {
+    position: relative;
+    padding: 1rem 2rem;
+    background: transparent;
+    border: none;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    z-index: 1;
+  }
+
+  .drift-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--gradient-drift-1);
+    transition: left 0.3s ease;
+    z-index: -1;
+  }
+
+  .drift-button:hover::before {
+    left: 0;
+  }
+
+  .drift-button::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--gradient-drift-2);
+    transition: right 0.3s ease;
+    z-index: -2;
+  }
+
+  .drift-button:hover::after {
+    right: 0;
+  }
+
+  /* Drift Backgrounds */
+  .drift-bg-1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    animation: smoothDrift 15s ease-in-out infinite;
+  }
+
+  .drift-bg-2 {
+    background: radial-gradient(circle at 30% 50%, #4158D0, #C850C0, #FFCC70);
+    background-size: 200% 200%;
+    animation: organicDrift 12s ease-in-out infinite;
+  }
+
+  .drift-bg-3 {
+    background: conic-gradient(from 0deg, #ff6b6b, #4ecdc4, #45b7d1, #ff6b6b);
+    animation: rotateDrift 20s linear infinite;
+  }
+
+  /* Drift Borders */
+  .drift-border {
+    border: 2px solid transparent;
+    border-image: var(--gradient-drift-1);
+    border-image-slice: 1;
+    animation: pulseDrift 3s ease-in-out infinite;
+  }
+
+  .drift-border-animated {
+    position: relative;
+    border: none;
+  }
+
+  .drift-border-animated::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: var(--gradient-drift-1);
+    border-radius: inherit;
+    z-index: -1;
+    animation: rotateDrift 3s linear infinite;
+  }
+
+  /* Drift Shadows */
+  .drift-shadow {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .drift-shadow:hover {
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
+  }
+
+  .drift-shadow-animated {
+    animation: pulseDrift 3s ease-in-out infinite;
+  }
+
+  /* 3D Drift Effects */
+  .drift-3d {
+    transform: var(--perspective) var(--rotate-3d);
+    transition: transform 0.3s ease;
+  }
+
+  .drift-3d:hover {
+    transform: var(--perspective-lg) var(--rotate-3d-lg);
+  }
+
+  /* Drift Grid */
+  .drift-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    padding: 2rem;
+  }
+
+  /* Drift Shapes */
+  .drift-shape {
+    width: 100px;
+    height: 100px;
+    background: var(--gradient-drift-1);
+    animation: morphDrift 10s ease-in-out infinite;
+  }
+
+  .drift-shape-2 {
+    width: 100px;
+    height: 100px;
+    background: var(--gradient-drift-2);
+    animation: shearDrift 8s ease-in-out infinite;
+  }
+}
+
+/* Utility Classes */
+@layer utilities {
+  /* Animation Utilities */
+  .animate-drift-smooth { animation: smoothDrift 8s cubic-bezier(0.45, 0.05, 0.2, 0.99) infinite; }
+  .animate-drift-organic { animation: organicDrift 12s ease-in-out infinite; }
+  .animate-drift-float { animation: floatDrift 6s ease-in-out infinite; }
+  .animate-drift-wave { animation: waveDrift 10s linear infinite; }
+  .animate-drift-glitch { animation: glitchDrift 4s steps(2) infinite; }
+  .animate-drift-pulse { animation: pulseDrift 3s ease-in-out infinite; }
+  .animate-drift-rotate { animation: rotateDrift 20s linear infinite; }
+  .animate-drift-shear { animation: shearDrift 7s ease-in-out infinite; }
+  .animate-drift-morph { animation: morphDrift 15s ease-in-out infinite; }
+  
+  /* Gradient Utilities */
+  .bg-drift-1 { background: var(--gradient-drift-1); }
+  .bg-drift-2 { background: var(--gradient-drift-2); }
+  .bg-drift-3 { background: var(--gradient-drift-3); }
+  .bg-drift-4 { background: var(--gradient-drift-4); }
+  .bg-drift-5 { background: var(--gradient-drift-5); }
+  .bg-drift-6 { background: var(--gradient-drift-6); }
+  
+  /* Blur Utilities */
+  .backdrop-blur-drift-sm { backdrop-filter: blur(var(--blur-sm)); }
+  .backdrop-blur-drift-md { backdrop-filter: blur(var(--blur-md)); }
+  .backdrop-blur-drift-lg { backdrop-filter: blur(var(--blur-lg)); }
+  .backdrop-blur-drift-xl { backdrop-filter: blur(var(--blur-xl)); }
+  
+  /* 3D Utilities */
+  .transform-3d { transform-style: preserve-3d; }
+  .perspective { perspective: 1000px; }
+  .perspective-lg { perspective: 2000px; }
+  .rotate-3d { transform: var(--perspective) var(--rotate-3d); }
+  .rotate-3d-lg { transform: var(--perspective-lg) var(--rotate-3d-lg); }
+  
+  /* Mix Blend Modes */
+  .blend-overlay { mix-blend-mode: overlay; }
+  .blend-screen { mix-blend-mode: screen; }
+  .blend-multiply { mix-blend-mode: multiply; }
+  .blend-soft-light { mix-blend-mode: soft-light; }
 }

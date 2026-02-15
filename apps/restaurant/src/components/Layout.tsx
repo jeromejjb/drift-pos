@@ -30,45 +30,45 @@ export function Layout({ children, title }: LayoutProps) {
   const { user } = useUser();
   const { subscription } = useSubscription(user?.id);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [restaurantName, setRestaurantName] = useState('');
+  const [restaurantName, setRestaurantName] = useState('Your Restaurant');
+  const [loading, setLoading] = useState(true);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
 
   // Extract restaurantId from current path
   const restaurantId = location.pathname.split('/')[2] || '';
 
-  // Debug logging
-  useEffect(() => {
-    console.log('📌 Layout mounted');
-    console.log('📍 Current pathname:', location.pathname);
-    console.log('🔍 Extracted restaurantId:', restaurantId);
-    console.log('🌐 Full URL:', window.location.href);
-  }, [location, restaurantId]);
-
   // Fetch restaurant details
   useEffect(() => {
     const fetchRestaurantName = async () => {
-      if (restaurantId) {
-        try {
-          console.log('📡 Fetching restaurant name for ID:', restaurantId);
-          const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
-          if (response.ok) {
-            const data = await response.json();
-            setRestaurantName(data.name);
-            console.log('✅ Restaurant name:', data.name);
-          } else {
-            console.log('❌ Restaurant fetch failed:', response.status);
-          }
-        } catch (error) {
-          console.error('Error fetching restaurant name:', error);
+      if (!restaurantId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        console.log('📡 Fetching restaurant name for ID:', restaurantId);
+        const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setRestaurantName(data.name || 'Your Restaurant');
+          console.log('✅ Restaurant name:', data.name);
+        } else {
+          console.log('⚠️ Using default restaurant name');
+          setRestaurantName('Your Restaurant');
         }
+      } catch (error) {
+        console.error('Error fetching restaurant name:', error);
+        setRestaurantName('Your Restaurant');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchRestaurantName();
   }, [restaurantId, API_URL]);
 
-  // IMPORTANT FIX: Define navItems WITHOUT leading slashes
   const navItems = [
     { path: 'dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
     { path: 'tables', icon: Grid, label: 'Tables', description: 'Manage tables & QR codes' },
@@ -78,26 +78,25 @@ export function Layout({ children, title }: LayoutProps) {
     { path: 'settings', icon: Settings, label: 'Settings', description: 'Restaurant preferences' },
   ];
 
-  // FIXED navigation handler - builds path correctly with single slash
   const handleNavigation = (path: string) => {
-    // Build path with single slash: /dashboard/123, NOT //dashboard/123
     const fullPath = `/${path}/${restaurantId}`;
-    
-    console.log('📍 Navigation clicked:', {
-      from: location.pathname,
-      to: fullPath,
-      restaurantId,
-      fullUrl: window.location.origin + fullPath
-    });
-    
-    // Use React Router navigate - this keeps you within the SPA
     navigate(fullPath);
   };
 
-  // Helper to check if a nav item is active
   const isActivePath = (path: string) => {
     return location.pathname === `/${path}/${restaurantId}`;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -120,7 +119,7 @@ export function Layout({ children, title }: LayoutProps) {
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="text-sm font-medium truncate">{restaurantName || 'Your Restaurant'}</p>
+              <p className="text-sm font-medium truncate">{restaurantName}</p>
               <div className="mt-2">
                 <PlanBadge plan={subscription?.plan || 'free'} status={subscription?.status} />
               </div>
@@ -139,10 +138,7 @@ export function Layout({ children, title }: LayoutProps) {
                 key={item.path}
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigation(item.path);
-                }}
+                onClick={() => handleNavigation(item.path)}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl
                   transition-all duration-200
@@ -182,7 +178,7 @@ export function Layout({ children, title }: LayoutProps) {
             </button>
             <div>
               <h1 className="text-lg font-light">drift</h1>
-              <p className="text-xs text-gray-400">{restaurantName || 'Loading...'}</p>
+              <p className="text-xs text-gray-400">{restaurantName}</p>
             </div>
           </div>
           
@@ -231,7 +227,7 @@ export function Layout({ children, title }: LayoutProps) {
                 </div>
 
                 <div className="p-4 border-b border-gray-100">
-                  <p className="font-medium">{restaurantName || 'Your Restaurant'}</p>
+                  <p className="font-medium">{restaurantName}</p>
                   <div className="mt-2">
                     <PlanBadge plan={subscription?.plan || 'free'} />
                   </div>

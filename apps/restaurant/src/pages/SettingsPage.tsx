@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { User, Store, CreditCard, Bell, Save, AlertCircle } from 'lucide-react';
+import { User, Store, CreditCard, Bell, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import { PlanBadge } from '../components/ui/PlanBadge';
 
@@ -39,7 +39,6 @@ export function SettingsPage() {
   }, [user]);
 
   useEffect(() => {
-    // Fetch restaurant details if we have a user
     if (user?.restaurantId) {
       fetchRestaurantDetails(user.restaurantId);
     }
@@ -63,13 +62,14 @@ export function SettingsPage() {
   };
 
   const handleSaveProfile = async () => {
+    if (!user?.id) return;
+    
     setSaving(true);
     setSaveSuccess(false);
     setSaveError('');
     
     try {
-      // Call the API to update user profile
-      const response = await fetch(`${API_URL}/api/users/${user?.id}`, {
+      const response = await fetch(`${API_URL}/api/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile)
@@ -79,23 +79,25 @@ export function SettingsPage() {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
-        throw new Error('Failed to save');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save');
       }
-    } catch (error) {
-      setSaveError('Failed to save changes. Please try again.');
+    } catch (error: any) {
+      setSaveError(error.message || 'Failed to save changes. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleSaveRestaurant = async () => {
+    if (!user?.restaurantId) return;
+    
     setSaving(true);
     setSaveSuccess(false);
     setSaveError('');
     
     try {
-      // Call the API to update restaurant details
-      const response = await fetch(`${API_URL}/api/restaurants/${user?.restaurantId}`, {
+      const response = await fetch(`${API_URL}/api/restaurants/${user.restaurantId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(restaurant)
@@ -105,10 +107,11 @@ export function SettingsPage() {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
-        throw new Error('Failed to save');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save');
       }
-    } catch (error) {
-      setSaveError('Failed to save restaurant details.');
+    } catch (error: any) {
+      setSaveError(error.message || 'Failed to save restaurant details.');
     } finally {
       setSaving(false);
     }
@@ -147,7 +150,8 @@ export function SettingsPage() {
 
         {/* Success/Error Messages */}
         {saveSuccess && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
             Changes saved successfully!
           </div>
         )}

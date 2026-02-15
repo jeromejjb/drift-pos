@@ -32,21 +32,31 @@ interface Order {
   createdAt: string;
 }
 
+// Fallback data with correct status types
+const FALLBACK_SUMMARY: OrderSummary = {
+  total: 12,
+  pending: 3,
+  preparing: 2,
+  ready: 1,
+  revenue: 456.50
+};
+
+const FALLBACK_ORDERS: Order[] = [
+  { id: '#1234', tableNumber: 3, items: '2x Margherita, 1x Calamari', total: 42, status: 'pending', createdAt: new Date().toISOString() },
+  { id: '#1233', tableNumber: 7, items: '1x Diavola, 2x Arancini', total: 48, status: 'preparing', createdAt: new Date().toISOString() },
+  { id: '#1232', tableNumber: 2, items: '3x Burrata', total: 48, status: 'ready', createdAt: new Date().toISOString() },
+];
+
 export function DashboardPage() {
   const { restaurantId } = useParams();
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<OrderSummary>({
-    total: 0,
-    pending: 0,
-    preparing: 0,
-    ready: 0,
-    revenue: 0,
-  });
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [summary, setSummary] = useState<OrderSummary>(FALLBACK_SUMMARY);
+  const [recentOrders, setRecentOrders] = useState<Order[]>(FALLBACK_ORDERS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showQuickOrder, setShowQuickOrder] = useState(false);
-  const [restaurantName, setRestaurantName] = useState('');
+  const [restaurantName, setRestaurantName] = useState('Your Restaurant');
+  const [apiAvailable, setApiAvailable] = useState(true);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
 
@@ -61,16 +71,20 @@ export function DashboardPage() {
     fetchDashboardData();
     fetchRestaurantDetails();
     
-    const socket = io(API_URL);
-    socket.emit('join-restaurant', restaurantId);
-    
-    socket.on('order-updated', () => {
-      fetchDashboardData();
-    });
-    
-    return () => {
-      socket.disconnect();
-    };
+    try {
+      const socket = io(API_URL);
+      socket.emit('join-restaurant', restaurantId);
+      
+      socket.on('order-updated', () => {
+        fetchDashboardData();
+      });
+      
+      return () => {
+        socket.disconnect();
+      };
+    } catch (error) {
+      console.log('Socket connection failed, using demo mode');
+    }
   }, [restaurantId]);
 
   const fetchRestaurantDetails = async () => {
@@ -79,9 +93,12 @@ export function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setRestaurantName(data.name);
+        setApiAvailable(true);
       }
     } catch (error) {
-      console.error('Error fetching restaurant:', error);
+      console.log('Using default restaurant name');
+      setRestaurantName('Your Restaurant');
+      setApiAvailable(false);
     }
   };
 
@@ -94,23 +111,32 @@ export function DashboardPage() {
         fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`)
       ]);
       
+      if (!statsRes.ok || !ordersRes.ok) {
+        throw new Error('API unavailable');
+      }
+      
       const statsData = await statsRes.json();
       const ordersData = await ordersRes.json();
       
       setSummary(statsData);
       
-      const formattedOrders = ordersData.slice(0, 3).map((order: any) => ({
+      // Ensure the status matches the expected union type
+      const formattedOrders: Order[] = ordersData.slice(0, 3).map((order: any) => ({
         id: `#${order.id.slice(-4)}`,
         tableNumber: order.tableNumber,
         items: order.items.map((item: any) => `${item.quantity}x ${item.name}`).join(', '),
         total: order.total,
-        status: order.status,
+        status: order.status as 'pending' | 'preparing' | 'ready' | 'served',
         createdAt: order.createdAt
       }));
       
       setRecentOrders(formattedOrders);
+      setApiAvailable(true);
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      console.log('Using fallback dashboard data');
+      setSummary(FALLBACK_SUMMARY);
+      setRecentOrders(FALLBACK_ORDERS);
+      setApiAvailable(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -163,11 +189,17 @@ export function DashboardPage() {
 
   return (
     <Layout title="Dashboard">
+      {!apiAvailable && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+          ⚡ Running in demo mode with sample data. API connection unavailable.
+        </div>
+      )}
+
       {/* Welcome header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-light">{getGreeting()},</h2>
-          <p className="text-gray-400">{restaurantName || 'Your Restaurant'}</p>
+          <p className="text-gray-400">{restaurantName}</p>
         </div>
         <button 
           onClick={fetchDashboardData}
@@ -245,7 +277,7 @@ export function DashboardPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium">Table {order.tableNumber}</span>
-                      <Badge variant={order.status as any}>{order.status}</Badge>
+                      <Badge variant={order.status}>{order.status}</Badge>
                     </div>
                     <p className="text-xs text-gray-400">{order.id}</p>
                   </div>
