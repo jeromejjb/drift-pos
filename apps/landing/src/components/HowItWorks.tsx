@@ -1,4 +1,4 @@
-import { QrCode, Smartphone, Users, CreditCard, ArrowRight } from 'lucide-react';
+import { QrCode, Smartphone, Users, CreditCard, } from 'lucide-react';
 
 export function HowItWorks() {
   const steps = [
