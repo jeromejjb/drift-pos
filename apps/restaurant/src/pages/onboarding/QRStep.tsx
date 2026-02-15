@@ -15,12 +15,13 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [error, setError] = useState('');
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5174';
 
   const getToken = () => {
     const token = localStorage.getItem('drift-token');
     if (!token) {
       console.error('No token found');
-      window.location.href = '/login';
+      window.location.href = `${APP_URL}/login`;
       return null;
     }
     return token;
@@ -46,7 +47,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
       if (response.status === 401) {
         localStorage.removeItem('drift-token');
-        window.location.href = '/login';
+        window.location.href = `${APP_URL}/login`;
         return;
       }
 
@@ -82,20 +83,27 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         <head>
           <title>Table QR Codes</title>
           <style>
-            body { font-family: system-ui, sans-serif; padding: 20px; }
-            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+            body { font-family: system-ui, sans-serif; padding: 20px; margin: 0; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { font-weight: 300; }
+            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 20px; }
             .card { text-align: center; padding: 20px; border: 1px solid #eee; border-radius: 12px; }
+            .card h3 { font-weight: 400; margin-bottom: 10px; }
             img { width: 200px; height: 200px; margin: 10px auto; }
+            p { color: #666; font-size: 14px; margin-top: 10px; }
           </style>
         </head>
         <body>
-          <h1 style="text-align:center;">Your Table QR Codes</h1>
+          <div class="header">
+            <h1>Your Table QR Codes</h1>
+            <p>Place these on each table for customers to scan</p>
+          </div>
           <div class="grid">
             ${qrCodes.map(qr => `
               <div class="card">
                 <h3>Table ${qr.tableNumber}</h3>
-                <img src="${qr.qrCode}" />
-                <p>Scan to order</p>
+                <img src="${qr.qrCode}" alt="QR Code for Table ${qr.tableNumber}" />
+                <p>Scan to view menu and order</p>
               </div>
             `).join('')}
           </div>

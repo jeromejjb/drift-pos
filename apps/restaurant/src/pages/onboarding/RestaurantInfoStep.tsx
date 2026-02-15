@@ -19,8 +19,9 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
     cuisine: ''
   });
 
-  // Use environment variable for API URL
+  // Use environment variables
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5174';
 
   // Get JWT token from localStorage (saved during signup/login)
   const getToken = () => {
@@ -28,7 +29,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
     if (!token) {
       console.error('No token found - user may need to login again');
       // Redirect to login if no token
-      window.location.href = '/login';
+      window.location.href = `${APP_URL}/login`;
       return null;
     }
     return token;
@@ -57,7 +58,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
         console.error('Unauthorized - token may be expired');
         // Token expired - redirect to login
         localStorage.removeItem('drift-token');
-        window.location.href = '/login';
+        window.location.href = `${APP_URL}/login`;
         return;
       }
 
@@ -105,7 +106,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
       if (response.status === 401) {
         console.error('Unauthorized - token may be expired');
         localStorage.removeItem('drift-token');
-        window.location.href = '/login';
+        window.location.href = `${APP_URL}/login`;
         return;
       }
 
