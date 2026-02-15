@@ -1,5 +1,6 @@
 import { Navbar } from '../components/Navbar';
 import { Hero } from '../components/Hero';
+import { HowItWorks } from '../components/HowItWorks'; // Add this import
 import { Features } from '../components/Features';
 import { RestaurantShowcase } from '../components/RestaurantShowcase';
 import { DinerShowcase } from '../components/DinerShowcase';
@@ -18,10 +19,8 @@ export function HomePage() {
       {/* Subtle separator */}
       <div className="fin-divider max-w-7xl mx-auto" />
       
+      <HowItWorks /> {/* Add this line */}
       <Features />
-      
-      {/* Remove the fake stats section completely */}
-      
       <RestaurantShowcase />
       <DinerShowcase />
       <Testimonials />

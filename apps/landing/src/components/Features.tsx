@@ -1,50 +1,41 @@
-import { Smartphone, Users, CreditCard, Clock, Shield, BarChart, Headset, Zap, Lock } from 'lucide-react';
+import { Smartphone, Users, CreditCard, Clock, ShoppingBag, Coffee, Store, Pizza } from 'lucide-react';
 
 const features = [
   {
-    icon: <Zap className="w-6 h-6" />,
-    title: "Unlimited orders",
-    description: "Process as many orders as you want. No per-order fees, no limits."
+    icon: <Smartphone className="w-6 h-6" />,
+    title: "One tap payments",
+    description: "Customers pay instantly from their phone. No apps to download, no accounts to create.",
+    useCases: ["Restaurants", "Bars", "Coffee shops", "Food carts"]
   },
   {
     icon: <Users className="w-6 h-6" />,
     title: "Smart bill splitting",
-    description: "Split by item, equally, or custom amounts. Your customers decide how they want to pay."
+    description: "Split by item, equally, or custom amounts. Perfect for groups anywhere.",
+    useCases: ["Dinner tables", "Bar tabs", "Group orders", "Events"]
   },
   {
     icon: <CreditCard className="w-6 h-6" />,
     title: "Competitive rates",
-    description: "1.5% per transaction — significantly lower than traditional processors."
+    description: "One monthly fee plus low transaction fees. No hidden costs, no surprises.",
+    useCases: ["Pop-ups", "Market stalls", "Small businesses", "Growing brands"]
   },
   {
     icon: <Clock className="w-6 h-6" />,
-    title: "Faster table turnover",
-    description: "Reduce wait times for bills and payments. Serve more customers, earn more revenue."
+    title: "Faster transactions",
+    description: "Reduce wait times and increase turnover. Serve more customers, earn more revenue.",
+    useCases: ["Busy nights", "Lunch rushes", "Weekend markets", "Peak hours"]
   },
   {
-    icon: <Shield className="w-6 h-6" />,
-    title: "Bank-grade security",
-    description: "End-to-end encryption and compliance with the latest security standards."
+    icon: <ShoppingBag className="w-6 h-6" />,
+    title: "Works everywhere",
+    description: "From brick-and-mortar to pop-ups and events. Take payments wherever you are.",
+    useCases: ["Food trucks", "Farmers markets", "Temporary events", "Mobile businesses"]
   },
   {
-    icon: <BarChart className="w-6 h-6" />,
-    title: "Real-time analytics",
-    description: "Understand your business with detailed insights and reporting dashboard."
-  },
-  {
-    icon: <Headset className="w-6 h-6" />,
-    title: "Priority support",
-    description: "Get help when you need it with priority email and chat support."
-  },
-  {
-    icon: <Lock className="w-6 h-6" />,
-    title: "Team management",
-    description: "Add unlimited staff members with role-based access controls."
-  },
-  {
-    icon: <Smartphone className="w-6 h-6" />,
-    title: "Customer portal",
-    description: "Diners can view receipts, split bills, and pay from their phones."
+    icon: <Store className="w-6 h-6" />,
+    title: "All-in-one platform",
+    description: "Manage orders, payments, and staff in a single dashboard. No complex hardware needed.",
+    useCases: ["Multi-location", "Single shops", "Co-working cafes", "Breweries"]
   }
 ];
 
@@ -52,46 +43,47 @@ export function Features() {
   return (
     <section id="features" className="py-24 px-4 bg-white">
       <div className="container max-w-6xl mx-auto">
+        <div className="text-center mb-4">
+          <span className="text-sm font-medium text-gray-400 tracking-[0.2em] uppercase">
+            built for any business
+          </span>
+        </div>
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-light text-primary mb-4">Everything you need in one platform</h2>
-          <p className="text-gray-500 max-w-2xl mx-auto">
-            One monthly fee covers your entire team. No hidden costs, no surprises.
+          <h2 className="text-4xl font-light text-gray-900 mb-4">
+            From restaurants to pop-ups
+          </h2>
+          <p className="text-gray-400 max-w-2xl mx-auto font-light">
+            Wherever you do business, Drift helps you get paid faster.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, i) => (
-            <div key={i} className="fin-card group hover:border-accent/20">
-              <div className="w-12 h-12 bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl flex items-center justify-center mb-4 text-accent group-hover:scale-110 transition-transform">
+            <div key={i} className="group p-8 rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300">
+              <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center mb-4 text-gray-600 group-hover:scale-110 transition-transform">
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold text-primary mb-2">{feature.title}</h3>
-              <p className="text-gray-500 leading-relaxed">{feature.description}</p>
+              <h3 className="text-xl font-light text-gray-900 mb-2">{feature.title}</h3>
+              <p className="text-gray-400 text-sm mb-4 leading-relaxed">{feature.description}</p>
+              
+              {/* Use case tags - shows breadth without being limiting */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                {feature.useCases.slice(0, 2).map((useCase, idx) => (
+                  <span key={idx} className="text-xs text-gray-300">
+                    {useCase}{idx < 1 ? ' · ' : ''}
+                  </span>
+                ))}
+                <span className="text-xs text-gray-300">and more</span>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Value proposition summary */}
-        <div className="mt-16 p-8 bg-gradient-surface rounded-2xl border border-gray-200">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-              <h4 className="text-xl font-semibold text-primary mb-2">Why the monthly fee?</h4>
-              <p className="text-gray-500 max-w-2xl">
-                Unlike traditional processors that charge per feature or per user, Drift gives you 
-                unlimited access to everything. One price covers your entire restaurant.
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-semibold text-primary">$97</div>
-                <div className="text-xs text-gray-400">per month</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-semibold text-primary">1.5%</div>
-                <div className="text-xs text-gray-400">transaction fee</div>
-              </div>
-            </div>
-          </div>
+        {/* Breadth statement */}
+        <div className="text-center mt-16">
+          <p className="text-sm text-gray-400">
+            Trusted by restaurants, bars, coffee shops, food trucks, market vendors, and more.
+          </p>
         </div>
       </div>
     </section>
