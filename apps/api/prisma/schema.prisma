@@ -186,6 +186,7 @@ model User {
   name             String?
   email            String?       @unique(map: "users_email_unique")
   phone            String?       @unique(map: "users_phone_unique")
+  passwordHash     String?       // Add this line for authentication
   stripeCustomerId String?       @unique(map: "users_stripe_customer_unique")
   supabaseId       String?       @unique
   
@@ -216,14 +217,16 @@ model DemoRequest {
   preferredDate  DateTime
   preferredTime  String
   message        String?
-  status         String   @default("PENDING") // PENDING, CONTACTED, COMPLETED, CANCELLED
+  status         String   @default("PENDING")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([email])
   @@index([status])
   @@index([createdAt])
+  @@map("demo_requests")
 }
+
 
 enum TableStatus {
   AVAILABLE

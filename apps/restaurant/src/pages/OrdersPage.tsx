@@ -28,10 +28,12 @@ export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
+
   useEffect(() => {
     fetchOrders();
     
-    const socket = io('http://localhost:3001');
+    const socket = io(API_URL);
     socket.emit('join-restaurant', restaurantId);
     
     socket.on('order-updated', () => {
@@ -45,7 +47,7 @@ export function OrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/restaurant/${restaurantId}/orders`);
+      const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`);
       const data = await response.json();
       setOrders(data);
     } catch (error) {
@@ -57,7 +59,7 @@ export function OrdersPage() {
 
   const updateStatus = async (orderId: string, newStatus: Order['status']) => {
     try {
-      await fetch(`http://localhost:3001/api/order/${orderId}/status`, {
+      await fetch(`${API_URL}/api/order/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

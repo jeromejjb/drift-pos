@@ -9,6 +9,8 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import QRCode from 'qrcode';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 // Add this near the top after imports
 console.log('🚀 Starting Drift API...');
@@ -33,6 +35,9 @@ const adapter = new PrismaPg(pool);
 // Initialize Prisma Client WITH the adapter (required for Prisma 7)
 const prisma = new PrismaClient({ adapter });
 
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
+
 // Define allowed origins for CORS
 const allowedOrigins = [
   'http://localhost:5173',
@@ -51,19 +56,361 @@ const io = new Server(httpServer, {
   }
 });
 
-// Middleware
+// ==================== CORS FIXES ====================
+// Explicit CORS middleware (this runs before other middleware)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Allow requests from allowed origins or any localhost
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  // Set other CORS headers
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    console.log('✅ Handling OPTIONS preflight request from:', origin);
+    return res.sendStatus(204);
+  }
+  
+  next();
+});
+
+// Use cors package as backup
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 204
+}));
+
+// Other middleware
+app.use(express.json());
+app.use(morgan('dev'));
+
 // Use helmet without CSP for now to avoid blocking issues
 app.use(helmet({
   contentSecurityPolicy: false,
 }));
 
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
+// ==================== TEST ENDPOINT ====================
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'API is working!', 
+    cors: 'enabled',
+    headers: {
+      origin: req.headers.origin,
+      host: req.headers.host
+    },
+    timestamp: new Date().toISOString() 
+  });
+});
 
-app.use(express.json());
-app.use(morgan('dev'));
+// ==================== AUTH MIDDLEWARE ====================
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// ==================== AUTH ENDPOINTS ====================
+
+/**
+ * Register a new user and restaurant
+ * POST /api/auth/register
+ */
+app.post('/api/auth/register', async (req, res) => {
+  // Set CORS headers explicitly
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  try {
+    const { email, password, name, restaurantName } = req.body;
+
+    console.log('📝 Registration attempt:', { email, name, restaurantName });
+
+    // Validate required fields
+    if (!email || !password || !name || !restaurantName) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['email', 'password', 'name', 'restaurantName']
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user and restaurant in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user
+      const user = await tx.user.create({
+        data: {
+          email,
+          name,
+          passwordHash: hashedPassword
+        }
+      });
+
+      // Create restaurant
+      const restaurant = await tx.restaurant.create({
+        data: {
+          name: restaurantName,
+          email,
+          supabaseUserId: user.id,
+          tables: {
+            create: [
+              { number: 1, qrCode: `table_1_${Date.now()}` },
+              { number: 2, qrCode: `table_2_${Date.now()}` },
+              { number: 3, qrCode: `table_3_${Date.now()}` },
+              { number: 4, qrCode: `table_4_${Date.now()}` },
+              { number: 5, qrCode: `table_5_${Date.now()}` },
+            ]
+          }
+        },
+        include: {
+          tables: true
+        }
+      });
+
+      return { user, restaurant };
+    });
+
+    // Generate JWT
+    const token = jwt.sign(
+      { 
+        userId: result.user.id, 
+        email: result.user.email,
+        restaurantId: result.restaurant.id 
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log('✅ Registration successful:', result.restaurant.id);
+
+    res.status(201).json({
+      success: true,
+      token,
+      restaurantId: result.restaurant.id,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+/**
+ * Login endpoint
+ * POST /api/auth/login
+ */
+app.post('/api/auth/login', async (req, res) => {
+  // Set CORS headers explicitly
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  try {
+    const { email, password } = req.body;
+
+    console.log('🔐 Login attempt:', { email });
+
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['email', 'password']
+      });
+    }
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Verify password
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Find user's restaurant
+    const restaurant = await prisma.restaurant.findFirst({
+      where: { 
+        OR: [
+          { email: user.email },
+          { supabaseUserId: user.id }
+        ]
+      }
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: 'No restaurant found for this user' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email,
+        restaurantId: restaurant.id 
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    });
+
+    console.log('✅ Login successful:', { userId: user.id, restaurantId: restaurant.id });
+
+    res.json({
+      success: true,
+      token,
+      restaurantId: restaurant.id,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/**
+ * Verify token endpoint
+ * GET /api/auth/verify
+ */
+app.get('/api/auth/verify', authenticateToken, async (req: any, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true
+      }
+    });
+
+    const restaurant = await prisma.restaurant.findFirst({
+      where: { 
+        OR: [
+          { email: user?.email },
+          { supabaseUserId: user?.id }
+        ]
+      },
+      select: {
+        id: true,
+        name: true
+      }
+    });
+
+    res.json({
+      valid: true,
+      user,
+      restaurant
+    });
+
+  } catch (error) {
+    console.error('❌ Token verification error:', error);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+/**
+ * Change password
+ * POST /api/auth/change-password
+ */
+app.post('/api/auth/change-password', authenticateToken, async (req: any, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId }
+    });
+
+    if (!user || !user.passwordHash) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: hashedPassword }
+    });
+
+    res.json({ success: true, message: 'Password updated successfully' });
+
+  } catch (error) {
+    console.error('❌ Password change error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
 
 // ==================== ROOT ENDPOINT ====================
 app.get('/', (req, res) => {
@@ -73,7 +420,14 @@ app.get('/', (req, res) => {
     status: 'operational',
     timestamp: new Date().toISOString(),
     endpoints: {
-      health: '/health',
+      auth: {
+        register: 'POST /api/auth/register',
+        login: 'POST /api/auth/login',
+        verify: 'GET /api/auth/verify',
+        changePassword: 'POST /api/auth/change-password'
+      },
+      test: 'GET /api/test',
+      health: 'GET /health',
       restaurants: {
         create: 'POST /api/restaurants',
         get: 'GET /api/restaurants/:restaurantId',
@@ -91,10 +445,10 @@ app.get('/', (req, res) => {
         qrCode: 'GET /api/table/:tableId/qrcode',
         downloadQR: 'GET /api/table/:tableId/qrcode/download'
       },
-      debug: {
-        setupMenu: 'POST /api/debug/setup-menu',
-        testRestaurant: 'POST /test/restaurant',
-        testOrder: 'POST /api/test/create-order'
+      demo: {
+        schedule: 'POST /api/demo/schedule',
+        requests: 'GET /api/demo/requests',
+        stats: 'GET /api/demo/stats'
       }
     }
   });
@@ -772,10 +1126,7 @@ app.post('/api/test/create-order', async (req, res) => {
   }
 });
 
-
-
 // ==================== DEMO SCHEDULING ENDPOINTS ====================
-// Production-ready endpoints for managing demo requests
 
 /**
  * Submit a new demo request
@@ -939,20 +1290,17 @@ app.get('/api/demo/requests', async (req, res) => {
   try {
     const { status, limit = '50', page = '1' } = req.query;
     
-    const pageSize = Math.min(parseInt(limit as string), 100); // Max 100 per page
+    const pageSize = Math.min(parseInt(limit as string), 100);
     const pageNumber = Math.max(parseInt(page as string), 1);
     const skip = (pageNumber - 1) * pageSize;
 
-    // Build where clause
     const where: any = {};
     if (status) {
       where.status = status;
     }
 
-    // Get total count
     const totalCount = await prisma.demoRequest.count({ where });
 
-    // Fetch requests
     const requests = await prisma.demoRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -1011,7 +1359,6 @@ app.patch('/api/demo/requests/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    // Validate status
     const validStatuses = ['PENDING', 'CONTACTED', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ 
@@ -1020,7 +1367,6 @@ app.patch('/api/demo/requests/:id/status', async (req, res) => {
       });
     }
     
-    // Check if request exists
     const existing = await prisma.demoRequest.findUnique({
       where: { id }
     });
@@ -1029,7 +1375,6 @@ app.patch('/api/demo/requests/:id/status', async (req, res) => {
       return res.status(404).json({ error: 'Demo request not found' });
     }
 
-    // Update status
     const request = await prisma.demoRequest.update({
       where: { id },
       data: { 
@@ -1053,13 +1398,11 @@ app.patch('/api/demo/requests/:id/status', async (req, res) => {
  */
 app.get('/api/demo/stats', async (req, res) => {
   try {
-    // Get counts by status
     const statusCounts = await prisma.demoRequest.groupBy({
       by: ['status'],
       _count: true
     });
 
-    // Get today's requests
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -1071,7 +1414,6 @@ app.get('/api/demo/stats', async (req, res) => {
       }
     });
 
-    // Get this week's requests
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     
@@ -1083,7 +1425,6 @@ app.get('/api/demo/stats', async (req, res) => {
       }
     });
 
-    // Get this month's requests
     const monthAgo = new Date();
     monthAgo.setMonth(monthAgo.getMonth() - 1);
     
@@ -1095,7 +1436,6 @@ app.get('/api/demo/stats', async (req, res) => {
       }
     });
 
-    // Format status counts
     const byStatus = statusCounts.reduce((acc: any, curr) => {
       acc[curr.status] = curr._count;
       return acc;
@@ -1128,7 +1468,6 @@ app.delete('/api/demo/requests/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Check if request exists
     const existing = await prisma.demoRequest.findUnique({
       where: { id }
     });
@@ -1137,7 +1476,6 @@ app.delete('/api/demo/requests/:id', async (req, res) => {
       return res.status(404).json({ error: 'Demo request not found' });
     }
 
-    // Delete from database
     await prisma.demoRequest.delete({
       where: { id }
     });
@@ -1164,7 +1502,6 @@ app.get('/api/demo/export/csv', async (req, res) => {
   try {
     const { status, startDate, endDate } = req.query;
     
-    // Build where clause
     const where: any = {};
     if (status) where.status = status;
     if (startDate || endDate) {
@@ -1173,13 +1510,11 @@ app.get('/api/demo/export/csv', async (req, res) => {
       if (endDate) where.createdAt.lte = new Date(endDate as string);
     }
 
-    // Fetch all requests (no pagination for export)
     const requests = await prisma.demoRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' }
     });
 
-    // Create CSV header
     const csvRows = [];
     csvRows.push([
       'ID',
@@ -1196,7 +1531,6 @@ app.get('/api/demo/export/csv', async (req, res) => {
       'Created At'
     ].join(','));
 
-    // Add data rows
     for (const req of requests) {
       csvRows.push([
         req.id,
@@ -1226,53 +1560,6 @@ app.get('/api/demo/export/csv', async (req, res) => {
   }
 });
 
-/**
- * Bulk update demo request statuses
- * POST /api/demo/requests/bulk/status
- */
-app.post('/api/demo/requests/bulk/status', async (req, res) => {
-  try {
-    const { ids, status } = req.body;
-    
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'Invalid or missing ids array' });
-    }
-
-    // Validate status
-    const validStatuses = ['PENDING', 'CONTACTED', 'COMPLETED', 'CANCELLED'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        error: 'Invalid status',
-        validStatuses
-      });
-    }
-
-    // Update all matching requests
-    const result = await prisma.demoRequest.updateMany({
-      where: {
-        id: {
-          in: ids
-        }
-      },
-      data: {
-        status,
-        updatedAt: new Date()
-      }
-    });
-
-    console.log(`✅ Bulk updated ${result.count} demo requests to status: ${status}`);
-    res.json({ 
-      success: true, 
-      count: result.count,
-      message: `Updated ${result.count} requests`
-    });
-
-  } catch (error) {
-    console.error('❌ Error bulk updating demo requests:', error);
-    res.status(500).json({ error: 'Failed to bulk update demo requests' });
-  }
-});
-
 // ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -1295,20 +1582,18 @@ io.on('connection', (socket) => {
 // Make io available to routes
 app.set('io', io);
 
-// ==================== GRACEFUL SHUTDOWN ====================
-process.on('SIGINT', async () => {
-  await prisma.$disconnect()
-  console.log('Server shutting down')
-  process.exit(0)
-});
-
 // ==================== USER ENDPOINTS ====================
 
 // Get user by ID
-app.get('/api/users/:userId', async (req, res) => {
+app.get('/api/users/:userId', authenticateToken, async (req: any, res) => {
   try {
     const { userId } = req.params;
     
+    // Ensure user can only access their own data
+    if (userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1327,13 +1612,12 @@ app.get('/api/users/:userId', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Add subscription info (mock for now)
     const userWithSubscription = {
       ...user,
       subscription: {
-        plan: 'free',
+        plan: 'professional',
         status: 'active',
-        features: ['basic_ordering', 'qr_codes']
+        features: ['unlimited_orders', 'team_management', 'analytics', 'qr_codes']
       }
     };
     
@@ -1345,11 +1629,15 @@ app.get('/api/users/:userId', async (req, res) => {
 });
 
 // Update user by ID
-app.patch('/api/users/:userId', async (req, res) => {
+app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { name, email, phone } = req.body;
     
+    if (userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -1375,10 +1663,16 @@ app.patch('/api/users/:userId', async (req, res) => {
 // ==================== RESTAURANT UPDATE ENDPOINT ====================
 
 // Update restaurant by ID
-app.patch('/api/restaurants/:restaurantId', async (req, res) => {
+app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, res) => {
   try {
     const { restaurantId } = req.params;
-    const { name, address, phone, cuisine } = req.body;
+    
+    // Ensure user owns this restaurant
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { name, address, phone } = req.body;
     
     const restaurant = await prisma.restaurant.update({
       where: { id: restaurantId },
@@ -1386,7 +1680,6 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
         name,
         address,
         phone
-        // Note: cuisine might need to be added to your schema if not present
       },
       select: {
         id: true,
@@ -1409,16 +1702,17 @@ app.patch('/api/restaurants/:restaurantId', async (req, res) => {
 // ==================== MENU MANAGEMENT ENDPOINTS ====================
 
 // Create a new menu item
-app.post('/api/menu/items', async (req, res) => {
+app.post('/api/menu/items', authenticateToken, async (req: any, res) => {
   try {
-    const { name, description, price, categoryId, restaurantId, isAvailable } = req.body;
+    const { name, description, price, categoryId, isAvailable } = req.body;
+    const restaurantId = req.user.restaurantId;
     
     console.log('📝 Creating menu item:', { name, categoryId, restaurantId });
     
-    if (!name || !price || !categoryId || !restaurantId) {
+    if (!name || !price || !categoryId) {
       return res.status(400).json({ 
         error: 'Missing required fields',
-        received: { name, price, categoryId, restaurantId }
+        received: { name, price, categoryId }
       });
     }
     
@@ -1446,11 +1740,23 @@ app.post('/api/menu/items', async (req, res) => {
 });
 
 // Update a menu item
-app.patch('/api/menu/items/:itemId', async (req, res) => {
+app.patch('/api/menu/items/:itemId', authenticateToken, async (req: any, res) => {
   try {
     const { itemId } = req.params;
     const { name, description, price, isAvailable } = req.body;
     
+    // Verify the menu item belongs to user's restaurant
+    const existing = await prisma.menuItem.findFirst({
+      where: {
+        id: itemId,
+        restaurantId: req.user.restaurantId
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
     const menuItem = await prisma.menuItem.update({
       where: { id: itemId },
       data: {
@@ -1469,10 +1775,22 @@ app.patch('/api/menu/items/:itemId', async (req, res) => {
 });
 
 // Delete a menu item
-app.delete('/api/menu/items/:itemId', async (req, res) => {
+app.delete('/api/menu/items/:itemId', authenticateToken, async (req: any, res) => {
   try {
     const { itemId } = req.params;
     
+    // Verify the menu item belongs to user's restaurant
+    const existing = await prisma.menuItem.findFirst({
+      where: {
+        id: itemId,
+        restaurantId: req.user.restaurantId
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
     await prisma.menuItem.delete({
       where: { id: itemId }
     });
@@ -1485,9 +1803,10 @@ app.delete('/api/menu/items/:itemId', async (req, res) => {
 });
 
 // Create a new category
-app.post('/api/menu/categories', async (req, res) => {
+app.post('/api/menu/categories', authenticateToken, async (req: any, res) => {
   try {
-    const { name, restaurantId } = req.body;
+    const { name } = req.body;
+    const restaurantId = req.user.restaurantId;
     
     const category = await prisma.menuCategory.create({
       data: {
