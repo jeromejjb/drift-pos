@@ -14,12 +14,15 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [qrCodes, setQrCodes] = useState<any[]>(data.qrCodes || []);
   const [error, setError] = useState('');
 
+  // Use environment variable for API URL
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
   const generateQRCodes = async () => {
     setGenerating(true);
     setError('');
     
     try {
-      const response = await fetch(`http://localhost:3001/api/restaurants/${restaurantId}/tables/generate-qrs`, {
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/tables/generate-qrs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -81,7 +84,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
   useEffect(() => {
     if (qrCodes.length === 0 && data.tables) {
-      // If we have tables but no QR codes, generate them
       generateQRCodes();
     }
   }, []);

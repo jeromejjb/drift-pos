@@ -18,13 +18,16 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
     cuisine: ''
   });
 
+  // Use environment variable for API URL
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
   useEffect(() => {
     fetchRestaurant();
   }, [restaurantId]);
 
   const fetchRestaurant = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/restaurants/${restaurantId}`);
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
       if (response.ok) {
         const data = await response.json();
         setInfo({
@@ -42,7 +45,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/restaurants/${restaurantId}`, {
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(info)
@@ -51,6 +54,8 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
       if (response.ok) {
         updateData({ restaurantInfo: info });
         onNext();
+      } else {
+        console.error('Failed to save restaurant');
       }
     } catch (error) {
       console.error('Error saving restaurant:', error);
