@@ -205,6 +205,26 @@ model User {
   @@map("users")
 }
 
+model DemoRequest {
+  id             String   @id @default(cuid())
+  name           String
+  email          String
+  phone          String?
+  restaurantName String
+  role           String?
+  teamSize       String?
+  preferredDate  DateTime
+  preferredTime  String
+  message        String?
+  status         String   @default("PENDING") // PENDING, CONTACTED, COMPLETED, CANCELLED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
 enum TableStatus {
   AVAILABLE
   OCCUPIED

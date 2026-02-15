@@ -772,6 +772,159 @@ app.post('/api/test/create-order', async (req, res) => {
   }
 });
 
+// ==================== DEMO SCHEDULING ENDPOINTS ====================
+
+// Submit a demo request
+app.post('/api/demo/schedule', async (req, res) => {
+  try {
+    const { 
+      name, 
+      email, 
+      phone, 
+      restaurant, 
+      role, 
+      teamSize, 
+      date, 
+      time, 
+      message 
+    } = req.body;
+    
+    console.log('📅 New demo request received:', { 
+      name, 
+      email, 
+      restaurant, 
+      date, 
+      time 
+    });
+
+    // Validate required fields
+    if (!name || !email || !restaurant || !date || !time) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['name', 'email', 'restaurant', 'date', 'time'],
+        received: { name, email, restaurant, date, time }
+      });
+    }
+
+    // OPTION 1: Save to database (if you have a DemoRequest model)
+    /*
+    const demoRequest = await prisma.demoRequest.create({
+      data: {
+        name,
+        email,
+        phone,
+        restaurantName: restaurant,
+        role,
+        teamSize,
+        preferredDate: new Date(date),
+        preferredTime: time,
+        message,
+        status: 'PENDING'
+      }
+    });
+    */
+
+    // OPTION 2: Send email notification (using your email service)
+    // You can integrate with SendGrid, Resend, AWS SES, etc.
+    
+    // For now, just log it and return success
+    console.log('✅ Demo request logged:', {
+      name,
+      email,
+      restaurant,
+      date,
+      time
+    });
+
+    // OPTION 3: Send to Slack (uncomment and add webhook URL)
+    /*
+    if (process.env.SLACK_WEBHOOK_URL) {
+      await fetch(process.env.SLACK_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `🚀 New Demo Request from ${restaurant}`,
+          blocks: [
+            {
+              type: 'section',
+              fields: [
+                { type: 'mrkdwn', text: `*Name:*\n${name}` },
+                { type: 'mrkdwn', text: `*Email:*\n${email}` },
+                { type: 'mrkdwn', text: `*Restaurant:*\n${restaurant}` },
+                { type: 'mrkdwn', text: `*Date:*\n${date} at ${time}` },
+                { type: 'mrkdwn', text: `*Role:*\n${role || 'Not specified'}` },
+                { type: 'mrkdwn', text: `*Team Size:*\n${teamSize || 'Not specified'}` }
+              ]
+            },
+            {
+              type: 'section',
+              text: { type: 'mrkdwn', text: `*Message:*\n${message || 'No message'}` }
+            }
+          ]
+        })
+      });
+    }
+    */
+
+    // OPTION 4: Send email (example with console.log)
+    console.log(`
+📧 ===== DEMO REQUEST =====
+Name: ${name}
+Email: ${email}
+Phone: ${phone || 'Not provided'}
+Restaurant: ${restaurant}
+Role: ${role || 'Not specified'}
+Team Size: ${teamSize || 'Not specified'}
+Preferred: ${date} at ${time}
+Message: ${message || 'No message'}
+=========================
+    `);
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Demo scheduled successfully',
+      data: {
+        name,
+        email,
+        restaurant,
+        date,
+        time
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error scheduling demo:', error);
+    res.status(500).json({ 
+      error: 'Failed to schedule demo',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get all demo requests (admin only - add auth later)
+app.get('/api/demo/requests', async (req, res) => {
+  try {
+    // This would require authentication in production
+    // For now, just return a message
+    res.json({ 
+      message: 'Demo requests endpoint - add authentication first',
+      note: 'This should be protected in production'
+    });
+    
+    // When you have a DemoRequest model:
+    /*
+    const requests = await prisma.demoRequest.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(requests);
+    */
+  } catch (error) {
+    console.error('Error fetching demo requests:', error);
+    res.status(500).json({ error: 'Failed to fetch demo requests' });
+  }
+});
+
+
 // ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
