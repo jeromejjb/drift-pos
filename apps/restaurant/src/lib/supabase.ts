@@ -6,11 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY: string
 }
 
-// Extend ImportMeta interface for Vite environment variables
-declare global {
-  interface ImportMeta {
-    readonly env: ImportMetaEnv
-  }
+interface ImportMeta {
+  readonly env: ImportMetaEnv
 }
 
 // Get environment variables
