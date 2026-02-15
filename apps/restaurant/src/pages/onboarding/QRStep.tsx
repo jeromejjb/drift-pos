@@ -14,24 +14,48 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [qrCodes, setQrCodes] = useState<any[]>(data.qrCodes || []);
   const [error, setError] = useState('');
 
-  // Use environment variable for API URL
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+  const getToken = () => {
+    const token = localStorage.getItem('drift-token');
+    if (!token) {
+      console.error('No token found');
+      window.location.href = '/login';
+      return null;
+    }
+    return token;
+  };
 
   const generateQRCodes = async () => {
     setGenerating(true);
     setError('');
     
     try {
+      const token = getToken();
+      if (!token) return;
+
+      console.log('Generating QR codes with token:', token.substring(0, 20) + '...');
+      
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/tables/generate-qrs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('drift-token');
+        window.location.href = '/login';
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to generate QR codes');
       }
 
       const data = await response.json();
+      console.log('QR codes generated:', data.tables.length);
       setQrCodes(data.tables);
       updateData({ qrCodes: data.tables });
     } catch (error) {
