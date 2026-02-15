@@ -1,46 +1,57 @@
 const testimonials = [
   {
-    quote: "Drift has transformed how we handle tables. Our customers love it and our staff spends more time serving, not splitting bills.",
+    quote: "We've been using Drift for 3 months and the difference is clear. Table turnover is faster, tips are higher, and customers keep coming back.",
     author: "Maria Bellini",
     role: "Owner, Trattoria Bellini",
     rating: 5
   },
   {
-    quote: "The pizza claim feature is genius. No more arguments over who had the last slice. Everyone just taps and pays.",
-    author: "John Smith",
-    role: "Manager, Pizza Heaven",
+    quote: "The split payment feature alone saves our staff hours each week. No more manual calculations or awkward moments between friends.",
+    author: "James Chen",
+    role: "Operations Manager, Noodle House",
     rating: 5
   },
   {
-    quote: "As a customer, I never want to go back to traditional restaurant payments. Drift just makes sense.",
+    quote: "As a regular at several Drift-enabled restaurants, I can't imagine going back to traditional payments. It just makes sense.",
     author: "Sarah Johnson",
-    role: "Regular Diner",
+    role: "Early Adopter",
     rating: 5
   }
 ];
 
 export function Testimonials() {
   return (
-    <section className="py-20 px-4">
+    <section className="py-24 px-4 bg-gray-50">
       <div className="container max-w-6xl mx-auto">
-        <h2 className="text-4xl font-light text-center mb-4">Loved by restaurants and diners</h2>
-        <p className="text-gray-400 text-center mb-12">Join hundreds of happy customers</p>
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-light text-primary mb-4">Trusted by early adopters</h2>
+          <p className="text-gray-500 max-w-2xl mx-auto">
+            We're building Drift with feedback from real restaurants and diners
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-8">
           {testimonials.map((t, i) => (
-            <div key={i} className="bg-white rounded-2xl p-6 border border-gray-100">
-              <div className="flex gap-1 mb-4">
+            <div key={i} className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex gap-1 mb-6">
                 {[...Array(t.rating)].map((_, i) => (
-                  <span key={i} className="text-black">★</span>
+                  <span key={i} className="text-yellow-400 text-xl">★</span>
                 ))}
               </div>
-              <p className="text-gray-600 mb-4">"{t.quote}"</p>
+              <p className="text-gray-700 mb-6 leading-relaxed">"{t.quote}"</p>
               <div>
-                <p className="font-medium">{t.author}</p>
+                <p className="font-semibold text-primary">{t.author}</p>
                 <p className="text-sm text-gray-400">{t.role}</p>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Optional: Add a subtle callout for more testimonials */}
+        <div className="text-center mt-12">
+          <p className="text-sm text-gray-400">
+            Join restaurants like yours • <button className="text-accent hover:underline">Share your experience</button>
+          </p>
         </div>
       </div>
     </section>

@@ -1,85 +1,73 @@
 import { Check } from 'lucide-react';
 
-const plans = [
-  {
-    name: 'Starter',
-    price: '0',
-    description: 'Perfect for testing',
-    features: [
-      'Up to 10 tables',
-      'Basic ordering',
-      'Email support',
-      'QR code generation'
-    ]
-  },
-  {
-    name: 'Pro',
-    price: '49',
-    description: 'For growing restaurants',
-    features: [
-      'Unlimited tables',
-      'Advanced analytics',
-      'Priority support',
-      'Custom branding',
-      'Staff accounts',
-      'Menu management'
-    ],
-    popular: true
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    description: 'For chains and groups',
-    features: [
-      'Multiple locations',
-      'Dedicated account manager',
-      'API access',
-      'Custom integrations',
-      'SLA guarantee'
-    ]
-  }
-];
-
 export function Pricing() {
   return (
-    <section id="pricing" className="py-20 bg-gray-50 px-4">
+    <section className="py-24 px-4 bg-gray-50">
       <div className="container max-w-6xl mx-auto">
-        <h2 className="text-4xl font-light text-center mb-4">Simple, transparent pricing</h2>
-        <p className="text-gray-400 text-center mb-12">No hidden fees. Cancel anytime.</p>
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-light text-primary mb-4">Simple, transparent pricing</h2>
+          <p className="text-gray-500 max-w-2xl mx-auto">
+            Everything you need to manage your restaurant's payments in one place
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((plan, i) => (
-            <div key={i} className={`bg-white rounded-3xl p-6 border ${plan.popular ? 'border-black' : 'border-gray-100'}`}>
-              {plan.popular && (
-                <span className="text-xs bg-black text-white px-3 py-1 rounded-full mb-4 inline-block">
-                  Most Popular
-                </span>
-              )}
-              <h3 className="text-xl font-medium mb-2">{plan.name}</h3>
-              <div className="mb-4">
-                <span className="text-4xl font-light">${plan.price}</span>
-                {plan.price !== 'Custom' && <span className="text-gray-400">/mo</span>}
-              </div>
-              <p className="text-sm text-gray-400 mb-6">{plan.description}</p>
-              
-              <div className="space-y-3 mb-6">
-                {plan.features.map((feature, j) => (
-                  <div key={j} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-green-500" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <button className={`w-full py-3 rounded-full transition-colors ${
-                plan.popular 
-                  ? 'bg-black text-white hover:bg-gray-800' 
-                  : 'bg-white border border-gray-200 hover:border-black'
-              }`}>
-                Get started
-              </button>
+        <div className="max-w-md mx-auto">
+          <div className="fin-card text-center">
+            {/* Professional badge */}
+            <div className="inline-flex items-center gap-2 bg-accent/10 text-accent px-3 py-1 rounded-full text-sm font-medium mb-6">
+              Early access pricing
             </div>
-          ))}
+
+            <div className="mb-8">
+              <h3 className="text-2xl font-semibold text-primary mb-2">Professional</h3>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-5xl font-light">$97</span>
+                <span className="text-gray-400">/month</span>
+              </div>
+              <p className="text-sm text-gray-400 mt-2">plus 1.5% per transaction</p>
+            </div>
+
+            <ul className="space-y-4 mb-8 text-left">
+              {[
+                'Unlimited orders',
+                'Unlimited team members',
+                'Real-time analytics dashboard',
+                'Customer payment portal',
+                'Automated bill splitting',
+                'Priority email & chat support',
+                'Regular feature updates'
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  <span className="text-gray-600">{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <button className="fin-btn-primary w-full">
+              Start your 14-day trial
+            </button>
+
+            <p className="text-xs text-gray-400 mt-4">
+              No credit card required • Cancel anytime
+            </p>
+          </div>
+
+          {/* Optional: Annual option */}
+          <div className="text-center mt-6">
+            <p className="text-sm text-gray-500">
+              Save 20% with annual billing •{' '}
+              <button className="text-accent hover:underline">Contact sales</button>
+            </p>
+          </div>
+        </div>
+
+        {/* Feature comparison note */}
+        <div className="text-center mt-16">
+          <p className="text-sm text-gray-400">
+            Need custom features or higher volume?{' '}
+            <button className="text-accent hover:underline">Talk to our team</button>
+          </p>
         </div>
       </div>
     </section>

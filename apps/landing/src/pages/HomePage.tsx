@@ -20,25 +20,7 @@ export function HomePage() {
       
       <Features />
       
-      {/* Professional metric highlight section */}
-      <div className="bg-gradient-surface py-16 my-8">
-        <div className="container max-w-7xl mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="fin-metric-card text-center">
-              <div className="fin-stat">$2.5B+</div>
-              <div className="fin-stat-label">Processed annually</div>
-            </div>
-            <div className="fin-metric-card text-center">
-              <div className="fin-stat">99.9%</div>
-              <div className="fin-stat-label">Uptime SLA</div>
-            </div>
-            <div className="fin-metric-card text-center">
-              <div className="fin-stat">5,000+</div>
-              <div className="fin-stat-label">Restaurants</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Remove the fake stats section completely */}
       
       <RestaurantShowcase />
       <DinerShowcase />

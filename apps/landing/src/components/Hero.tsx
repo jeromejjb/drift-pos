@@ -14,50 +14,47 @@ export function Hero() {
   };
 
   return (
-    <section className="pt-32 pb-20 px-4">
+    <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-white to-gray-50">
       <div className="container max-w-6xl mx-auto text-center">
-        <h1 className="text-6xl md:text-8xl font-light tracking-tight mb-6 animate-fade-in">
-          eat · drink · <span className="italic">drift</span>
+        {/* Professional badge */}
+        <div className="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full mb-8 animate-fade-in">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          <span className="text-sm font-medium text-gray-600">Professional payment infrastructure for restaurants</span>
+        </div>
+
+        <h1 className="text-5xl md:text-7xl font-light tracking-tight mb-6 animate-fade-in text-primary">
+          The complete financial stack for<br />
+          <span className="bg-gradient-primary bg-clip-text text-transparent font-normal">
+            growing restaurants
+          </span>
         </h1>
-        <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-12 animate-slide-up">
-          The simplest way for restaurants to handle orders and payments. 
-          No apps. No awkward splitting. Just good food and good company.
+        
+        <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-12 animate-slide-up leading-relaxed">
+          From first order to final payment — handle everything in one place. 
+          Start your 14-day trial today, no credit card required.
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
           <button 
             onClick={handleGetStarted}
-            className="bg-black text-white px-8 py-4 rounded-full text-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="fin-btn-primary text-base px-8 py-4 cursor-pointer group"
           >
-            Start with Drift
-            <ArrowRight className="w-5 h-5" />
+            <span className="flex items-center gap-2">
+              Start free trial
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </span>
           </button>
           <button 
             onClick={handleLearnMore}
-            className="bg-white border border-gray-200 px-8 py-4 rounded-full text-lg hover:border-black transition-colors cursor-pointer"
+            className="fin-btn-secondary text-base px-8 py-4 cursor-pointer"
           >
             See how it works
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-20">
-          <div className="cursor-default">
-            <div className="text-3xl font-light">50+</div>
-            <div className="text-sm text-gray-400">Restaurants</div>
-          </div>
-          <div className="cursor-default">
-            <div className="text-3xl font-light">10k+</div>
-            <div className="text-sm text-gray-400">Happy Diners</div>
-          </div>
-          <div className="cursor-default">
-            <div className="text-3xl font-light">$2M+</div>
-            <div className="text-sm text-gray-400">Processed</div>
-          </div>
-          <div className="cursor-default">
-            <div className="text-3xl font-light">4.9★</div>
-            <div className="text-sm text-gray-400">Rating</div>
-          </div>
+        {/* Trial badge */}
+        <div className="mt-8 text-sm text-gray-400">
+          ✨ 14-day free trial • No credit card needed • Cancel anytime
         </div>
       </div>
     </section>
