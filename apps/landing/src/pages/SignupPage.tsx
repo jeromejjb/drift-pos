@@ -7,11 +7,14 @@ export function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    restaurantName: '',
+    businessName: '', // Changed from restaurantName to be more generic
     email: '',
     password: '',
     agreeTerms: false
   });
+
+  // Use environment variable for API URL
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,31 +22,36 @@ export function SignupPage() {
     setError('');
     
     try {
-      // Call your API to create restaurant
-      const response = await fetch('http://localhost:3001/api/restaurants', {
+      // Call the auth/register endpoint instead of restaurants directly
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.restaurantName,
+          name: formData.businessName, // User's name (you might want to add a name field)
           email: formData.email,
-          supabaseUserId: `temp-${Date.now()}`, // Replace with real auth later
+          password: formData.password,
+          restaurantName: formData.businessName // Business name for the restaurant
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create restaurant');
+        throw new Error(data.error || 'Failed to create account');
       }
 
-      // Save restaurant info
-      localStorage.setItem('drift-restaurant-id', data.id);
+      // Save auth info
+      localStorage.setItem('drift-token', data.token);
+      localStorage.setItem('drift-restaurant-id', data.restaurantId);
       localStorage.setItem('drift-user-email', formData.email);
 
-      // Direct to onboarding (not login!)
-      window.location.href = `http://localhost:5174/onboarding?restaurantId=${data.id}`;
+      // Get the restaurant app URL from env or default
+      const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'http://localhost:5174';
+      
+      // Direct to onboarding with restaurant ID
+      window.location.href = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}`;
       
     } catch (err) {
       console.error('Signup error:', err);
@@ -125,8 +133,8 @@ export function SignupPage() {
                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  value={formData.restaurantName}
-                  onChange={(e) => setFormData({...formData, restaurantName: e.target.value})}
+                  value={formData.businessName}
+                  onChange={(e) => setFormData({...formData, businessName: e.target.value})}
                   className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   placeholder="Trattoria Bellini"
                   required

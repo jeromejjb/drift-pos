@@ -8,13 +8,18 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Use environment variable for API URL
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'http://localhost:5174';
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     try {
-      // Call your API to authenticate
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      console.log('🔐 Login attempt:', { email });
+      
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -27,14 +32,17 @@ export function LoginPage() {
         localStorage.setItem('drift-token', data.token);
         localStorage.setItem('drift-restaurant-id', data.restaurantId);
         
-        // Direct to restaurant dashboard (not login page!)
-        window.location.href = `http://localhost:5174/dashboard/${data.restaurantId}`;
+        console.log('✅ Login successful, redirecting to dashboard');
+        
+        // Direct to restaurant dashboard with restaurant ID
+        window.location.href = `${RESTAURANT_URL}/dashboard/${data.restaurantId}`;
       } else {
         alert(data.error || 'Login failed');
         setLoading(false);
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
+      alert('Connection error. Please check your internet connection and try again.');
       setLoading(false);
     }
   };
