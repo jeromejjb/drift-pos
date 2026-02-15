@@ -1,4 +1,3 @@
-// apps/restaurant/src/pages/OnboardingPage.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,8 +10,6 @@ import {
   CheckCircle,
   ArrowLeft,
 } from 'lucide-react';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
 import { RestaurantInfoStep } from './onboarding/RestaurantInfoStep';
 import { TablesStep } from './onboarding/TablesStep';
 import { MenuImportStep } from './onboarding/MenuImportStep';
@@ -47,20 +44,18 @@ export function OnboardingPage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
-  // Load restaurant ID from URL and saved progress
   useEffect(() => {
     const id = searchParams.get('restaurantId');
     console.log('📦 Onboarding page loaded with restaurantId:', id);
     
     if (!id) {
-      console.log('❌ No restaurantId found, redirecting to login');
-      navigate('/');
+      console.log('❌ No restaurantId found - this should not happen from signup');
+      // Instead of redirecting to login, show an error
       return;
     }
     
     setRestaurantId(id);
 
-    // Load saved progress from localStorage
     const saved = localStorage.getItem(`onboarding-${id}`);
     if (saved) {
       try {
@@ -72,9 +67,8 @@ export function OnboardingPage() {
         console.error('Error loading saved progress:', e);
       }
     }
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
-  // Save progress whenever step or data changes
   useEffect(() => {
     if (restaurantId) {
       localStorage.setItem(`onboarding-${restaurantId}`, JSON.stringify({
@@ -106,13 +100,21 @@ export function OnboardingPage() {
   const CurrentStepComponent = steps[currentStep].component;
   const progress = ((currentStep + 1) / steps.length) * 100;
 
-  // If no restaurantId yet, show loading
   if (!restaurantId) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-200 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading your setup...</p>
+        <div className="text-center max-w-md p-8">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h2 className="text-2xl font-light mb-2">Something went wrong</h2>
+          <p className="text-gray-400 mb-4">No restaurant ID provided. Please go back to signup.</p>
+          <button
+            onClick={() => window.location.href = 'https://drift-landing.onrender.com/signup'}
+            className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800"
+          >
+            Back to Signup
+          </button>
         </div>
       </div>
     );

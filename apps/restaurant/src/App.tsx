@@ -11,14 +11,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Login page - available at both root and /login */}
+        {/* Public routes */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/login" element={<LoginPage />} />
         
-        {/* Onboarding */}
+        {/* Onboarding - THIS MUST BE PUBLIC (no auth required) */}
         <Route path="/onboarding" element={<OnboardingPage />} />
         
-        {/* Protected routes */}
+        {/* Protected routes - require authentication */}
         <Route path="/dashboard/:restaurantId" element={<DashboardPage />} />
         <Route path="/tables/:restaurantId" element={<TablesPage />} />
         <Route path="/orders/:restaurantId" element={<OrdersPage />} />
