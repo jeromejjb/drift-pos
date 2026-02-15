@@ -165,6 +165,17 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email }
@@ -188,7 +199,7 @@ app.post('/api/auth/register', async (req, res) => {
         }
       });
 
-      // Create restaurant
+      // Create restaurant with 5 default tables
       const restaurant = await tx.restaurant.create({
         data: {
           name: restaurantName,
@@ -196,11 +207,11 @@ app.post('/api/auth/register', async (req, res) => {
           supabaseUserId: user.id,
           tables: {
             create: [
-              { number: 1, qrCode: `table_1_${Date.now()}` },
-              { number: 2, qrCode: `table_2_${Date.now()}` },
-              { number: 3, qrCode: `table_3_${Date.now()}` },
-              { number: 4, qrCode: `table_4_${Date.now()}` },
-              { number: 5, qrCode: `table_5_${Date.now()}` },
+              { number: 1 },
+              { number: 2 },
+              { number: 3 },
+              { number: 4 },
+              { number: 5 }
             ]
           }
         },
@@ -342,8 +353,9 @@ app.get('/api/auth/verify', authenticateToken, async (req: any, res) => {
       where: { id: req.user.userId },
       select: {
         id: true,
+        name: true,
         email: true,
-        name: true
+        phone: true
       }
     });
 
@@ -382,6 +394,10 @@ app.post('/api/auth/change-password', authenticateToken, async (req: any, res) =
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
 
     const user = await prisma.user.findUnique({
@@ -429,21 +445,29 @@ app.get('/', (req, res) => {
       test: 'GET /api/test',
       health: 'GET /health',
       restaurants: {
-        create: 'POST /api/restaurants',
         get: 'GET /api/restaurants/:restaurantId',
+        update: 'PATCH /api/restaurants/:restaurantId',
         tables: 'GET /api/restaurant/:restaurantId/tables',
         orders: 'GET /api/restaurant/:restaurantId/orders',
         stats: 'GET /api/restaurant/:restaurantId/stats',
         menu: 'GET /api/restaurant/:restaurantId/menu'
       },
+      tables: {
+        getAll: 'GET /api/restaurant/:restaurantId/tables',
+        generateQR: 'POST /api/tables/:tableId/generate-qr',
+        generateAllQR: 'POST /api/restaurants/:restaurantId/tables/generate-qrs',
+        downloadQR: 'GET /api/tables/:tableId/qrcode/download',
+        getQR: 'GET /api/table/:tableId/qrcode'
+      },
+      menu: {
+        createItem: 'POST /api/menu/items',
+        updateItem: 'PATCH /api/menu/items/:itemId',
+        deleteItem: 'DELETE /api/menu/items/:itemId',
+        createCategory: 'POST /api/menu/categories'
+      },
       orders: {
         create: 'POST /api/orders',
-        update: 'PATCH /api/order/:orderId/status'
-      },
-      tables: {
-        lookup: 'GET /api/table/:tableId/restaurant',
-        qrCode: 'GET /api/table/:tableId/qrcode',
-        downloadQR: 'GET /api/table/:tableId/qrcode/download'
+        updateStatus: 'PATCH /api/order/:orderId/status'
       },
       demo: {
         schedule: 'POST /api/demo/schedule',
@@ -474,112 +498,7 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// ==================== TEST ENDPOINTS ====================
-app.post('/test/restaurant', async (req, res) => {
-  try {
-    const restaurant = await prisma.restaurant.create({
-      data: {
-        name: 'Trattoria Bellini',
-        address: '123 Main St',
-        tables: {
-          create: [
-            { number: 1, qrCode: `table_1_${Date.now()}` },
-            { number: 2, qrCode: `table_2_${Date.now()}` },
-            { number: 3, qrCode: `table_3_${Date.now()}` },
-          ]
-        }
-      },
-      include: {
-        tables: true
-      }
-    })
-    res.json(restaurant)
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error creating restaurant:', err)
-    res.status(500).json({ error: 'Failed to create restaurant' })
-  }
-});
-
 // ==================== RESTAURANT ENDPOINTS ====================
-
-// Create a new restaurant (called from signup)
-app.post('/api/restaurants', async (req, res) => {
-  try {
-    const { name, email, supabaseUserId } = req.body;
-    
-    console.log('📝 Creating restaurant:', { name, email, supabaseUserId });
-    
-    if (!name || !email || !supabaseUserId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        received: { name, email, supabaseUserId }
-      });
-    }
-    
-    // Check if restaurant already exists
-    const existing = await prisma.restaurant.findFirst({
-      where: {
-        OR: [
-          { email: email },
-          { supabaseUserId: supabaseUserId }
-        ]
-      }
-    });
-    
-    if (existing) {
-      console.log('⚠️ Restaurant already exists:', existing.id);
-      return res.json(existing);
-    }
-    
-    // Create new restaurant with default tables
-    const restaurant = await prisma.restaurant.create({
-      data: {
-        name: name,
-        email: email,
-        supabaseUserId: supabaseUserId,
-        tables: {
-          create: [
-            { number: 1, qrCode: `table_1_${Date.now()}` },
-            { number: 2, qrCode: `table_2_${Date.now()}` },
-            { number: 3, qrCode: `table_3_${Date.now()}` },
-            { number: 4, qrCode: `table_4_${Date.now()}` },
-            { number: 5, qrCode: `table_5_${Date.now()}` },
-          ]
-        }
-      },
-      include: {
-        tables: true
-      }
-    });
-    
-    // Create user record
-    try {
-      await prisma.user.upsert({
-        where: { email: email },
-        update: {},
-        create: {
-          id: supabaseUserId,
-          email: email,
-          name: name,
-          supabaseId: supabaseUserId
-        }
-      });
-    } catch (userError) {
-      console.log('⚠️ User creation issue:', userError);
-    }
-    
-    console.log('✅ Restaurant created:', restaurant.id);
-    res.status(201).json(restaurant);
-    
-  } catch (error) {
-    console.error('❌ Error creating restaurant:', error);
-    res.status(500).json({ 
-      error: 'Failed to create restaurant',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
 
 // Get restaurant by ID
 app.get('/api/restaurants/:restaurantId', async (req, res) => {
@@ -610,7 +529,44 @@ app.get('/api/restaurants/:restaurantId', async (req, res) => {
   }
 });
 
-// Get restaurant by table ID
+// Update restaurant by ID
+app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    // Ensure user owns this restaurant
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { name, address, phone } = req.body;
+    
+    const restaurant = await prisma.restaurant.update({
+      where: { id: restaurantId },
+      data: {
+        name,
+        address,
+        phone
+      },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        phone: true,
+        email: true,
+        logo: true,
+        timezone: true
+      }
+    });
+    
+    res.json(restaurant);
+  } catch (error) {
+    console.error('Error updating restaurant:', error);
+    res.status(500).json({ error: 'Failed to update restaurant' });
+  }
+});
+
+// Get restaurant by table ID (for diner app)
 app.get('/api/table/:tableId/restaurant', async (req, res) => {
   try {
     const { tableId } = req.params;
@@ -661,7 +617,100 @@ app.get('/api/restaurant/:restaurantId/tables', async (req, res) => {
   }
 });
 
-// Generate QR code for a table
+// Generate QR code for a single table
+app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
+  try {
+    const { tableId } = req.params;
+    
+    const table = await prisma.table.findUnique({
+      where: { id: tableId },
+      include: { restaurant: true }
+    });
+    
+    if (!table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+    
+    const baseUrl = process.env.DINER_URL || 'http://localhost:5175';
+    const url = `${baseUrl}/table/${tableId}`;
+    
+    const qrDataUrl = await QRCode.toDataURL(url, {
+      width: 400,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+    
+    // Update table with QR code URL
+    await prisma.table.update({
+      where: { id: tableId },
+      data: { qrCode: url }
+    });
+    
+    res.json({
+      tableId: table.id,
+      tableNumber: table.number,
+      qrCode: qrDataUrl,
+      url: url
+    });
+  } catch (error) {
+    console.error('QR generation error:', error);
+    res.status(500).json({ error: 'Failed to generate QR code' });
+  }
+});
+
+// Generate QR codes for all tables in a restaurant
+app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    
+    const tables = await prisma.table.findMany({
+      where: { restaurantId },
+      include: { restaurant: true }
+    });
+    
+    if (!tables.length) {
+      return res.status(404).json({ error: 'No tables found' });
+    }
+    
+    const baseUrl = process.env.DINER_URL || 'http://localhost:5175';
+    const qrCodes = [];
+    
+    for (const table of tables) {
+      const url = `${baseUrl}/table/${table.id}`;
+      
+      const qrDataUrl = await QRCode.toDataURL(url, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+      
+      await prisma.table.update({
+        where: { id: table.id },
+        data: { qrCode: url }
+      });
+      
+      qrCodes.push({
+        tableId: table.id,
+        tableNumber: table.number,
+        qrCode: qrDataUrl,
+        url: url
+      });
+    }
+    
+    res.json({ tables: qrCodes });
+  } catch (error) {
+    console.error('Bulk QR generation error:', error);
+    res.status(500).json({ error: 'Failed to generate QR codes' });
+  }
+});
+
+// Get QR code for a table (GET version)
 app.get('/api/table/:tableId/qrcode', async (req, res) => {
   try {
     const { tableId } = req.params;
@@ -675,7 +724,7 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
     
-    const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
+    const baseUrl = process.env.DINER_URL || 'http://localhost:5175';
     const url = `${baseUrl}/table/${tableId}`;
     
     const qrDataUrl = await QRCode.toDataURL(url, {
@@ -702,7 +751,7 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
 });
 
 // Download QR code as PNG
-app.get('/api/table/:tableId/qrcode/download', async (req, res) => {
+app.get('/api/tables/:tableId/qrcode/download', async (req, res) => {
   try {
     const { tableId } = req.params;
     
@@ -715,7 +764,7 @@ app.get('/api/table/:tableId/qrcode/download', async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
     
-    const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
+    const baseUrl = process.env.DINER_URL || 'http://localhost:5175';
     const url = `${baseUrl}/table/${tableId}`;
     
     const qrBuffer = await QRCode.toBuffer(url, {
@@ -728,12 +777,12 @@ app.get('/api/table/:tableId/qrcode/download', async (req, res) => {
     });
     
     res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Content-Disposition', `attachment; filename=${table.restaurant.name.replace(/\s+/g, '-')}-table-${table.number}.png`);
+    res.setHeader('Content-Disposition', `attachment; filename=table-${table.number}.png`);
     res.send(qrBuffer);
   } catch (error) {
     const err = error as Error;
     console.error('QR download error:', err);
-    res.status(500).json({ error: 'Failed to generate QR code' });
+    res.status(500).json({ error: 'Failed to download QR code' });
   }
 });
 
@@ -748,6 +797,7 @@ app.get('/api/restaurant/:restaurantId/menu', async (req, res) => {
       where: { restaurantId },
       include: {
         items: {
+          where: { isAvailable: true },
           orderBy: { name: 'asc' }
         }
       },
@@ -762,112 +812,143 @@ app.get('/api/restaurant/:restaurantId/menu', async (req, res) => {
   }
 });
 
-// Debug endpoint to set up menu items
-app.post('/api/debug/setup-menu', async (req, res) => {
+// Create a new menu item
+app.post('/api/menu/items', authenticateToken, async (req: any, res) => {
   try {
-    const { restaurantId } = req.body;
+    const { name, description, price, categoryId, isAvailable } = req.body;
+    const restaurantId = req.user.restaurantId;
     
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId }
-    });
+    console.log('📝 Creating menu item:', { name, categoryId, restaurantId });
     
-    if (!restaurant) {
-      return res.status(404).json({ error: 'Restaurant not found' });
+    if (!name || !price || !categoryId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        received: { name, price, categoryId }
+      });
     }
     
-    const cat1 = await prisma.menuCategory.upsert({
-      where: { id: 'cat1' },
-      update: {},
-      create: {
-        id: 'cat1',
-        name: 'Antipasti',
-        sortOrder: 0,
+    // Verify category belongs to restaurant
+    const category = await prisma.menuCategory.findFirst({
+      where: {
+        id: categoryId,
         restaurantId
       }
     });
     
-    const cat2 = await prisma.menuCategory.upsert({
-      where: { id: 'cat2' },
-      update: {},
-      create: {
-        id: 'cat2',
-        name: 'Pizza',
-        sortOrder: 1,
-        restaurantId
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    const menuItem = await prisma.menuItem.create({
+      data: {
+        name,
+        description,
+        price: parseFloat(price),
+        categoryId,
+        restaurantId,
+        isAvailable: isAvailable ?? true
       }
     });
     
-    const items = await prisma.menuItem.createMany({
-      data: [
-        { 
-          id: 'item1', 
-          name: 'Arancini', 
-          description: 'Crispy rice balls with mozzarella', 
-          price: 12, 
-          isShared: true, 
-          categoryId: cat1.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item2', 
-          name: 'Calamari', 
-          description: 'Fried squid with marinara', 
-          price: 14, 
-          isShared: true, 
-          categoryId: cat1.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item3', 
-          name: 'Burrata', 
-          description: 'Creamy burrata with heirloom tomatoes', 
-          price: 16, 
-          isShared: true, 
-          categoryId: cat1.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item4', 
-          name: 'Margherita', 
-          description: 'Tomato, mozzarella, basil', 
-          price: 18, 
-          isShared: true, 
-          categoryId: cat2.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item5', 
-          name: 'Diavola', 
-          description: 'Spicy salami, tomato, mozzarella', 
-          price: 20, 
-          isShared: true, 
-          categoryId: cat2.id, 
-          restaurantId 
-        },
-        { 
-          id: 'item6', 
-          name: 'Quattro Formaggi', 
-          description: 'Four cheese blend', 
-          price: 22, 
-          isShared: true, 
-          categoryId: cat2.id, 
-          restaurantId 
-        }
-      ],
-      skipDuplicates: true
-    });
-    
-    res.json({ 
-      success: true, 
-      message: 'Menu setup complete',
-      categories: [cat1, cat2],
-      itemsCreated: items.count
-    });
+    console.log('✅ Menu item created:', menuItem.id);
+    res.status(201).json(menuItem);
     
   } catch (error) {
-    const err = error as Error;
-    console.error('Error setting up menu:', err);
-    res.status(500).json({ error: err.message });
+    console.error('❌ Error creating menu item:', error);
+    res.status(500).json({ 
+      error: 'Failed to create menu item',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Update a menu item
+app.patch('/api/menu/items/:itemId', authenticateToken, async (req: any, res) => {
+  try {
+    const { itemId } = req.params;
+    const { name, description, price, isAvailable } = req.body;
+    
+    // Verify the menu item belongs to user's restaurant
+    const existing = await prisma.menuItem.findFirst({
+      where: {
+        id: itemId,
+        restaurantId: req.user.restaurantId
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
+    const menuItem = await prisma.menuItem.update({
+      where: { id: itemId },
+      data: {
+        name,
+        description,
+        price: price ? parseFloat(price) : undefined,
+        isAvailable
+      }
+    });
+    
+    res.json(menuItem);
+  } catch (error) {
+    console.error('Error updating menu item:', error);
+    res.status(500).json({ error: 'Failed to update menu item' });
+  }
+});
+
+// Delete a menu item
+app.delete('/api/menu/items/:itemId', authenticateToken, async (req: any, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    // Verify the menu item belongs to user's restaurant
+    const existing = await prisma.menuItem.findFirst({
+      where: {
+        id: itemId,
+        restaurantId: req.user.restaurantId
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
+    await prisma.menuItem.delete({
+      where: { id: itemId }
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting menu item:', error);
+    res.status(500).json({ error: 'Failed to delete menu item' });
+  }
+});
+
+// Create a new category
+app.post('/api/menu/categories', authenticateToken, async (req: any, res) => {
+  try {
+    const { name } = req.body;
+    const restaurantId = req.user.restaurantId;
+    
+    // Get the highest sort order
+    const lastCategory = await prisma.menuCategory.findFirst({
+      where: { restaurantId },
+      orderBy: { sortOrder: 'desc' }
+    });
+    
+    const category = await prisma.menuCategory.create({
+      data: {
+        name,
+        restaurantId,
+        sortOrder: (lastCategory?.sortOrder || 0) + 1
+      }
+    });
+    
+    res.json(category);
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: 'Failed to create category' });
   }
 });
 
@@ -889,7 +970,8 @@ app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
         },
         table: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: 50
     });
     
     const formattedOrders = orders.map(order => ({
@@ -1007,6 +1089,7 @@ app.post('/api/orders', async (req, res) => {
       }
     });
 
+    // Verify all menu items exist
     for (const item of items) {
       const menuItem = await prisma.menuItem.findUnique({
         where: { id: item.menuItemId }
@@ -1074,6 +1157,11 @@ app.patch('/api/order/:orderId/status', async (req, res) => {
     const { orderId } = req.params;
     const { status } = req.body;
     
+    const validStatuses = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
+    if (!validStatuses.includes(status.toUpperCase())) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    
     const order = await prisma.order.update({
       where: { id: orderId },
       data: { status: status.toUpperCase() },
@@ -1087,42 +1175,6 @@ app.patch('/api/order/:orderId/status', async (req, res) => {
     const err = error as Error;
     console.error('Error updating order:', err);
     res.status(500).json({ error: 'Failed to update order' });
-  }
-});
-
-// Test endpoint to create an order
-app.post('/api/test/create-order', async (req, res) => {
-  try {
-    const { restaurantId, tableId, userId, items, total } = req.body;
-    
-    const order = await prisma.order.create({
-      data: {
-        restaurantId,
-        tableId,
-        userId,
-        total,
-        status: 'PENDING',
-        items: {
-          create: items.map((item: any) => ({
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            price: item.price
-          }))
-        }
-      },
-      include: {
-        items: true,
-        table: true
-      }
-    });
-    
-    io.to(`restaurant:${restaurantId}`).emit('order-updated', order);
-    
-    res.json(order);
-  } catch (error) {
-    const err = error as Error;
-    console.error('Error creating order:', err);
-    res.status(500).json({ error: 'Failed to create order' });
   }
 });
 
@@ -1286,8 +1338,9 @@ app.post('/api/demo/schedule', async (req, res) => {
  * Get all demo requests (paginated)
  * GET /api/demo/requests
  */
-app.get('/api/demo/requests', async (req, res) => {
+app.get('/api/demo/requests', authenticateToken, async (req: any, res) => {
   try {
+    // Only allow admin users - you can add an admin check here
     const { status, limit = '50', page = '1' } = req.query;
     
     const pageSize = Math.min(parseInt(limit as string), 100);
@@ -1327,76 +1380,10 @@ app.get('/api/demo/requests', async (req, res) => {
 });
 
 /**
- * Get demo request by ID
- * GET /api/demo/requests/:id
- */
-app.get('/api/demo/requests/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const request = await prisma.demoRequest.findUnique({
-      where: { id }
-    });
-    
-    if (!request) {
-      return res.status(404).json({ error: 'Demo request not found' });
-    }
-    
-    res.json(request);
-
-  } catch (error) {
-    console.error('❌ Error fetching demo request:', error);
-    res.status(500).json({ error: 'Failed to fetch demo request' });
-  }
-});
-
-/**
- * Update demo request status
- * PATCH /api/demo/requests/:id/status
- */
-app.patch('/api/demo/requests/:id/status', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    const validStatuses = ['PENDING', 'CONTACTED', 'COMPLETED', 'CANCELLED'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        error: 'Invalid status',
-        validStatuses
-      });
-    }
-    
-    const existing = await prisma.demoRequest.findUnique({
-      where: { id }
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Demo request not found' });
-    }
-
-    const request = await prisma.demoRequest.update({
-      where: { id },
-      data: { 
-        status,
-        updatedAt: new Date()
-      }
-    });
-
-    console.log(`✅ Demo request ${id} status updated to: ${status}`);
-    res.json(request);
-
-  } catch (error) {
-    console.error('❌ Error updating demo request:', error);
-    res.status(500).json({ error: 'Failed to update demo request' });
-  }
-});
-
-/**
  * Get demo request statistics
  * GET /api/demo/stats
  */
-app.get('/api/demo/stats', async (req, res) => {
+app.get('/api/demo/stats', authenticateToken, async (req: any, res) => {
   try {
     const statusCounts = await prisma.demoRequest.groupBy({
       by: ['status'],
@@ -1460,106 +1447,6 @@ app.get('/api/demo/stats', async (req, res) => {
   }
 });
 
-/**
- * Delete demo request
- * DELETE /api/demo/requests/:id
- */
-app.delete('/api/demo/requests/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const existing = await prisma.demoRequest.findUnique({
-      where: { id }
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Demo request not found' });
-    }
-
-    await prisma.demoRequest.delete({
-      where: { id }
-    });
-
-    console.log(`✅ Demo request ${id} deleted`);
-    res.json({ success: true, message: 'Demo request deleted' });
-
-  } catch (error) {
-    console.error('❌ Error deleting demo request:', error);
-    
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      return res.status(404).json({ error: 'Demo request not found' });
-    }
-    
-    res.status(500).json({ error: 'Failed to delete demo request' });
-  }
-});
-
-/**
- * Export demo requests as CSV
- * GET /api/demo/export/csv
- */
-app.get('/api/demo/export/csv', async (req, res) => {
-  try {
-    const { status, startDate, endDate } = req.query;
-    
-    const where: any = {};
-    if (status) where.status = status;
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate as string);
-      if (endDate) where.createdAt.lte = new Date(endDate as string);
-    }
-
-    const requests = await prisma.demoRequest.findMany({
-      where,
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const csvRows = [];
-    csvRows.push([
-      'ID',
-      'Name',
-      'Email',
-      'Phone',
-      'Restaurant',
-      'Role',
-      'Team Size',
-      'Preferred Date',
-      'Preferred Time',
-      'Message',
-      'Status',
-      'Created At'
-    ].join(','));
-
-    for (const req of requests) {
-      csvRows.push([
-        req.id,
-        `"${req.name}"`,
-        req.email,
-        req.phone || '',
-        `"${req.restaurantName}"`,
-        req.role || '',
-        req.teamSize || '',
-        req.preferredDate.toISOString().split('T')[0],
-        req.preferredTime,
-        `"${(req.message || '').replace(/"/g, '""')}"`,
-        req.status,
-        req.createdAt.toISOString()
-      ].join(','));
-    }
-
-    const csv = csvRows.join('\n');
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=demo-requests.csv');
-    res.send(csv);
-
-  } catch (error) {
-    console.error('❌ Error exporting demo requests:', error);
-    res.status(500).json({ error: 'Failed to export demo requests' });
-  }
-});
-
 // ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -1600,11 +1487,7 @@ app.get('/api/users/:userId', authenticateToken, async (req: any, res) => {
         id: true,
         name: true,
         email: true,
-        phone: true,
-        stripeCustomerId: true,
-        supabaseId: true,
-        createdAt: true,
-        lastLoginAt: true
+        phone: true
       }
     });
     
@@ -1612,16 +1495,7 @@ app.get('/api/users/:userId', authenticateToken, async (req: any, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const userWithSubscription = {
-      ...user,
-      subscription: {
-        plan: 'professional',
-        status: 'active',
-        features: ['unlimited_orders', 'team_management', 'analytics', 'qr_codes']
-      }
-    };
-    
-    res.json(userWithSubscription);
+    res.json(user);
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Failed to fetch user' });
@@ -1636,6 +1510,16 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
     
     if (userId !== req.user.userId) {
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Check if email is already taken
+    if (email && email !== req.user.email) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email }
+      });
+      if (existingUser) {
+        return res.status(409).json({ error: 'Email already in use' });
+      }
     }
 
     const user = await prisma.user.update({
@@ -1657,169 +1541,6 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Failed to update user' });
-  }
-});
-
-// ==================== RESTAURANT UPDATE ENDPOINT ====================
-
-// Update restaurant by ID
-app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, res) => {
-  try {
-    const { restaurantId } = req.params;
-    
-    // Ensure user owns this restaurant
-    if (restaurantId !== req.user.restaurantId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const { name, address, phone } = req.body;
-    
-    const restaurant = await prisma.restaurant.update({
-      where: { id: restaurantId },
-      data: {
-        name,
-        address,
-        phone
-      },
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        phone: true,
-        email: true,
-        logo: true,
-        timezone: true
-      }
-    });
-    
-    res.json(restaurant);
-  } catch (error) {
-    console.error('Error updating restaurant:', error);
-    res.status(500).json({ error: 'Failed to update restaurant' });
-  }
-});
-
-// ==================== MENU MANAGEMENT ENDPOINTS ====================
-
-// Create a new menu item
-app.post('/api/menu/items', authenticateToken, async (req: any, res) => {
-  try {
-    const { name, description, price, categoryId, isAvailable } = req.body;
-    const restaurantId = req.user.restaurantId;
-    
-    console.log('📝 Creating menu item:', { name, categoryId, restaurantId });
-    
-    if (!name || !price || !categoryId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        received: { name, price, categoryId }
-      });
-    }
-    
-    const menuItem = await prisma.menuItem.create({
-      data: {
-        name,
-        description,
-        price: parseFloat(price),
-        categoryId,
-        restaurantId,
-        isAvailable: isAvailable ?? true
-      }
-    });
-    
-    console.log('✅ Menu item created:', menuItem.id);
-    res.status(201).json(menuItem);
-    
-  } catch (error) {
-    console.error('❌ Error creating menu item:', error);
-    res.status(500).json({ 
-      error: 'Failed to create menu item',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Update a menu item
-app.patch('/api/menu/items/:itemId', authenticateToken, async (req: any, res) => {
-  try {
-    const { itemId } = req.params;
-    const { name, description, price, isAvailable } = req.body;
-    
-    // Verify the menu item belongs to user's restaurant
-    const existing = await prisma.menuItem.findFirst({
-      where: {
-        id: itemId,
-        restaurantId: req.user.restaurantId
-      }
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Menu item not found' });
-    }
-
-    const menuItem = await prisma.menuItem.update({
-      where: { id: itemId },
-      data: {
-        name,
-        description,
-        price: price ? parseFloat(price) : undefined,
-        isAvailable
-      }
-    });
-    
-    res.json(menuItem);
-  } catch (error) {
-    console.error('Error updating menu item:', error);
-    res.status(500).json({ error: 'Failed to update menu item' });
-  }
-});
-
-// Delete a menu item
-app.delete('/api/menu/items/:itemId', authenticateToken, async (req: any, res) => {
-  try {
-    const { itemId } = req.params;
-    
-    // Verify the menu item belongs to user's restaurant
-    const existing = await prisma.menuItem.findFirst({
-      where: {
-        id: itemId,
-        restaurantId: req.user.restaurantId
-      }
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Menu item not found' });
-    }
-
-    await prisma.menuItem.delete({
-      where: { id: itemId }
-    });
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting menu item:', error);
-    res.status(500).json({ error: 'Failed to delete menu item' });
-  }
-});
-
-// Create a new category
-app.post('/api/menu/categories', authenticateToken, async (req: any, res) => {
-  try {
-    const { name } = req.body;
-    const restaurantId = req.user.restaurantId;
-    
-    const category = await prisma.menuCategory.create({
-      data: {
-        name,
-        restaurantId,
-        sortOrder: 0
-      }
-    });
-    
-    res.json(category);
-  } catch (error) {
-    console.error('Error creating category:', error);
-    res.status(500).json({ error: 'Failed to create category' });
   }
 });
 

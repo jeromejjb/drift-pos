@@ -34,7 +34,7 @@ model Restaurant {
 model Table {
   id           String     @id @default(cuid())
   number       Int
-  qrCode       String     @unique(map: "tables_qr_code_unique")
+  qrCode       String?    @unique(map: "tables_qr_code_unique")  // Make optional with ?
   section      String?
   status       TableStatus @default(AVAILABLE)
   
@@ -186,7 +186,7 @@ model User {
   name             String?
   email            String?       @unique(map: "users_email_unique")
   phone            String?       @unique(map: "users_phone_unique")
-  passwordHash     String?       // Add this line for authentication
+  passwordHash     String?       // For authentication
   stripeCustomerId String?       @unique(map: "users_stripe_customer_unique")
   supabaseId       String?       @unique
   
@@ -226,7 +226,6 @@ model DemoRequest {
   @@index([createdAt])
   @@map("demo_requests")
 }
-
 
 enum TableStatus {
   AVAILABLE

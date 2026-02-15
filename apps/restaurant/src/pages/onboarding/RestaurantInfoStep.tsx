@@ -1,139 +1,133 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Store, MapPin, Phone, Clock, Globe, ChevronRight } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
-import { Input } from '../../components/ui/Input';
+import { useState, useEffect } from 'react';
+import { CheckCircle } from 'lucide-react';
 
-interface Props {
-  restaurantId: string | null;
+interface RestaurantInfoStepProps {
+  restaurantId: string;
   data: any;
   updateData: (data: any) => void;
   onNext: () => void;
   onPrev: () => void;
 }
 
-export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: Props) {
-  const [formData, setFormData] = useState({
-    name: data?.name || '',
-    address: data?.address || '',
-    phone: data?.phone || '',
-    cuisine: data?.cuisine || '',
-    website: data?.website || '',
-    hours: data?.hours || '',
+export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: RestaurantInfoStepProps) {
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState(data.restaurantInfo || {
+    name: '',
+    address: '',
+    phone: '',
+    cuisine: ''
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetchRestaurant();
+  }, [restaurantId]);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.name.trim()) newErrors.name = 'Restaurant name is required';
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    if (!formData.cuisine.trim()) newErrors.cuisine = 'Cuisine type is required';
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const fetchRestaurant = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/restaurants/${restaurantId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setInfo({
+          name: data.name || '',
+          address: data.address || '',
+          phone: data.phone || '',
+          cuisine: data.cuisine || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching restaurant:', error);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validate()) {
-      updateData({ restaurantInfo: formData });
-      onNext();
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:3001/api/restaurants/${restaurantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(info)
+      });
+
+      if (response.ok) {
+        updateData({ restaurantInfo: info });
+        onNext();
+      }
+    } catch (error) {
+      console.error('Error saving restaurant:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-2xl mx-auto"
-    >
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Store className="w-8 h-8 text-white" />
-        </div>
-        <h2 className="text-3xl font-light mb-2">Tell us about your restaurant</h2>
-        <p className="text-gray-400">This helps us personalize your experience</p>
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-light text-gray-900 mb-2">Restaurant Information</h2>
+        <p className="text-gray-400">Tell us about your restaurant</p>
       </div>
 
-      <Card padding="lg">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Restaurant Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Restaurant name</label>
+          <input
+            type="text"
+            value={info.name}
+            onChange={(e) => setInfo({ ...info, name: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
             placeholder="Trattoria Bellini"
-            icon={<Store className="w-4 h-4" />}
-            error={errors.name}
-            required
           />
+        </div>
 
-          <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+          <input
+            type="text"
+            value={info.address}
+            onChange={(e) => setInfo({ ...info, address: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
             placeholder="123 Main St, New York, NY"
-            icon={<MapPin className="w-4 h-4" />}
-            error={errors.address}
-            required
           />
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="(212) 555-0123"
-              icon={<Phone className="w-4 h-4" />}
-              error={errors.phone}
-              required
-            />
-
-            <Input
-              label="Cuisine Type"
-              value={formData.cuisine}
-              onChange={(e) => setFormData({ ...formData, cuisine: e.target.value })}
-              placeholder="Italian, Pizza, etc."
-              icon={<Globe className="w-4 h-4" />}
-              error={errors.cuisine}
-              required
-            />
-          </div>
-
-          <Input
-            label="Website (optional)"
-            value={formData.website}
-            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-            placeholder="https://www.trattoriabellini.com"
-            icon={<Globe className="w-4 h-4" />}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+          <input
+            type="tel"
+            value={info.phone}
+            onChange={(e) => setInfo({ ...info, phone: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
+            placeholder="(555) 123-4567"
           />
+        </div>
 
-          <Input
-            label="Hours (optional)"
-            value={formData.hours}
-            onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-            placeholder="Mon-Fri: 11am-10pm, Sat-Sun: 10am-11pm"
-            icon={<Clock className="w-4 h-4" />}
-          />
-
-          <div className="pt-4">
-            <Button type="submit" size="lg" fullWidth>
-              Continue to Table Setup
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Tip Box */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-xl">
-        <p className="text-sm text-blue-700">
-          <span className="font-medium">💡 Tip:</span> You can always update this information later in your settings.
-        </p>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine type</label>
+          <select
+            value={info.cuisine}
+            onChange={(e) => setInfo({ ...info, cuisine: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
+          >
+            <option value="">Select cuisine</option>
+            <option value="italian">Italian</option>
+            <option value="american">American</option>
+            <option value="mexican">Mexican</option>
+            <option value="chinese">Chinese</option>
+            <option value="japanese">Japanese</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
       </div>
-    </motion.div>
+
+      <div className="flex justify-end pt-6">
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !info.name}
+          className="px-8 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+          {loading ? 'Saving...' : 'Continue'}
+          <CheckCircle className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
   );
 }
