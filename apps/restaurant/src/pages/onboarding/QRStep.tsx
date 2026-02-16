@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { QrCode, Download, Heart, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
+import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 interface QRStepProps {
@@ -55,249 +56,261 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     }
   };
 
-  const downloadPDF = () => {
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+  const downloadPDF = async () => {
+    // Create a hidden container for PDF generation
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.style.width = '210mm'; // A4 width
+    container.style.backgroundColor = 'white';
+    container.style.fontFamily = 'Helvetica, Arial, sans-serif';
+    document.body.appendChild(container);
 
-    // Layout based on cards per sheet
-    let cols, rows, cardW, cardH, qrSize;
     const perPage = parseInt(cardsPerSheet);
     
-    if (perPage === 6) {
-      cols = 2; rows = 3;
-      cardW = 85; cardH = 60;
-      qrSize = 45;
-    } else if (perPage === 9) {
-      cols = 3; rows = 3;
-      cardW = 60; cardH = 55;
-      qrSize = 38;
-    } else {
-      cols = 3; rows = 4;
-      cardW = 60; cardH = 48;
-      qrSize = 32;
-    }
+    // Generate cover page
+    const coverPage = document.createElement('div');
+    coverPage.style.width = '210mm';
+    coverPage.style.height = '297mm';
+    coverPage.style.padding = '15mm';
+    coverPage.style.backgroundColor = 'white';
+    coverPage.style.position = 'relative';
+    coverPage.innerHTML = `
+      <div style="text-align: center; margin-top: 40mm;">
+        <h1 style="font-size: 48px; font-weight: 300; letter-spacing: 4px; margin-bottom: 10px; color: #000;">DRIFT</h1>
+        <p style="font-size: 18px; color: #666; margin-bottom: 30px;">${restaurantName}</p>
+        <p style="font-size: 24px; color: #333; margin-bottom: 40px;">Table QR Code Kit</p>
+        
+        <div style="width: 80%; margin: 0 auto; text-align: left; border-top: 1px solid #eee; padding-top: 20px;">
+          <h3 style="font-size: 16px; font-weight: 500; margin-bottom: 15px;">WHAT'S INSIDE</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li style="margin-bottom: 10px; color: #555;">✓ ${qrCodes.length} unique QR codes — one per table</li>
+            <li style="margin-bottom: 10px; color: #555;">✓ ${perPage} codes per sheet · ${Math.ceil(qrCodes.length / perPage)} pages total</li>
+            <li style="margin-bottom: 10px; color: #555;">✓ Each code links directly to your menu</li>
+            <li style="margin-bottom: 10px; color: #555;">✓ No app required — works with any smartphone</li>
+            <li style="margin-bottom: 10px; color: #555;">✓ Real-time orders in your dashboard</li>
+          </ul>
+        </div>
 
-    const startX = (pageWidth - (cols * cardW)) / 2;
-    const startY = 20;
-    const gap = 5;
+        <div style="position: absolute; bottom: 25mm; left: 0; right: 0; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #999;">
+            <span style="font-size: 12px;">Made with</span>
+            <span style="font-size: 16px; color: #999;">♡</span>
+            <span style="font-size: 12px;">on the</span>
+            <img src="/greatlakes.png" style="height: 16px; width: auto; opacity: 0.8;" />
+          </div>
+          <p style="font-size: 10px; color: #ccc; margin-top: 8px;">DRIFT TECHNOLOGIES INC.</p>
+        </div>
+      </div>
+    `;
+    container.appendChild(coverPage);
 
-    // ===== PAGE 1: WELCOME & INSTRUCTIONS =====
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-
-    // DRIFT in elegant uppercase
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(42);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('DRIFT', pageWidth / 2, 35, { align: 'center' });
-
-    // Restaurant name
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(16);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(restaurantName, pageWidth / 2, 55, { align: 'center' });
-
-    // Welcome message
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(20);
-    pdf.setTextColor(30, 30, 30);
-    pdf.text('Your Table QR Codes', pageWidth / 2, 80, { align: 'center' });
-
-    // How to use section
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(14);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('How to use', 30, 110);
-
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(11);
-    pdf.setTextColor(60, 60, 60);
+    // Generate QR code pages
+    const cardsPerPage = perPage;
+    const totalPages = Math.ceil(qrCodes.length / cardsPerPage);
     
-    const steps = [
-      '1. PRINT on card stock (80-100lb recommended)',
-      '2. CUT along the borders of each card',
-      '3. PLACE on tables at eye level',
-      '4. CUSTOMERS SCAN with any phone camera',
-      '5. ORDERS appear instantly in your dashboard'
-    ];
+    for (let pageNum = 0; pageNum < totalPages; pageNum++) {
+      const page = document.createElement('div');
+      page.style.width = '210mm';
+      page.style.height = '297mm';
+      page.style.padding = '10mm';
+      page.style.backgroundColor = 'white';
+      page.style.position = 'relative';
+      page.style.boxSizing = 'border-box';
 
-    steps.forEach((step, index) => {
-      pdf.text(step, 30, 130 + index * 9);
-    });
+      // Page header
+      const header = document.createElement('div');
+      header.style.textAlign = 'center';
+      header.style.marginBottom = '10mm';
+      header.style.color = '#999';
+      header.style.fontSize = '10px';
+      header.style.letterSpacing = '1px';
+      header.innerText = `TABLE QR CODES · PAGE ${pageNum + 1} OF ${totalPages}`;
+      page.appendChild(header);
 
-    // What's inside section
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(14);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text("What's inside", 30, 195);
-
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(11);
-    pdf.setTextColor(60, 60, 60);
-    
-    const features = [
-      `• ${qrCodes.length} unique QR codes — one per table`,
-      `• ${perPage} codes per sheet · ${Math.ceil(qrCodes.length / perPage)} pages total`,
-      '• Each code links directly to your menu',
-      '• No app required — works with any smartphone',
-      '• Real-time orders in your dashboard'
-    ];
-
-    features.forEach((feature, index) => {
-      pdf.text(feature, 30, 215 + index * 9);
-    });
-
-    // Great Lakes branding - matching footer exactly
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(9);
-    pdf.setTextColor(140, 140, 140);
-    pdf.text('Made with', pageWidth / 2 - 35, pageHeight - 25, { align: 'center' });
-    pdf.text('♡', pageWidth / 2 - 12, pageHeight - 25, { align: 'center' });
-    pdf.text('on the', pageWidth / 2 - 4, pageHeight - 25, { align: 'center' });
-    pdf.text('Great Lakes', pageWidth / 2 + 15, pageHeight - 25, { align: 'center' });
-
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(8);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('DRIFT TECHNOLOGIES INC.', pageWidth / 2, pageHeight - 12, { align: 'center' });
-
-    // ===== QR CODE PAGES =====
-    for (let i = 0; i < qrCodes.length; i++) {
-      if (i % perPage === 0) {
-        if (i > 0) pdf.addPage();
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-
-        // Page header
-        pdf.setFont('helvetica', 'light');
-        pdf.setFontSize(9);
-        pdf.setTextColor(150, 150, 150);
-        pdf.text(`Table QR Codes · Page ${Math.floor(i / perPage) + 1} of ${Math.ceil(qrCodes.length / perPage)}`, pageWidth / 2, 12, { align: 'center' });
-      }
-
-      const pos = i % perPage;
-      const row = Math.floor(pos / cols);
-      const col = pos % cols;
-      const x = startX + col * cardW;
-      const y = startY + row * (cardH + gap);
-
-      // Subtle card background
-      pdf.setFillColor(252, 252, 252);
-      pdf.setDrawColor(230, 230, 230);
-      pdf.setLineWidth(0.2);
-      pdf.roundedRect(x, y, cardW - 1, cardH - 1, 2, 2, 'FD');
-
-      // QR Code - centered
-      try {
-        const qrImage = qrCodes[i].qrCode.split(',')[1];
-        pdf.addImage(
-          qrImage, 
-          'PNG', 
-          x + (cardW - qrSize) / 2, 
-          y + 10, 
-          qrSize, 
-          qrSize
-        );
-      } catch (err) {
-        console.error('QR error:', err);
-      }
-
-      // Table number
-      pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(14);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text(`${qrCodes[i].tableNumber}`, x + cardW - 22, y + 20);
-
-      pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(7);
-      pdf.setTextColor(150, 150, 150);
-      pdf.text('table', x + cardW - 25, y + 12);
-
-      // DRIFT in elegant uppercase
-      pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(7);
-      pdf.setTextColor(140, 140, 140);
-      pdf.text('DRIFT', x + 10, y + cardH - 15);
-
-      // Great Lakes branding on each card - matching footer exactly
-      pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(4);
-      pdf.setTextColor(160, 160, 160);
+      // Grid container
+      const grid = document.createElement('div');
+      grid.style.display = 'grid';
+      grid.style.gap = '5mm';
+      grid.style.justifyContent = 'center';
       
-      // "Made with ♡ on the Great Lakes" split across three lines to match footer style
-      pdf.text('Made with', x + 10, y + cardH - 8);
-      pdf.text('♡', x + 22, y + cardH - 8);
-      pdf.text('on the', x + 26, y + cardH - 8);
-      pdf.text('Great Lakes', x + 40, y + cardH - 8);
+      if (perPage === 6) {
+        grid.style.gridTemplateColumns = 'repeat(2, 85mm)';
+      } else if (perPage === 9) {
+        grid.style.gridTemplateColumns = 'repeat(3, 60mm)';
+      } else {
+        grid.style.gridTemplateColumns = 'repeat(3, 60mm)';
+      }
+
+      const startIdx = pageNum * cardsPerPage;
+      const endIdx = Math.min(startIdx + cardsPerPage, qrCodes.length);
+
+      for (let i = startIdx; i < endIdx; i++) {
+        const qr = qrCodes[i];
+        
+        const card = document.createElement('div');
+        card.style.width = '100%';
+        card.style.height = perPage === 6 ? '60mm' : perPage === 9 ? '55mm' : '48mm';
+        card.style.backgroundColor = '#fcfcfc';
+        card.style.border = '1px solid #eaeaea';
+        card.style.borderRadius = '4px';
+        card.style.padding = '5px';
+        card.style.boxSizing = 'border-box';
+        card.style.position = 'relative';
+
+        // QR Code image
+        const img = document.createElement('img');
+        img.src = qr.qrCode;
+        img.style.width = perPage === 6 ? '45mm' : perPage === 9 ? '38mm' : '32mm';
+        img.style.height = 'auto';
+        img.style.position = 'absolute';
+        img.style.top = '50%';
+        img.style.left = '50%';
+        img.style.transform = 'translate(-50%, -50%)';
+        card.appendChild(img);
+
+        // Table number
+        const tableNum = document.createElement('div');
+        tableNum.style.position = 'absolute';
+        tableNum.style.top = '8px';
+        tableNum.style.right = '12px';
+        tableNum.style.fontSize = '16px';
+        tableNum.style.fontWeight = '300';
+        tableNum.style.color = '#333';
+        tableNum.innerText = qr.tableNumber.toString();
+        card.appendChild(tableNum);
+
+        const tableLabel = document.createElement('div');
+        tableLabel.style.position = 'absolute';
+        tableLabel.style.top = '26px';
+        tableLabel.style.right = '14px';
+        tableLabel.style.fontSize = '8px';
+        tableLabel.style.color = '#999';
+        tableLabel.innerText = 'table';
+        card.appendChild(tableLabel);
+
+        // DRIFT logo
+        const drift = document.createElement('div');
+        drift.style.position = 'absolute';
+        drift.style.bottom = '8px';
+        drift.style.left = '10px';
+        drift.style.fontSize = '8px';
+        drift.style.fontWeight = '300';
+        drift.style.letterSpacing = '1px';
+        drift.style.color = '#aaa';
+        drift.innerText = 'DRIFT';
+        card.appendChild(drift);
+
+        // Great Lakes branding
+        const lakes = document.createElement('div');
+        lakes.style.position = 'absolute';
+        lakes.style.bottom = '8px';
+        lakes.style.right = '10px';
+        lakes.style.display = 'flex';
+        lakes.style.alignItems = 'center';
+        lakes.style.gap = '2px';
+        lakes.style.fontSize = '6px';
+        lakes.style.color = '#bbb';
+        lakes.innerHTML = `
+          <span>made with</span>
+          <span style="font-size: 8px;">♡</span>
+          <span>on the</span>
+          <img src="/greatlakes.png" style="height: 8px; width: auto; opacity: 0.8; margin-left: 2px;" />
+        `;
+        card.appendChild(lakes);
+
+        grid.appendChild(card);
+      }
+
+      page.appendChild(grid);
+      container.appendChild(page);
     }
 
-    // ===== LAST PAGE: PRO TIPS & SUPPORT =====
-    pdf.addPage();
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+    // Generate pro tips page
+    const tipsPage = document.createElement('div');
+    tipsPage.style.width = '210mm';
+    tipsPage.style.height = '297mm';
+    tipsPage.style.padding = '15mm';
+    tipsPage.style.backgroundColor = 'white';
+    tipsPage.style.position = 'relative';
+    tipsPage.innerHTML = `
+      <div style="text-align: center; margin-top: 30mm;">
+        <h1 style="font-size: 42px; font-weight: 300; letter-spacing: 4px; margin-bottom: 10px; color: #000;">DRIFT</h1>
+        <p style="font-size: 16px; color: #666; margin-bottom: 30px;">pro tips</p>
+        
+        <div style="width: 80%; margin: 0 auto; text-align: left;">
+          <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 400; margin-bottom: 15px; color: #333;">📄 Paper</h3>
+            <p style="color: #666; margin-bottom: 20px;">Use 80-100lb card stock for durability — it feels premium and lasts longer.</p>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 400; margin-bottom: 15px; color: #333;">✂️ Cutting</h3>
+            <p style="color: #666; margin-bottom: 20px;">Cut carefully with scissors or a paper cutter for clean edges.</p>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 400; margin-bottom: 15px; color: #333;">🛡️ Protection</h3>
+            <p style="color: #666; margin-bottom: 20px;">Laminate to make them last longer — especially in busy venues.</p>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 400; margin-bottom: 15px; color: #333;">👁️ Placement</h3>
+            <p style="color: #666; margin-bottom: 20px;">Place at eye level on tables for easy scanning.</p>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 400; margin-bottom: 15px; color: #333;">📱 Testing</h3>
+            <p style="color: #666; margin-bottom: 20px;">Test each code with your phone before placing.</p>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: 400; margin-bottom: 15px; color: #333;">🔄 Spares</h3>
+            <p style="color: #666; margin-bottom: 20px;">Keep spares for quick replacement if needed.</p>
+          </div>
+        </div>
 
-    // DRIFT in elegant uppercase
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(42);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('DRIFT', pageWidth / 2, 45, { align: 'center' });
+        <div style="position: absolute; bottom: 25mm; left: 0; right: 0; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #999;">
+            <span style="font-size: 12px;">Made with</span>
+            <span style="font-size: 16px; color: #999;">♡</span>
+            <span style="font-size: 12px;">on the</span>
+            <img src="/greatlakes.png" style="height: 16px; width: auto; opacity: 0.8;" />
+          </div>
+          <p style="font-size: 10px; color: #ccc; margin-top: 8px;">DRIFT TECHNOLOGIES INC.</p>
+        </div>
+      </div>
+    `;
+    container.appendChild(tipsPage);
 
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(14);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text('pro tips & support', pageWidth / 2, 65, { align: 'center' });
+    // Wait for images to load
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Pro tips section
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(16);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('Pro Tips', 30, 100);
-
-    const tips = [
-      '• Use 80-100lb card stock for durability',
-      '• Cut carefully with scissors or a paper cutter',
-      '• Laminate to make them last longer',
-      '• Place at eye level for easy scanning',
-      '• Test each code with your phone first',
-      '• Keep spares for quick replacement'
-    ];
-
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(11);
-    pdf.setTextColor(80, 80, 80);
-    
-    tips.forEach((tip, index) => {
-      pdf.text(tip, 30, 125 + index * 10);
+    // Convert to PDF
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
     });
 
-    // Support section
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(16);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('Need Help?', 30, 210);
+    const pages = container.children;
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await html2canvas(pages[i] as HTMLElement, {
+        scale: 2,
+        backgroundColor: '#ffffff'
+      });
 
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(11);
-    pdf.setTextColor(80, 80, 80);
-    pdf.text('📧 help@drift.com', 30, 230);
-    pdf.text('🌐 drift.com/support', 30, 245);
-    pdf.text('📞 1-800-DRIFT-01', 30, 260);
+      const imgData = canvas.toDataURL('image/png');
+      
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+    }
 
-    // Great Lakes branding - matching footer exactly
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(9);
-    pdf.setTextColor(140, 140, 140);
-    pdf.text('Made with', pageWidth / 2 - 35, pageHeight - 25, { align: 'center' });
-    pdf.text('♡', pageWidth / 2 - 12, pageHeight - 25, { align: 'center' });
-    pdf.text('on the', pageWidth / 2 - 4, pageHeight - 25, { align: 'center' });
-    pdf.text('Great Lakes', pageWidth / 2 + 15, pageHeight - 25, { align: 'center' });
+    // Clean up
+    document.body.removeChild(container);
 
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(8);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('DRIFT TECHNOLOGIES INC.', pageWidth / 2, pageHeight - 12, { align: 'center' });
-
+    // Save PDF
     pdf.save(`${restaurantName}-qr-codes.pdf`);
   };
 
