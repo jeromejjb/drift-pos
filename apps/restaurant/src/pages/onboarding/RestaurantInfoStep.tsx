@@ -27,6 +27,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
   console.log('🎯 ===== RESTAURANT INFO STEP MOUNTED =====');
   console.log('📌 restaurantId prop:', restaurantId);
   console.log('🔧 API_URL being used:', API_URL);
+  console.log('🔑 Token exists:', !!localStorage.getItem('drift-token'));
   console.log('📦 Initial info state (from signup):', info);
   console.log('=======================================');
 
@@ -71,10 +72,15 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
     setError('');
     
     try {
+      // Get the token from localStorage (saved during signup)
+      const token = localStorage.getItem('drift-token');
+      console.log('🔑 Using token:', token ? `${token.substring(0, 20)}...` : 'No token found');
+      
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
         method: 'PATCH',
         headers: { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
         },
         body: JSON.stringify(info)
       });
