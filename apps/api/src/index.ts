@@ -99,7 +99,10 @@ const allowedOrigins = [
   'https://drift-landing.onrender.com',
   'https://drift-api-7vs7.onrender.com',
   'https://www.driftpos.com',
-  'https://driftpos.com'      
+  'https://driftpos.com',
+  'restaurant.driftpos.com',
+  'app.driftpos.com',
+     
 ];
 
 // Socket.io setup with strict CORS
