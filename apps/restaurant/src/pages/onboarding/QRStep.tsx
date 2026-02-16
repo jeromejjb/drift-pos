@@ -32,7 +32,15 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [selectedDensity, setSelectedDensity] = useState<'standard' | 'compact' | 'professional'>('professional');
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
-  const restaurantName = localStorage.getItem('drift-restaurant-name') || 'Your Business';
+  
+  // Get restaurant name from multiple sources
+  const restaurantName = 
+    data?.restaurantInfo?.name || 
+    localStorage.getItem('drift-restaurant-name') || 
+    'Your Business';
+
+  console.log('🏢 Restaurant name in QRStep:', restaurantName);
+  console.log('📦 Data received:', data);
 
   const styles = [
     { id: 'classic', icon: Square, label: 'Classic', desc: 'traditional border' },
@@ -124,7 +132,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Drift logo in cool font (using Helvetica with styling to mimic a more elegant font)
+    // Drift logo
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(52);
     pdf.setTextColor(0, 0, 0);
@@ -147,24 +155,25 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     pdf.setTextColor(140, 140, 140);
     pdf.text(`${qrCodes.length} tables · ${density?.perSheet} per sheet · ${selectedStyle} series`, pageWidth / 2, 175, { align: 'center' });
 
-    // Great Lakes branding - exactly like landing page
-    const greatLakesX = pageWidth / 2 - 30;
+    // Great Lakes branding - exactly like landing page footer
+    const greatLakesX = pageWidth / 2 - 35;
     const greatLakesY = pageHeight - 45;
     
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(9);
     pdf.setTextColor(150, 150, 150);
-    pdf.text('made with', greatLakesX, greatLakesY);
+    pdf.text('Made with', greatLakesX, greatLakesY);
     pdf.text('♡', greatLakesX + 22, greatLakesY);
-    pdf.text('on the', greatLakesX + 32, greatLakesY);
+    pdf.text('on the', greatLakesX + 30, greatLakesY);
     
-    // Add a simple line as placeholder for Great Lakes image (in PDF)
-    pdf.setDrawColor(200, 200, 200);
+    // Simple line representation for Great Lakes (since we can't embed images easily in PDF)
+    pdf.setDrawColor(180, 180, 180);
     pdf.setLineWidth(0.3);
-    pdf.line(greatLakesX + 52, greatLakesY - 2, greatLakesX + 72, greatLakesY - 2);
+    pdf.line(greatLakesX + 50, greatLakesY - 2, greatLakesX + 75, greatLakesY - 2);
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(7);
-    pdf.text('great lakes', greatLakesX + 52, greatLakesY - 5);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Great Lakes', greatLakesX + 50, greatLakesY - 8);
 
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(7);
@@ -206,7 +215,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
       // QR Code
       const qrImage = qrCodes[i].qrCode.split(',')[1];
-      const qrSize = Math.min(cardWidth - 20, cardHeight - 30);
+      const qrSize = Math.min(cardWidth - 20, cardHeight - 35);
       pdf.addImage(
         qrImage, 
         'PNG', 
@@ -216,28 +225,33 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         qrSize
       );
 
-      // Table number - elegant
+      // Table number
       pdf.setFont('helvetica', 'light');
       pdf.setFontSize(8);
       pdf.setTextColor(60, 60, 60);
-      pdf.text(`${qrCodes[i].tableNumber.toString().padStart(2, '0')}`, x + cardWidth - 18, y + cardHeight - 10);
+      pdf.text(`${qrCodes[i].tableNumber.toString().padStart(2, '0')}`, x + cardWidth - 18, y + cardHeight - 12);
 
-      // Drift logo on each card (cool font styling)
+      // Drift logo on each card
       pdf.setFont('helvetica', 'light');
       pdf.setFontSize(6);
       pdf.setTextColor(160, 160, 160);
-      pdf.text('drift', x + 8, y + cardHeight - 10);
+      pdf.text('drift', x + 8, y + cardHeight - 12);
 
-      // Made with love on the Great Lakes on each card
+      // Made with love on the Great Lakes on each card - matching footer style
       pdf.setFont('helvetica', 'light');
       pdf.setFontSize(4);
-      pdf.setTextColor(180, 180, 180);
+      pdf.setTextColor(170, 170, 170);
       
       const loveX = x + 8;
       const loveY = y + cardHeight - 5;
-      pdf.text('made with', loveX, loveY);
+      pdf.text('Made with', loveX, loveY);
       pdf.text('♡', loveX + 15, loveY);
-      pdf.text('on great lakes', loveX + 22, loveY);
+      pdf.text('on the', loveX + 21, loveY);
+      
+      // Tiny line for Great Lakes
+      pdf.setDrawColor(190, 190, 190);
+      pdf.setLineWidth(0.1);
+      pdf.line(loveX + 35, loveY - 1, loveX + 45, loveY - 1);
     }
 
     // Back cover with instructions
@@ -273,23 +287,24 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     pdf.setTextColor(160, 160, 160);
     pdf.text('SOC 2 · PCI DSS · GDPR', pageWidth / 2, pageHeight - 50, { align: 'center' });
 
-    // Great Lakes branding on back cover
-    const backLoveX = pageWidth / 2 - 30;
+    // Great Lakes branding on back cover - matching footer style
+    const backLoveX = pageWidth / 2 - 35;
     const backLoveY = pageHeight - 30;
     
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(9);
     pdf.setTextColor(150, 150, 150);
-    pdf.text('made with', backLoveX, backLoveY);
+    pdf.text('Made with', backLoveX, backLoveY);
     pdf.text('♡', backLoveX + 22, backLoveY);
-    pdf.text('on the', backLoveX + 32, backLoveY);
+    pdf.text('on the', backLoveX + 30, backLoveY);
     
-    pdf.setDrawColor(200, 200, 200);
+    pdf.setDrawColor(180, 180, 180);
     pdf.setLineWidth(0.3);
-    pdf.line(backLoveX + 52, backLoveY - 2, backLoveX + 72, backLoveY - 2);
+    pdf.line(backLoveX + 50, backLoveY - 2, backLoveX + 75, backLoveY - 2);
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(7);
-    pdf.text('great lakes', backLoveX + 52, backLoveY - 5);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Great Lakes', backLoveX + 50, backLoveY - 8);
 
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(7);
@@ -307,7 +322,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      {/* Header with cool font styling */}
+      {/* Header with restaurant name */}
       <div className="text-center mb-12">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -342,7 +357,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         </div>
       ) : qrCodes.length > 0 ? (
         <>
-          {/* Style selection - elegant */}
+          {/* Style selection */}
           <div className="grid grid-cols-3 gap-3 mb-8">
             {styles.map((style) => {
               const Icon = style.icon;
@@ -365,7 +380,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             })}
           </div>
 
-          {/* Density selection - professional */}
+          {/* Density selection */}
           <div className="flex justify-center gap-3 mb-8">
             {densities.map((density) => (
               <button
@@ -383,7 +398,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             ))}
           </div>
 
-          {/* Preview - elegant */}
+          {/* Preview */}
           <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs text-gray-400 uppercase tracking-wider">preview · {selectedStyle} series</span>
@@ -408,7 +423,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             </div>
           </div>
 
-          {/* Download button - prominent */}
+          {/* Download button */}
           <button
             onClick={downloadKit}
             className="w-full bg-gradient-to-r from-gray-900 to-gray-800 text-white py-5 rounded-xl hover:from-gray-800 hover:to-gray-700 transition-all flex items-center justify-center gap-3 mb-8 shadow-md"
@@ -417,15 +432,15 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             <span className="text-base font-light">download prestige pdf kit</span>
           </button>
 
-          {/* Great Lakes branding - exactly like landing page */}
+          {/* Made with love on the Great Lakes - exactly like footer */}
           <div className="flex items-center justify-center gap-2 mb-8">
-            <span className="text-sm text-gray-400">made with</span>
+            <span className="text-sm text-gray-400">Made with</span>
             <span className="text-gray-400 text-lg">♡</span>
             <span className="text-sm text-gray-400">on the</span>
             <img 
               src="/greatlakes.png" 
               alt="Great Lakes" 
-              className="h-6 w-auto inline-block opacity-70 hover:opacity-100 transition-opacity"
+              className="h-8 w-auto inline-block opacity-80 hover:opacity-100 transition-opacity"
             />
           </div>
 
