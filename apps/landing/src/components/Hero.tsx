@@ -1,4 +1,4 @@
-import { ArrowRight, Building2} from 'lucide-react';
+import { ArrowRight, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -16,16 +16,7 @@ export function Hero() {
       />
 
       <div className="container max-w-5xl mx-auto text-center relative">
-        {/* Professional badge - understated */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 bg-gray-100 text-gray-600 text-sm px-4 py-2 rounded-full mb-8"
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Trusted by 500+ businesses</span>
-        </motion.div>
+        {/* Removed fake "500+ businesses" badge */}
 
         {/* Main headline - clean and bold */}
         <motion.h1 
@@ -56,7 +47,7 @@ export function Hero() {
           Built for restaurants, retail, and everything in between.
         </motion.p>
 
-        {/* Stats row - clean and professional */}
+        {/* Stats row - honest and forward-looking */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -72,8 +63,8 @@ export function Hero() {
             <div className="text-sm text-gray-400">At volume</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-light text-gray-900">500+</div>
-            <div className="text-sm text-gray-400">Businesses</div>
+            <div className="text-2xl font-light text-gray-900">Coming 2026</div>
+            <div className="text-sm text-gray-400">First restaurants</div>
           </div>
         </motion.div>
 
@@ -88,7 +79,7 @@ export function Hero() {
             onClick={() => navigate('/signup')}
             className="group px-8 py-4 bg-black text-white rounded-full hover:bg-gray-800 transition-all duration-300 text-lg font-light flex items-center justify-center gap-2 min-w-[200px]"
           >
-            Schedule demo
+            Get early access
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
           <button
@@ -101,14 +92,14 @@ export function Hero() {
           </button>
         </motion.div>
 
-        {/* Simple trust signal - just the essentials */}
+        {/* Simple trust signal - honest and transparent */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
           className="text-sm text-gray-300"
         >
-          <span>14-day free trial · No credit card required</span>
+          <span>Early access · No credit card required</span>
         </motion.div>
       </div>
     </section>
