@@ -10,21 +10,19 @@ router.post('/stripe/connect', async (req, res) => {
   try {
     const { email, name, restaurantId, tier } = req.body;
     
-    console.log('🚀 Creating Stripe Connect account for:', { email, name, restaurantId, tier });
+    console.log('📦 Request body:', { email, name, restaurantId, tier });
     
     // Validate required fields
     if (!email || !name || !restaurantId) {
+      console.log('❌ Missing fields');
       return res.status(400).json({ 
         error: 'Missing required fields',
         details: 'Email, name, and restaurantId are required'
       });
     }
 
-    // Note: Stripe doesn't support filtering accounts by email directly.
-    // You should implement duplicate checking in your database.
-    // For now, we'll rely on Stripe's error handling.
+    console.log('🚀 Creating Stripe account...');
     
-    // Create connected account
     const account = await stripe.accounts.create({
       type: 'express',
       email,
@@ -49,27 +47,35 @@ router.post('/stripe/connect', async (req, res) => {
     
     console.log('✅ Stripe account created:', account.id);
     
-    // Create an ACCOUNT SESSION for embedded onboarding
     const session = await stripe.accountSessions.create({
       account: account.id,
       components: {
         account_onboarding: {
           enabled: true,
           features: {
-            external_account_collection: true, // Collect bank details
+            external_account_collection: true,
           },
         },
       },
     });
     
-    // Return client secret for the frontend
+    console.log('✅ Session created');
+    
     res.json({ 
       clientSecret: session.client_secret,
       accountId: account.id 
     });
     
   } catch (error) {
-    console.error('❌ Stripe connect error:', error);
+    console.error('❌ FULL ERROR OBJECT:', error);
+    console.error('❌ Error type:', error.type);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    
+    if (error.raw) {
+      console.error('❌ Raw error:', error.raw);
+    }
     
     // Handle specific Stripe errors
     if (error.code === 'resource_already_exists') {
@@ -87,7 +93,7 @@ router.post('/stripe/connect', async (req, res) => {
     }
     
     res.status(500).json({ 
-      error: 'Failed to create Stripe account. Please try again.',
+      error: error.message || 'Failed to create Stripe account. Please try again.',
       code: 'server_error'
     });
   }
