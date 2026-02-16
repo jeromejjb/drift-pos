@@ -44,17 +44,18 @@ export function SignupPage() {
         throw new Error(data.error || 'Failed to create account');
       }
 
-      // Save auth info for later (after onboarding)
-    localStorage.setItem('drift-token', data.token);
-    localStorage.setItem('drift-restaurant-id', data.restaurantId);
-    localStorage.setItem('drift-user-email', formData.email);
+      // Save auth info for landing page (optional)
+      localStorage.setItem('drift-token', data.token);
+      localStorage.setItem('drift-restaurant-id', data.restaurantId);
+      localStorage.setItem('drift-user-email', formData.email);
 
-    // DIRECT to onboarding - NO LOGIN PAGE
-    const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}&businessName=${encodeURIComponent(formData.businessName)}&email=${encodeURIComponent(formData.email)}`;
-    console.log('🚀 Redirecting to onboarding:', redirectUrl);
-    window.location.href = redirectUrl; // ← ONLY ONE REDIRECT
+      // IMPORTANT: Include token in URL for cross-domain transfer
+      const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}&businessName=${encodeURIComponent(formData.businessName)}&email=${encodeURIComponent(formData.email)}&token=${encodeURIComponent(data.token)}`;
       
-      // Use window.location for full page redirect
+      console.log('🚀 Redirecting to onboarding:', redirectUrl);
+      console.log('🔑 Token included in URL:', !!data.token);
+      
+      // Single redirect
       window.location.href = redirectUrl;
       
     } catch (err) {
