@@ -26,18 +26,18 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': resolve(__dirname, './src'),
+        // Force resolution of Stripe packages
+        '@stripe/connect-js': resolve(__dirname, 'node_modules/@stripe/connect-js/dist/index.js'),
+        '@stripe/react-connect-js': resolve(__dirname, 'node_modules/@stripe/react-connect-js/dist/index.js')
       },
-      dedupe: ['react', 'react-dom', '@stripe/connect-js', '@stripe/react-connect-js']
+      dedupe: ['react', 'react-dom']
     },
     optimizeDeps: {
       include: [
         '@stripe/connect-js',
         '@stripe/react-connect-js',
         'framer-motion',
-        'lucide-react',
-        'react',
-        'react-dom',
-        'react-router-dom'
+        'lucide-react'
       ],
       force: true,
       esbuildOptions: {
