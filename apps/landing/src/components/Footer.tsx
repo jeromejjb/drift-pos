@@ -48,11 +48,17 @@ export function Footer() {
               © 2026 Drift Technologies. All rights reserved.
             </p>
             
-            <div className="flex items-center gap-2">
+          
+          <div className="flex items-center gap-2">
               <span className="text-sm text-gray-400">Built with</span>
-              <Heart className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-400">on the Great Lakes</span>
-            </div>
+              <span className="text-gray-400">♡</span>
+              <span className="text-sm text-gray-400">on the</span>
+              <img 
+                src="/greatlakes.png" 
+                alt="Great Lakes" 
+                className="h-8 w-auto inline-block opacity-80 hover:opacity-100 transition-opacity"
+              />
+              </div>
           </div>
         </div>
       </div>
