@@ -104,7 +104,13 @@ const authenticateToken = (req: any, res: any, next: any) => {
  */
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, name, restaurantName, tableCount = 5 } = req.body;
+    const { email, password, name, restaurantName } = req.body;
+    
+    console.log('📝 Registration attempt:', { 
+      email, 
+      name, 
+      restaurantName
+    });
 
     // Validation
     if (!email || !password || !name || !restaurantName) {
@@ -127,19 +133,22 @@ app.post('/api/auth/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user and restaurant
+    // Create user and restaurant with DEFAULT 1 table
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: { email, name, passwordHash: hashedPassword }
       });
 
+      // Create restaurant with 1 default table
       const restaurant = await tx.restaurant.create({
         data: {
           name: restaurantName,
           email,
           supabaseUserId: user.id,
           tables: {
-            create: Array.from({ length: tableCount }, (_, i) => ({ number: i + 1 }))
+            create: [
+              { number: 1 } // Just one table by default
+            ]
           }
         },
         include: { tables: true }
@@ -154,10 +163,16 @@ app.post('/api/auth/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    console.log('✅ Registration successful:', { 
+      restaurantId: result.restaurant.id,
+      tablesCreated: result.restaurant.tables.length // Should be 1
+    });
+
     res.status(201).json({
       success: true,
       token,
       restaurantId: result.restaurant.id,
+      tableCount: result.restaurant.tables.length,
       user: { id: result.user.id, email: result.user.email, name: result.user.name }
     });
 
