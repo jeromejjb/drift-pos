@@ -78,12 +78,16 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     if (!printWindow) return;
 
     const restaurantName = localStorage.getItem('drift-restaurant-name') || 'Your Restaurant';
-    const currentDate = new Date().toLocaleDateString();
+    const currentDate = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
 
     printWindow.document.write(`
       <html>
         <head>
-          <title>Drift - Table QR Codes</title>
+          <title>drift · table codes</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
             
@@ -95,166 +99,228 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             
             body {
               font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-              background: #f8fafc;
-              padding: 40px 20px;
-              color: #0f172a;
+              background: #ffffff;
+              padding: 48px 32px;
+              color: #111111;
             }
             
+            /* Minimalist header */
             .header {
-              text-align: center;
-              margin-bottom: 40px;
-              padding-bottom: 20px;
-              border-bottom: 2px solid #e2e8f0;
+              margin-bottom: 48px;
+              position: relative;
             }
             
-            .header h1 {
-              font-size: 32px;
+            .header-top {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              padding-bottom: 16px;
+              border-bottom: 1px solid #eaeaea;
+            }
+            
+            .logo {
+              font-size: 24px;
               font-weight: 300;
               letter-spacing: -0.02em;
-              margin-bottom: 8px;
-              color: #0f172a;
+              color: #000000;
             }
             
-            .header h1 span {
+            .logo span {
               font-style: italic;
               font-weight: 400;
+              color: #666666;
             }
             
-            .header p {
-              color: #64748b;
-              font-size: 16px;
+            .date {
+              font-size: 12px;
+              color: #999999;
               font-weight: 300;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
             }
             
             .restaurant-name {
-              font-size: 20px;
-              font-weight: 500;
-              margin-top: 12px;
-              color: #0f172a;
+              margin-top: 24px;
             }
             
+            .restaurant-name h2 {
+              font-size: 32px;
+              font-weight: 300;
+              color: #000000;
+              margin-bottom: 4px;
+            }
+            
+            .restaurant-name p {
+              font-size: 12px;
+              color: #999999;
+              font-weight: 300;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            
+            /* Grid layout */
             .grid {
               display: grid;
               grid-template-columns: repeat(2, 1fr);
-              gap: 24px;
-              max-width: 1000px;
-              margin: 0 auto;
+              gap: 32px;
+              margin: 48px 0;
             }
             
+            /* Minimal card design */
             .card {
-              background: white;
-              border-radius: 20px;
-              padding: 30px 20px;
-              text-align: center;
-              box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
-              border: 1px solid #e2e8f0;
-              page-break-inside: avoid;
-            }
-            
-            .card h3 {
-              font-size: 24px;
-              font-weight: 400;
-              margin-bottom: 20px;
-              color: #0f172a;
-            }
-            
-            .qr-container {
               background: #ffffff;
-              padding: 20px;
-              border-radius: 16px;
+              border: 1px solid #f0f0f0;
+              padding: 40px 24px 32px;
+              text-align: center;
+              transition: all 0.2s ease;
+            }
+            
+            .table-number {
+              font-size: 11px;
+              font-weight: 400;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              color: #999999;
+              margin-bottom: 24px;
+            }
+            
+            .qr-wrapper {
+              position: relative;
+              margin-bottom: 24px;
               display: inline-block;
-              margin-bottom: 20px;
+            }
+            
+            .qr-wrapper::after {
+              content: '';
+              position: absolute;
+              top: -8px;
+              left: -8px;
+              right: -8px;
+              bottom: -8px;
+              border: 1px solid #f0f0f0;
+              border-radius: 0;
+              z-index: -1;
+              opacity: 0;
+              transition: opacity 0.2s ease;
+            }
+            
+            .qr-wrapper:hover::after {
+              opacity: 1;
             }
             
             img {
-              width: 200px;
-              height: 200px;
+              width: 160px;
+              height: 160px;
               display: block;
               margin: 0 auto;
+              filter: grayscale(100%);
+              transition: filter 0.2s ease;
+            }
+            
+            img:hover {
+              filter: grayscale(0%);
             }
             
             .instruction {
-              color: #475569;
-              font-size: 14px;
-              margin-top: 12px;
-              font-weight: 400;
+              font-size: 10px;
+              color: #cccccc;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin-top: 16px;
             }
             
+            /* Minimalist footer */
             .footer {
-              margin-top: 60px;
-              padding-top: 30px;
-              text-align: center;
-              border-top: 1px solid #e2e8f0;
-              color: #94a3b8;
-              font-size: 12px;
-            }
-            
-            .footer-logo {
-              font-size: 18px;
-              font-weight: 300;
-              letter-spacing: -0.02em;
-              margin-bottom: 8px;
-            }
-            
-            .footer-logo span {
-              font-style: italic;
-              font-weight: 400;
-            }
-            
-            .security-badge {
+              margin-top: 64px;
+              padding-top: 32px;
+              border-top: 1px solid #f0f0f0;
               display: flex;
+              justify-content: space-between;
               align-items: center;
-              justify-content: center;
+              font-size: 10px;
+              color: #cccccc;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            
+            .footer-left {
+              display: flex;
+              gap: 24px;
+            }
+            
+            .footer-left span {
+              color: #e0e0e0;
+            }
+            
+            .footer-right {
+              display: flex;
               gap: 16px;
-              margin-top: 12px;
-              font-size: 11px;
-              color: #94a3b8;
             }
             
-            .badge {
-              display: flex;
-              align-items: center;
-              gap: 4px;
+            .dot {
+              width: 2px;
+              height: 2px;
+              background: #e0e0e0;
+              border-radius: 50%;
+              display: inline-block;
+              margin: 0 8px;
             }
             
+            /* Print styles */
             @media print {
               body {
-                background: white;
-                padding: 20px;
+                padding: 24px;
               }
+              
               .card {
-                box-shadow: none;
-                border: 1px solid #e2e8f0;
+                border: 1px solid #f0f0f0;
+                page-break-inside: avoid;
+              }
+              
+              .qr-wrapper::after {
+                display: none;
+              }
+              
+              img {
+                filter: grayscale(100%);
               }
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>drift <span>· table codes</span></h1>
-            <p>Scan to view menu & order</p>
-            <div class="restaurant-name">${restaurantName}</div>
+            <div class="header-top">
+              <div class="logo">drift <span>· table</span></div>
+              <div class="date">${currentDate}</div>
+            </div>
+            <div class="restaurant-name">
+              <h2>${restaurantName}</h2>
+              <p>table qr codes</p>
+            </div>
           </div>
           
           <div class="grid">
-            ${qrCodes.map(qr => `
+            ${qrCodes.map((qr, index) => `
               <div class="card">
-                <h3>Table ${qr.tableNumber}</h3>
-                <div class="qr-container">
+                <div class="table-number">table ${qr.tableNumber.toString().padStart(2, '0')}</div>
+                <div class="qr-wrapper">
                   <img src="${qr.qrCode}" alt="QR Code for Table ${qr.tableNumber}" />
                 </div>
-                <p class="instruction">Scan with phone camera to order</p>
+                <div class="instruction">scan to order</div>
               </div>
             `).join('')}
           </div>
           
           <div class="footer">
-            <div class="footer-logo">drift <span>· technologies</span></div>
-            <p>Generated on ${currentDate} · All rights reserved</p>
-            <div class="security-badge">
-              <span class="badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> SOC 2</span>
-              <span class="badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> PCI DSS</span>
-              <span class="badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> GDPR</span>
+            <div class="footer-left">
+              <span>drift technologies</span>
+              <span>·</span>
+              <span>soc 2</span>
+              <span>·</span>
+              <span>pci dss</span>
+            </div>
+            <div class="footer-right">
+              <span>minimal · intentional · drift</span>
             </div>
           </div>
         </body>
