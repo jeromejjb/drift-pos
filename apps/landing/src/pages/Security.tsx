@@ -9,7 +9,7 @@ import {
   FileCheck,
   CreditCard
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+// Removed unused Link import
 
 export function Security() {
   return (
@@ -163,10 +163,10 @@ export function Security() {
               We take security seriously. If you've found a security issue, please report it responsibly.
             </p>
             <a
-              href="mailto:security@drift.com"
+              href="mailto:security@driftpos.com"
               className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full hover:bg-gray-800 transition-colors"
             >
-              security@drift.com
+              security@driftpos.com
             </a>
             <p className="text-xs text-gray-300 mt-4">
               We offer bounties for verified security issues.

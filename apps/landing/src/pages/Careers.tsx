@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { Briefcase, Heart, Zap, Users, } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Briefcase, Heart, Zap, Users } from 'lucide-react';
+// Removed unused navigate
 
 export function Careers() {
-  const navigate = useNavigate();
+  // Removed unused navigate
 
   return (
     <div className="min-h-screen bg-white">
@@ -144,9 +144,9 @@ export function Careers() {
           >
             <p className="text-gray-400">
               Don't see a role but think you'd be a fit?{' '}
-              <button className="text-black font-medium hover:underline">
+              <a href="mailto:careers@driftpos.com" className="text-black font-medium hover:underline">
                 Say hello →
-              </button>
+              </a>
             </p>
           </motion.div>
         </div>

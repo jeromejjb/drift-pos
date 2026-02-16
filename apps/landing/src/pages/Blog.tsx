@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Calendar, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { BookOpen, ArrowRight } from 'lucide-react';
+// Removed unused Calendar and User imports
 
 export function Blog() {
-  const navigate = useNavigate();
+  // Removed unused navigate
 
   return (
     <div className="min-h-screen bg-white">
