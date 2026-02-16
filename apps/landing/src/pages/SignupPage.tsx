@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
+import { motion, AnimatePresence } from 'framer-motion';import { 
   Building2, 
   Mail, 
   Lock, 
