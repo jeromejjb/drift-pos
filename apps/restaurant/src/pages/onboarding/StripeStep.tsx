@@ -19,10 +19,13 @@ import {
   TrendingUp,
   BarChart3,
   Users,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { Button } from './../../components/ui/Button';
 import { Card } from './../../components/ui/Card';
+import { loadConnectAndInitialize } from '@stripe/connect-js';
+import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
 
 // Animation variants
 const fadeInUp = {
@@ -93,9 +96,16 @@ const TIERS = {
 
 export function StripeStep({ restaurantId, data, onComplete, updateData }) {
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [selectedTier, setSelectedTier] = useState('free');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [annualBilling, setAnnualBilling] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [clientSecret, setClientSecret] = useState(null);
+  const [connectInstance, setConnectInstance] = useState(null);
+  const [accountId, setAccountId] = useState(null);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'failed' | null>(null);
   
   // Load ALL saved data from props and localStorage
   const [savedData, setSavedData] = useState({
@@ -111,7 +121,6 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
   useEffect(() => {
     console.log('📊 StripeStep received data prop:', data);
     
-    // Start with empty object
     let mergedData: any = {};
     
     // 1. Load from localStorage first
@@ -126,7 +135,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
       }
     }
     
-    // 2. Props override localStorage (they're more recent)
+    // 2. Props override localStorage
     if (data) {
       console.log('📦 Merging props data:', data);
       mergedData = { ...mergedData, ...data };
@@ -146,11 +155,11 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
       setSelectedTier(mergedData.tier);
     }
     
-    console.log('✅ Final savedData:', {
-      restaurantName: mergedData.name || mergedData.restaurantName || 'Your Restaurant',
-      email: mergedData.email || '',
-      tier: mergedData.tier || 'free'
-    });
+    // Check if we already have a Stripe account in progress
+    if (mergedData.stripeAccountId && mergedData.stripeConnectInProgress) {
+      setAccountId(mergedData.stripeAccountId);
+      // Resume onboarding if needed
+    }
     
   }, [data]);
 
@@ -188,13 +197,13 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
 
   const estimated = calculateEstimatedFees(45, savedData.monthlyOrders || 100);
 
+  // Create Stripe Connect account
   const handleConnect = async () => {
     setLoading(true);
     
     try {
-      // Validate we have required data
+      // Validate required data
       if (!savedData.email) {
-        console.error('❌ Missing email. Current state:', savedData);
         throw new Error('Email address is missing. Please go back to Restaurant Info step.');
       }
       
@@ -206,11 +215,9 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
       if (!API_URL) throw new Error('API_URL not configured');
       API_URL = API_URL.replace('http://', 'https://');
       
-      console.log('📧 Sending to Stripe API:', {
+      console.log('📧 Creating Stripe account for:', {
         email: savedData.email,
-        name: savedData.restaurantName,
-        restaurantId: data?.restaurantId,
-        tier: selectedTier
+        name: savedData.restaurantName
       });
       
       // Save the selected tier
@@ -218,6 +225,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
         await updateData({ tier: selectedTier });
       }
       
+      // Call API to create Stripe Connect account
       const res = await fetch(`${API_URL}/api/stripe/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -232,14 +240,24 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
       const response = await res.json();
       if (!res.ok) throw new Error(response.error || 'Failed to connect');
       
-      const { accountId } = response;
+      const { clientSecret, accountId } = response;
+      setClientSecret(clientSecret);
+      setAccountId(accountId);
+      
+      // Initialize Stripe Connect instance
+      const stripeConnectInstance = loadConnectAndInitialize({
+        publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+        fetchClientSecret: async () => clientSecret,
+      });
+      
+      setConnectInstance(stripeConnectInstance);
       
       // Save progress
       const onboardingData = {
         ...savedData,
         tier: selectedTier,
         stripeAccountId: accountId,
-        stripeConnected: true
+        stripeConnectInProgress: true
       };
       
       localStorage.setItem('drift_onboarding', JSON.stringify(onboardingData));
@@ -247,14 +265,79 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
         await updateData(onboardingData);
       }
       
-      alert('✅ Stripe account created successfully!');
-      onComplete();
+      // Show embedded onboarding
+      setShowOnboarding(true);
+      setLoading(false);
       
     } catch (error) {
       console.error('❌ Connection error:', error);
       alert(`Failed to connect: ${error.message}`);
-    } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle onboarding exit
+  const handleOnboardingExit = () => {
+    setShowOnboarding(false);
+    
+    // If we have an account ID, check if onboarding was completed
+    if (accountId) {
+      checkAccountStatus(accountId);
+    }
+  };
+
+  // Check account status to verify all details are submitted
+  const checkAccountStatus = async (id: string) => {
+    setVerifying(true);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL?.replace('http://', 'https://');
+      const res = await fetch(`${API_URL}/api/stripe/account-status/${id}`);
+      const status = await res.json();
+      
+      if (status.details_submitted && status.charges_enabled) {
+        // Account is fully verified!
+        setVerificationStatus('verified');
+        setOnboardingComplete(true);
+        
+        // Update stored data
+        const onboardingData = {
+          ...savedData,
+          tier: selectedTier,
+          stripeAccountId: accountId,
+          stripeConnected: true,
+          stripeConnectInProgress: false
+        };
+        
+        localStorage.setItem('drift_onboarding', JSON.stringify(onboardingData));
+        if (updateData) {
+          await updateData(onboardingData);
+        }
+        
+        // Show success message briefly then complete
+        setTimeout(() => {
+          setVerifying(false);
+          onComplete();
+        }, 1500);
+        
+      } else {
+        // Account needs more info
+        setVerificationStatus('pending');
+        setVerifying(false);
+        
+        // Ask user to complete onboarding
+        const shouldContinue = window.confirm(
+          'Your payment setup needs a few more details. Would you like to continue?'
+        );
+        
+        if (shouldContinue) {
+          setShowOnboarding(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking account status:', error);
+      setVerificationStatus('failed');
+      setVerifying(false);
     }
   };
 
@@ -304,16 +387,6 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
           <p className="font-medium text-sm">{savedData.tables} tables</p>
         </div>
       </div>
-      
-      {/* Debug info - remove in production */}
-      {import.meta.env.DEV && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs font-mono">
-          <p>Email: {savedData.email || '❌ MISSING'}</p>
-          <p>Name: {savedData.restaurantName || '❌ MISSING'}</p>
-          <p>Tables: {savedData.tables}</p>
-          <p>Menu Items: {savedData.menuItems}</p>
-        </div>
-      )}
     </motion.div>
   );
 
@@ -465,7 +538,86 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     </AnimatePresence>
   );
 
-  // Main render
+  // Success state
+  if (verificationStatus === 'verified') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-md mx-auto p-6 text-center"
+      >
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 className="w-10 h-10 text-green-600" />
+        </div>
+        <h2 className="text-3xl font-light mb-2">Payment setup complete!</h2>
+        <p className="text-gray-400 mb-8">
+          Your account is ready to accept payments.
+        </p>
+        <Button onClick={onComplete} size="lg">
+          Continue to Dashboard
+        </Button>
+      </motion.div>
+    );
+  }
+
+  // Embedded onboarding view
+  if (showOnboarding && connectInstance && clientSecret) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="max-w-2xl mx-auto p-6"
+      >
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-light mb-2">Complete your payment setup</h2>
+          <p className="text-gray-400">
+            Just a few more details to start accepting payments.
+          </p>
+        </div>
+
+        <Card className="p-6">
+          <ConnectComponentsProvider connectInstance={connectInstance}>
+            <ConnectAccountOnboarding
+              onExit={handleOnboardingExit}
+            />
+          </ConnectComponentsProvider>
+        </Card>
+
+        {verifying && (
+          <div className="mt-4 text-center text-sm text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+            Verifying your information...
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
+  // Verifying status after onboarding
+  if (verifying) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="max-w-md mx-auto p-6 text-center"
+      >
+        <div className="relative w-20 h-20 mx-auto mb-6">
+          <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+          <motion.div 
+            className="absolute inset-0 border-4 border-black rounded-full border-t-transparent"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          />
+        </div>
+        <h2 className="text-2xl font-light mb-2">Verifying your information</h2>
+        <p className="text-gray-400">
+          This will just take a moment...
+        </p>
+      </motion.div>
+    );
+  }
+
+  // Main render (tier selection)
   return (
     <>
       <motion.div 
