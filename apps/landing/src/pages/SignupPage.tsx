@@ -16,13 +16,15 @@ import {
   EyeOff,
   Globe,
   Phone,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 
 export function SignupPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +34,7 @@ export function SignupPage() {
   const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [modalContent, setModalContent] = useState<'terms' | 'privacy'>('terms');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -97,6 +100,50 @@ export function SignupPage() {
     { code: '+55', country: 'BR' },
     { code: '+52', country: 'MX' },
   ];
+
+  // Phone number formatting function
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-numeric characters
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits for US/Canada numbers
+    const limited = numbers.slice(0, 10);
+    
+    // Format based on length
+    if (limited.length <= 3) {
+      return limited;
+    } else if (limited.length <= 6) {
+      return `(${limited.slice(0, 3)}) ${limited.slice(3)}`;
+    } else {
+      return `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6, 10)}`;
+    }
+  };
+
+  // Phone validation
+  const validatePhone = (phone: string) => {
+    const numbers = phone.replace(/\D/g, '');
+    if (numbers.length === 0) return true; // Optional field
+    if (numbers.length !== 10) {
+      setPhoneError('Phone number must have 10 digits');
+      return false;
+    }
+    setPhoneError(null);
+    return true;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setFormData({ ...formData, phone: formatted });
+    validatePhone(formatted);
+  };
+
+  const handlePhoneBlur = () => {
+    if (formData.phone) {
+      validatePhone(formData.phone);
+    } else {
+      setPhoneError(null);
+    }
+  };
 
   // Password strength checker
   const checkPasswordStrength = (password: string) => {
@@ -170,7 +217,8 @@ export function SignupPage() {
       formData.businessName.trim() !== '' &&
       formData.businessType !== '' &&
       formData.role !== '' &&
-      formData.teamSize !== ''
+      formData.teamSize !== '' &&
+      !phoneError // Make sure phone is valid if provided
     );
   };
 
@@ -194,6 +242,9 @@ export function SignupPage() {
     setError('');
     
     try {
+      // Remove formatting before sending
+      const phoneDigits = formData.phone ? formData.phone.replace(/\D/g, '') : '';
+      
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,12 +256,16 @@ export function SignupPage() {
           role: formData.role,
           businessType: formData.businessType,
           teamSize: formData.teamSize,
-          phone: formData.phone ? `${formData.countryCode}${formData.phone}` : null
+          phone: phoneDigits || null
         }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create account');
+
+      // Show minimal redirect overlay
+      setRedirecting(true);
+      setLoading(false);
 
       const userProfile = {
         fullName: formData.fullName,
@@ -219,7 +274,7 @@ export function SignupPage() {
         role: formData.role,
         businessType: formData.businessType,
         teamSize: formData.teamSize,
-        phone: formData.phone ? `${formData.countryCode}${formData.phone}` : null,
+        phone: phoneDigits || null,
         userId: data.userId,
         restaurantId: data.restaurantId
       };
@@ -236,20 +291,52 @@ export function SignupPage() {
         fullName: formData.fullName,
         role: formData.role,
         teamSize: formData.teamSize,
-        phone: formData.phone || '',
+        phone: phoneDigits || '',
         token: data.token
       }).toString();
       
-      window.location.href = redirectUrl;
+      // Slight delay for smooth transition
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 300);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account');
       setLoading(false);
+      setRedirecting(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex">
+      {/* Minimal Redirect Overlay */}
+      <AnimatePresence>
+        {redirecting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-white/90 backdrop-blur-md rounded-2xl p-8 shadow-2xl flex flex-col items-center"
+            >
+              <div className="relative">
+                <div className="w-16 h-16 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-8 h-8 bg-black rounded-full opacity-10" />
+                </div>
+              </div>
+              <p className="mt-4 text-sm font-medium text-gray-700">Preparing your workspace</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Left panel - Enhanced value proposition */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden p-12 text-white flex-col">
         {/* Animated background pattern */}
@@ -261,7 +348,7 @@ export function SignupPage() {
         </div>
         
         <div className="relative z-10 flex-1 flex flex-col">
-          {/* Logo and Sign in - Moved to top */}
+          {/* Logo and Sign in */}
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -274,7 +361,6 @@ export function SignupPage() {
               <span className="text-xl font-light tracking-tight">drift</span>
             </div>
             
-            {/* Sign in button always visible */}
             <button
               onClick={() => navigate('/login')}
               className="text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1"
@@ -336,12 +422,12 @@ export function SignupPage() {
             </div>
           </div>
           
-          {/* Feature list - Condensed based on step */}
+          {/* Feature list - Updated without trial */}
           <div className="space-y-4 mb-12">
             {step === 1 ? (
               // Account benefits
               [
-                { icon: '🚀', text: 'Free 14-day trial' },
+                { icon: '🚀', text: 'Get started in minutes' },
                 { icon: '💳', text: 'No credit card required' },
                 { icon: '🔒', text: '256-bit encryption' }
               ].map((feature, i) => (
@@ -377,7 +463,7 @@ export function SignupPage() {
             )}
           </div>
           
-          {/* Trust badges - Always visible */}
+          {/* Trust badges */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -400,7 +486,7 @@ export function SignupPage() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          {/* Mobile sign in - Only visible on mobile */}
+          {/* Mobile sign in */}
           <div className="lg:hidden flex justify-end mb-4">
             <button
               onClick={() => navigate('/login')}
@@ -411,7 +497,7 @@ export function SignupPage() {
             </button>
           </div>
 
-          {/* Back button - Only shows on step 2 */}
+          {/* Back button */}
           {step === 2 && (
             <button 
               onClick={handlePrevStep}
@@ -677,7 +763,7 @@ export function SignupPage() {
                     </div>
                   </div>
 
-                  {/* Business Type - Grid with icons */}
+                  {/* Business Type */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Business type <span className="text-red-400">*</span>
@@ -751,7 +837,7 @@ export function SignupPage() {
                     </div>
                   </div>
 
-                  {/* Phone (Optional) with country code */}
+                  {/* Phone with auto-formatting and validation */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone number <span className="text-gray-400">(optional)</span>
@@ -770,19 +856,41 @@ export function SignupPage() {
                         </select>
                       </div>
                       <div className="relative flex-1">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Phone className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                          phoneError ? 'text-red-400' : 'text-gray-400'
+                        }`} />
                         <input
                           type="tel"
                           value={formData.phone}
-                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                          className="w-full pl-9 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none transition-all bg-white"
-                          placeholder="555-0123"
+                          onChange={handlePhoneChange}
+                          onBlur={handlePhoneBlur}
+                          maxLength={14}
+                          className={`w-full pl-9 pr-4 py-4 border-2 rounded-xl focus:border-black focus:outline-none transition-all ${
+                            phoneError 
+                              ? 'border-red-300 bg-red-50' 
+                              : formData.phone && !phoneError
+                              ? 'border-green-300 bg-green-50'
+                              : 'border-gray-100'
+                          }`}
+                          placeholder="(555) 555-5555"
                         />
+                        {formData.phone && !phoneError && (
+                          <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                        )}
                       </div>
                     </div>
+                    {phoneError && (
+                      <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {phoneError}
+                      </p>
+                    )}
+                    {formData.phone && !phoneError && (
+                      <p className="text-xs text-green-600 mt-1">✓ Valid phone number</p>
+                    )}
                   </div>
 
-                  {/* Terms agreement - UPDATED with clickable buttons */}
+                  {/* Terms agreement */}
                   <div className="flex items-start gap-3 pt-4">
                     <button
                       type="button"
@@ -835,7 +943,7 @@ export function SignupPage() {
                     >
                       {loading ? (
                         <span className="flex items-center justify-center gap-2">
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <Loader2 className="w-5 h-5 animate-spin" />
                           Creating account...
                         </span>
                       ) : (
