@@ -10,7 +10,10 @@
     "dev": "npm run dev --workspace=apps/diner & npm run dev --workspace=apps/restaurant & npm run dev --workspace=apps/api"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.95.3"
+    "@stripe/connect-js": "^3.3.33",
+    "@stripe/react-connect-js": "^3.3.33",
+    "@supabase/supabase-js": "^2.95.3",
+    "framer-motion": "^12.34.0"
   },
   "devDependencies": {
     "supabase": "^2.76.8"

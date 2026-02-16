@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// 1. Create Stripe account for restaurant
+// 1. Create Stripe account for restaurant with embedded onboarding
 router.post('/stripe/connect', async (req, res) => {
   try {
     const { email, name, restaurantId } = req.body;
@@ -17,19 +17,25 @@ router.post('/stripe/connect', async (req, res) => {
       metadata: { restaurantId }
     });
     
-    // 🔒 FORCE HTTPS for the URLs
-    let appUrl = process.env.APP_URL || 'https://drift-restaurant.onrender.com';
-    appUrl = appUrl.replace('http://', 'https://');
-    
-    // Create onboarding link with HTTPS URLs
-    const link = await stripe.accountLinks.create({
+    // Create an ACCOUNT SESSION for embedded onboarding (not account links!)
+    const session = await stripe.accountSessions.create({
       account: account.id,
-      refresh_url: `${appUrl}/onboarding?step=stripe`,
-      return_url: `${appUrl}/onboarding?step=complete`,
-      type: 'account_onboarding',
+      components: {
+        account_onboarding: {
+          enabled: true,
+          features: {
+            external_account_collection: true, // Collect bank details
+          },
+        },
+      },
     });
     
-    res.json({ url: link.url, accountId: account.id });
+    // Return client secret for the frontend to use with Connect.js
+    res.json({ 
+      clientSecret: session.client_secret,
+      accountId: account.id 
+    });
+    
   } catch (error) {
     console.error('Stripe connect error:', error);
     res.status(500).json({ error: error.message });
