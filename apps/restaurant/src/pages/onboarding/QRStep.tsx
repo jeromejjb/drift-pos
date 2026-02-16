@@ -17,7 +17,20 @@ import {
   Gem,
   Leaf,
   Mountain,
-  Droplets
+  Droplets,
+  HelpCircle,
+  Info,
+  Printer,
+  Scissors,
+  CreditCard,
+  Smartphone,
+  Users,
+  Coffee,
+  Beer,
+  Utensils,
+  X,
+  Check,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
@@ -39,6 +52,9 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [selectedFinish, setSelectedFinish] = useState<'classic' | 'matte' | 'prestige'>('prestige');
   const [showUnboxing, setShowUnboxing] = useState(true);
   const [unboxed, setUnboxed] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
+  const [selectedDensity, setSelectedDensity] = useState<'6' | '9' | '12'>('9');
+  const [activeTab, setActiveTab] = useState<'configure' | 'preview' | 'tips'>('configure');
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
   
@@ -47,34 +63,147 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     localStorage.getItem('drift-restaurant-name') || 
     'Your Business';
 
+  const businessType = localStorage.getItem('drift-business-type') || 'restaurant';
+
+  // Animation variants
+  const fadeInUp = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 }
+  };
+
+  const stagger = {
+    animate: {
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  // Educational content
+  const getBusinessIcon = () => {
+    switch(businessType) {
+      case 'bar': return <Beer className="w-5 h-5" />;
+      case 'cafe': return <Coffee className="w-5 h-5" />;
+      case 'restaurant': return <Utensils className="w-5 h-5" />;
+      default: return <Users className="w-5 h-5" />;
+    }
+  };
+
+  const getEducationalContent = () => {
+    return {
+      title: `QR codes for your ${businessType}`,
+      valueProp: "Reduce wait times by 40% · Increase order value by 23%",
+      steps: [
+        {
+          icon: <Printer className="w-5 h-5" />,
+          title: "Print & place",
+          description: "Print on card stock, cut, and place at each table.",
+          time: "5 minutes"
+        },
+        {
+          icon: <Smartphone className="w-5 h-5" />,
+          title: "Customers scan",
+          description: "No app needed — just point and tap.",
+          time: "2 seconds"
+        },
+        {
+          icon: <CreditCard className="w-5 h-5" />,
+          title: "Order & pay",
+          description: "Guests browse, order, and pay from their phone.",
+          time: "90 seconds"
+        },
+        {
+          icon: <Users className="w-5 h-5" />,
+          title: "You receive",
+          description: "Orders appear instantly in your dashboard.",
+          time: "real-time"
+        }
+      ]
+    };
+  };
+
   const collections = [
     { 
       id: 'signature', 
       name: 'Signature', 
       icon: Star, 
-      desc: 'essential elegance',
-      colors: ['#000000', '#333333', '#666666']
+      description: 'Clean, essential design',
+      colors: ['#000000', '#333333', '#666666'],
+      density: '9 per sheet',
+      bestFor: 'All business types',
+      popular: true
     },
     { 
       id: 'heritage', 
       name: 'Heritage', 
       icon: Leaf, 
-      desc: 'inspired by the lakes',
-      colors: ['#2C5530', '#4A7A4F', '#6B8E6B']
+      description: 'Inspired by the Great Lakes',
+      colors: ['#2C5530', '#4A7A4F', '#6B8E6B'],
+      density: '6 per sheet',
+      bestFor: 'Bars, cafes, casual dining'
     },
     { 
       id: 'legacy', 
       name: 'Legacy', 
       icon: Gem, 
-      desc: 'premium collection',
-      colors: ['#1A2F4A', '#2C3E5A', '#4A5F7A']
+      description: 'Premium, sophisticated',
+      colors: ['#1A2F4A', '#2C3E5A', '#4A5F7A'],
+      density: '12 per sheet',
+      bestFor: 'Fine dining, high-volume'
     }
   ];
 
   const finishes = [
-    { id: 'classic', name: 'Classic', icon: Layout, desc: 'clean lines' },
-    { id: 'matte', name: 'Matte', icon: Palette, desc: 'soft finish' },
-    { id: 'prestige', name: 'Prestige', icon: Gem, desc: 'double border' }
+    { 
+      id: 'classic', 
+      name: 'Classic', 
+      icon: Layout, 
+      description: 'Clean lines, standard border',
+      preview: 'single-line'
+    },
+    { 
+      id: 'matte', 
+      name: 'Matte', 
+      icon: Palette, 
+      description: 'Soft finish, rounded corners',
+      preview: 'soft-edge'
+    },
+    { 
+      id: 'prestige', 
+      name: 'Prestige', 
+      icon: Gem, 
+      description: 'Double border, premium feel',
+      preview: 'double-line'
+    }
+  ];
+
+  const densities = [
+    { 
+      id: '6', 
+      name: 'Large', 
+      size: '85 × 60mm', 
+      qrSize: '42mm', 
+      bestFor: 'Easy reading, bars',
+      cardsPerSheet: 6
+    },
+    { 
+      id: '9', 
+      name: 'Medium', 
+      size: '60 × 55mm', 
+      qrSize: '35mm', 
+      bestFor: 'Balanced, restaurants',
+      cardsPerSheet: 9,
+      default: true
+    },
+    { 
+      id: '12', 
+      name: 'Small', 
+      size: '60 × 48mm', 
+      qrSize: '30mm', 
+      bestFor: 'High volume, cafes',
+      cardsPerSheet: 12
+    }
   ];
 
   const generateQRCodes = async () => {
@@ -124,7 +253,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   };
 
   const createHeritagePattern = (pdf: any, x: number, y: number, width: number, height: number) => {
-    // Create a subtle wave pattern representing the Great Lakes
     pdf.setDrawColor(200, 215, 220);
     pdf.setLineWidth(0.1);
     
@@ -146,110 +274,104 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     
-    // Premium layout
-    const cols = 2;
-    const rows = 3;
-    const cardWidth = 85;
-    const cardHeight = 60;
-    const margin = 18;
+    const itemsPerPage = parseInt(selectedDensity);
+    const density = densities.find(d => d.id === selectedDensity);
+    
+    // Layout calculations
+    let cols, rows, cardWidth, cardHeight;
+    if (itemsPerPage === 6) {
+      cols = 2; rows = 3;
+      cardWidth = 85; cardHeight = 60;
+    } else if (itemsPerPage === 9) {
+      cols = 3; rows = 3;
+      cardWidth = 60; cardHeight = 55;
+    } else {
+      cols = 3; rows = 4;
+      cardWidth = 60; cardHeight = 48;
+    }
+
     const startX = (pageWidth - (cols * cardWidth)) / 2;
-    const startY = 35;
+    const startY = 30;
 
-    // Collection colors
-    const colors = collections.find(c => c.id === selectedCollection)?.colors || ['#000000', '#333333', '#666666'];
+    const collection = collections.find(c => c.id === selectedCollection);
+    const colors = collection?.colors || ['#000000', '#333333', '#666666'];
 
-    // ===== COVER PAGE - UNBOXING EXPERIENCE =====
+    // ===== COVER PAGE =====
     pdf.setFillColor(250, 250, 252);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Heritage pattern
-    pdf.setDrawColor(220, 225, 230);
-    pdf.setLineWidth(0.2);
-    
-    // Lake-inspired wave pattern
-    for (let i = 0; i < 5; i++) {
-      const y = 40 + i * 30;
-      pdf.line(30, y, pageWidth - 30, y - 10);
-      pdf.line(30, y + 10, pageWidth - 30, y);
-    }
-
-    // Drift logo with elevation
+    // Logo
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(52);
+    pdf.setFontSize(48);
     pdf.setTextColor(parseInt(colors[0].slice(1,3), 16), parseInt(colors[0].slice(3,5), 16), parseInt(colors[0].slice(5,7), 16));
-    pdf.text('drift', pageWidth / 2, 90, { align: 'center' });
+    pdf.text('drift', pageWidth / 2, 60, { align: 'center' });
 
-    // Collection name
-    pdf.setFont('helvetica', 'lightitalic');
-    pdf.setFontSize(16);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(`${selectedCollection} collection`, pageWidth / 2, 115, { align: 'center' });
+    // Collection
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(14);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`${collection?.name} Collection · ${finishes.find(f => f.id === selectedFinish)?.name} Finish`, pageWidth / 2, 80, { align: 'center' });
 
-    // Restaurant name - elegantly centered
+    // Restaurant
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(28);
+    pdf.setFontSize(24);
     pdf.setTextColor(30, 30, 30);
-    pdf.text(restaurantName, pageWidth / 2, 160, { align: 'center' });
+    pdf.text(restaurantName, pageWidth / 2, 120, { align: 'center' });
 
-    // Details with finish
+    // Specs
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(10);
-    pdf.setTextColor(140, 140, 140);
-    pdf.text(`${qrCodes.length} tables · ${finishes.find(f => f.id === selectedFinish)?.name} finish · ${selectedCollection} series`, pageWidth / 2, 190, { align: 'center' });
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(`${qrCodes.length} tables · ${itemsPerPage} per sheet · ${density?.size}`, pageWidth / 2, 150, { align: 'center' });
 
-    // Great Lakes signature - exactly like landing page
+    // Instructions
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(9);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('Made with ♡ on the Great Lakes', pageWidth / 2, pageHeight - 35, { align: 'center' });
-    
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(7);
-    pdf.setTextColor(170, 170, 170);
-    pdf.text('drift technologies inc. · established 2024', pageWidth / 2, pageHeight - 25, { align: 'center' });
+    pdf.setTextColor(140, 140, 140);
+    pdf.text('Print · Cut · Place · Scan', pageWidth / 2, 200, { align: 'center' });
 
-    // ===== QR CODE PAGES =====
+    // Great Lakes
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(8);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Made with love on the Great Lakes', pageWidth / 2, pageHeight - 30, { align: 'center' });
+    pdf.text('drift technologies inc.', pageWidth / 2, pageHeight - 20, { align: 'center' });
+
+    // ===== QR PAGES =====
     for (let i = 0; i < qrCodes.length; i++) {
-      if (i > 0 && i % (cols * rows) === 0) {
+      if (i > 0 && i % itemsPerPage === 0) {
         pdf.addPage();
         pdf.setFillColor(250, 250, 252);
         pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       }
 
-      const posOnPage = i % (cols * rows);
+      const posOnPage = i % itemsPerPage;
       const row = Math.floor(posOnPage / cols);
       const col = posOnPage % cols;
-
       const x = startX + col * cardWidth;
-      const y = startY + row * (cardHeight + 8);
+      const y = startY + row * (cardHeight + 5);
 
-      // Collection-specific background
+      // Heritage pattern
       if (selectedCollection === 'heritage') {
         createHeritagePattern(pdf, x, y, cardWidth, cardHeight);
       }
 
-      // Card border with finish
+      // Border
       pdf.setDrawColor(200, 200, 200);
       pdf.setLineWidth(0.2);
       
       if (selectedFinish === 'prestige') {
-        // Double border for prestige
         pdf.roundedRect(x - 0.5, y - 0.5, cardWidth - 1, cardHeight - 1, 3, 3, 'S');
         pdf.setDrawColor(220, 220, 220);
         pdf.roundedRect(x, y, cardWidth - 2, cardHeight - 2, 3, 3, 'S');
-      } else if (selectedFinish === 'matte') {
-        // Soft border for matte
-        pdf.setDrawColor(220, 220, 220);
-        pdf.roundedRect(x, y, cardWidth - 2, cardHeight - 2, 4, 4, 'S');
       } else {
-        // Clean border for classic
         pdf.roundedRect(x, y, cardWidth - 2, cardHeight - 2, 2, 2, 'S');
       }
 
-      // QR Code - premium placement
+      // QR Code
       try {
         const qrImage = qrCodes[i].qrCode.split(',')[1];
-        const qrSize = 38;
+        const qrSize = density?.qrSize ? parseInt(density.qrSize) : 35;
         
         pdf.addImage(
           qrImage, 
@@ -265,78 +387,59 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         console.error('Error adding QR image:', err);
       }
 
-      // Table number - refined
+      // Table number
       pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setTextColor(80, 80, 80);
-      pdf.text(`${qrCodes[i].tableNumber.toString().padStart(2, '0')}`, x + cardWidth - 20, y + cardHeight - 14);
+      pdf.text(`#${qrCodes[i].tableNumber.toString().padStart(2, '0')}`, x + cardWidth - 18, y + 15);
 
-      // Drift signature
+      // Drift
       pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(7);
-      pdf.setTextColor(160, 160, 160);
-      pdf.text('drift', x + 12, y + cardHeight - 14);
+      pdf.setFontSize(6);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('drift', x + 10, y + cardHeight - 12);
 
-      // Great Lakes mark on each card
+      // Great Lakes
       pdf.setFont('helvetica', 'light');
       pdf.setFontSize(4);
-      pdf.setTextColor(180, 180, 180);
-      pdf.text('made with ♡ on the great lakes', x + 12, y + cardHeight - 8);
+      pdf.setTextColor(170, 170, 170);
+      pdf.text('made with love on the great lakes', x + 12, y + cardHeight - 6);
     }
 
-    // ===== BACK COVER - INSTRUCTIONS =====
+    // ===== BACK COVER =====
     pdf.addPage();
     pdf.setFillColor(250, 250, 252);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Heritage wave
-    pdf.setDrawColor(200, 210, 220);
-    pdf.setLineWidth(0.3);
-    for (let i = 0; i < 3; i++) {
-      const y = 80 + i * 30;
-      pdf.line(40, y, pageWidth - 40, y - 15);
-    }
-
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(22);
+    pdf.setFontSize(20);
     pdf.setTextColor(40, 40, 40);
-    pdf.text('setting up', pageWidth / 2, 130, { align: 'center' });
+    pdf.text('quick start', pageWidth / 2, 80, { align: 'center' });
 
-    const instructions = [
-      'print on premium card stock (100lb recommended)',
-      'cut with precision along the subtle guidelines',
-      'fold gently for table tents',
-      'place where guests can easily scan',
-      '',
-      'each scan connects directly to your menu'
+    const tips = [
+      '1. Print on 80-100lb card stock',
+      '2. Cut along the borders',
+      '3. Place at eye level on tables',
+      '4. Test each code before use',
+      '5. Laminate for durability'
     ];
 
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(10);
     pdf.setTextColor(100, 100, 100);
     
-    instructions.forEach((line, index) => {
-      pdf.text(line, pageWidth / 2, 180 + index * 9, { align: 'center' });
+    tips.forEach((tip, index) => {
+      pdf.text(tip, 30, 130 + index * 12);
     });
 
-    // Security credentials
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(8);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('SOC 2 · PCI DSS · GDPR compliant', pageWidth / 2, pageHeight - 45, { align: 'center' });
-
-    // Great Lakes signature
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(9);
     pdf.setTextColor(140, 140, 140);
-    pdf.text('Made with ♡ on the Great Lakes', pageWidth / 2, pageHeight - 30, { align: 'center' });
-    
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(7);
-    pdf.setTextColor(160, 160, 160);
-    pdf.text('drift technologies inc.', pageWidth / 2, pageHeight - 20, { align: 'center' });
+    pdf.text('SOC 2 · PCI DSS · GDPR', pageWidth / 2, pageHeight - 40, { align: 'center' });
+    pdf.text('Made with love on the Great Lakes', pageWidth / 2, pageHeight - 25, { align: 'center' });
+    pdf.text('drift technologies inc.', pageWidth / 2, pageHeight - 15, { align: 'center' });
 
-    pdf.save(`${restaurantName.toLowerCase().replace(/\s+/g, '-')}-${selectedCollection}-collection.pdf`);
+    pdf.save(`${restaurantName.toLowerCase().replace(/\s+/g, '-')}-qr-kit.pdf`);
   };
 
   useEffect(() => {
@@ -350,314 +453,384 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     setShowUnboxing(false);
   };
 
+  const educational = getEducationalContent();
+  const totalPages = Math.ceil(qrCodes.length / parseInt(selectedDensity));
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Unboxing Experience */}
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Unboxing Modal */}
       <AnimatePresence>
         {showUnboxing && qrCodes.length > 0 && !unboxed && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={handleUnbox}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: -20 }}
-              className="text-center max-w-md p-12"
+              className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              <motion.div
-                animate={{ 
-                  rotate: [0, 5, -5, 5, 0],
-                  y: [0, -5, 5, -5, 0]
-                }}
-                transition={{ duration: 4, repeat: Infinity }}
-                className="mb-8"
-              >
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-b from-gray-200 to-gray-100 rounded-full blur-2xl opacity-50"></div>
-                  <div className="relative w-32 h-32 mx-auto bg-gradient-to-br from-gray-900 to-gray-700 rounded-3xl flex items-center justify-center shadow-2xl">
-                    <Layers className="w-12 h-12 text-white" />
+              <div className="text-center">
+                <div className="w-20 h-20 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <QrCode className="w-10 h-10 text-white" />
+                </div>
+                
+                <h2 className="text-2xl font-light text-gray-900 mb-2">Your QR kit is ready</h2>
+                <p className="text-gray-400 text-sm mb-4">{restaurantName}</p>
+                
+                <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <div className="text-lg font-light text-gray-700">{qrCodes.length}</div>
+                      <div className="text-xs text-gray-400">tables</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-light text-gray-700">{selectedDensity}</div>
+                      <div className="text-xs text-gray-400">per sheet</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-light text-gray-700">{totalPages}</div>
+                      <div className="text-xs text-gray-400">pages</div>
+                    </div>
                   </div>
                 </div>
-              </motion.div>
-              
-              <h2 className="text-3xl font-light text-gray-900 mb-4">Your collection is ready</h2>
-              <p className="text-gray-400 mb-8">Thoughtfully crafted for {restaurantName}</p>
-              
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleUnbox}
-                className="bg-black text-white px-8 py-4 rounded-xl hover:bg-gray-800 transition-all inline-flex items-center gap-3"
-              >
-                <span>unbox collection</span>
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
+                
+                <button
+                  onClick={handleUnbox}
+                  className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>View collection</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Header with elevation */}
+      {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12"
+        className="text-center mb-8"
       >
-        <motion.div
-          animate={{ 
-            y: [0, -5, 0],
-          }}
-          transition={{ duration: 3, repeat: Infinity }}
-          className="inline-block mb-6"
-        >
-          <div className="w-20 h-20 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl flex items-center justify-center shadow-xl">
-            <span className="text-white text-4xl font-light italic">d</span>
-          </div>
-        </motion.div>
-        <h1 className="text-5xl font-light text-gray-900 mb-2 tracking-tight">drift</h1>
-        <p className="text-gray-400 flex items-center justify-center gap-2">
-          <Mountain className="w-4 h-4" />
-          <span>qr collection · {restaurantName}</span>
-          <Droplets className="w-4 h-4" />
-        </p>
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-2xl mb-4 shadow-lg">
+          <span className="text-white text-3xl font-light">d</span>
+        </div>
+        <h1 className="text-4xl font-light text-gray-900 mb-1">drift</h1>
+        <p className="text-sm text-gray-400">qr code kit · {restaurantName}</p>
       </motion.div>
 
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl"
-        >
-          <p className="text-sm text-red-600">{error}</p>
-        </motion.div>
-      )}
+      {/* Error */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
+          >
+            <Info className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-600">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {generating ? (
+      {/* Generating State */}
+      {generating && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-white rounded-3xl p-16 text-center border border-gray-100 shadow-xl"
+          className="bg-white rounded-2xl p-12 text-center border border-gray-100"
         >
-          <div className="relative w-24 h-24 mx-auto mb-8">
-            <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 border-3 border-gray-100 rounded-full"></div>
             <motion.div 
-              className="absolute inset-0 border-4 border-black rounded-full border-t-transparent"
+              className="absolute inset-0 border-3 border-black rounded-full border-t-transparent"
               animate={{ rotate: 360 }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-            />
-            <motion.div 
-              className="absolute inset-0 border-4 border-gray-300 rounded-full border-b-transparent"
-              animate={{ rotate: -360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl font-light text-gray-700">{progress}%</span>
+              <span className="text-sm font-medium text-gray-600">{progress}%</span>
             </div>
           </div>
-          
-          <motion.h3 
-            key={Math.floor(progress / 25)}
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="text-xl font-light mb-3"
-          >
-            {progress < 25 && "curating your collection..."}
-            {progress >= 25 && progress < 50 && "adding heritage details..."}
-            {progress >= 50 && progress < 75 && "preparing for print..."}
-            {progress >= 75 && "almost ready to unbox..."}
-          </motion.h3>
-          
-          <div className="w-full max-w-md mx-auto h-1 bg-gray-100 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-gradient-to-r from-gray-900 to-gray-600"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
+          <h3 className="text-lg font-light text-gray-700 mb-2">Generating your QR codes</h3>
+          <p className="text-sm text-gray-400">Creating unique codes for each table</p>
         </motion.div>
-      ) : qrCodes.length > 0 ? (
-        <>
-          {/* Collection Selection */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-3 gap-4 mb-8"
-          >
-            {collections.map((collection) => {
-              const Icon = collection.icon;
-              const isActive = selectedCollection === collection.id;
-              return (
-                <motion.button
-                  key={collection.id}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedCollection(collection.id as any)}
-                  className={`p-5 rounded-xl border-2 transition-all ${
-                    isActive 
-                      ? 'border-black shadow-lg' 
-                      : 'border-gray-100 hover:border-gray-300 bg-white'
-                  }`}
-                >
-                  <Icon className={`w-6 h-6 mx-auto mb-3 ${isActive ? 'text-black' : 'text-gray-400'}`} />
-                  <p className="text-base font-light text-center">{collection.name}</p>
-                  <p className="text-xs text-gray-400 text-center mt-1">{collection.desc}</p>
-                  <div className="flex justify-center gap-1 mt-3">
-                    {collection.colors.map((color, i) => (
-                      <div key={i} className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+      )}
+
+      {/* Main Interface */}
+      {!generating && qrCodes.length > 0 && (
+        <motion.div
+          initial="initial"
+          animate="animate"
+          variants={stagger}
+          className="space-y-6"
+        >
+          {/* Value Proposition Banner */}
+          <motion.div variants={fadeInUp} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-green-600" />
+              </div>
+              <p className="text-sm text-gray-600">{educational.valueProp}</p>
+            </div>
+          </motion.div>
+
+          {/* Quick Stats */}
+          <motion.div variants={fadeInUp} className="grid grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl p-3 border border-gray-100 text-center">
+              <div className="text-xl font-light text-gray-700">{qrCodes.length}</div>
+              <div className="text-xs text-gray-400">tables</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 border border-gray-100 text-center">
+              <div className="text-xl font-light text-gray-700">{selectedDensity}</div>
+              <div className="text-xs text-gray-400">per sheet</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 border border-gray-100 text-center">
+              <div className="text-xl font-light text-gray-700">{totalPages}</div>
+              <div className="text-xs text-gray-400">pages</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 border border-gray-100 text-center">
+              <div className="text-xl font-light text-gray-700">A4</div>
+              <div className="text-xs text-gray-400">format</div>
+            </div>
+          </motion.div>
+
+          {/* Tabs */}
+          <motion.div variants={fadeInUp} className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+            {[
+              { id: 'configure', label: 'Configure' },
+              { id: 'preview', label: 'Preview' },
+              { id: 'tips', label: 'Tips' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </motion.div>
+
+          {/* Tab Content */}
+          <AnimatePresence mode="wait">
+            {/* Configure Tab */}
+            {activeTab === 'configure' && (
+              <motion.div
+                key="configure"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                {/* Size Selection */}
+                <div>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Card size</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {densities.map((density) => (
+                      <button
+                        key={density.id}
+                        onClick={() => setSelectedDensity(density.id as any)}
+                        className={`relative p-4 rounded-xl border transition-all text-left ${
+                          selectedDensity === density.id
+                            ? 'border-black bg-gray-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        {density.default && (
+                          <span className="absolute top-2 right-2 text-[10px] bg-black text-white px-2 py-0.5 rounded-full">
+                            recommended
+                          </span>
+                        )}
+                        <p className="text-base font-medium">{density.name}</p>
+                        <p className="text-xs text-gray-400 mt-1">{density.size}</p>
+                        <p className="text-[10px] text-gray-300 mt-2">{density.bestFor}</p>
+                      </button>
                     ))}
                   </div>
-                </motion.button>
-              );
-            })}
-          </motion.div>
+                </div>
 
-          {/* Finish Selection */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="flex justify-center gap-3 mb-8"
-          >
-            {finishes.map((finish) => {
-              const Icon = finish.icon;
-              const isActive = selectedFinish === finish.id;
-              return (
-                <motion.button
-                  key={finish.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedFinish(finish.id as any)}
-                  className={`px-6 py-3 rounded-xl border transition-all flex items-center gap-3 ${
-                    isActive
-                      ? 'border-black bg-gray-50 shadow-md'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-black' : 'text-gray-400'}`} />
-                  <span className="text-sm font-light">{finish.name}</span>
-                  <span className="text-xs text-gray-400">{finish.desc}</span>
-                </motion.button>
-              );
-            })}
-          </motion.div>
-
-          {/* Preview Gallery */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mb-8 p-8 bg-gray-50 rounded-2xl border border-gray-100"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <span className="text-sm text-gray-400 uppercase tracking-wider">collection preview</span>
-              <span className="text-sm text-gray-400">{qrCodes.length} pieces</span>
-            </div>
-            <div className="grid grid-cols-4 gap-4">
-              {qrCodes.slice(0, 4).map((qr, i) => (
-                <motion.div
-                  key={qr.tableId}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all"
-                >
-                  <img src={qr.qrCode} className="w-full aspect-square mb-3" />
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">#{qr.tableNumber}</span>
-                    <span className="text-gray-300">drift</span>
+                {/* Collection Selection */}
+                <div>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Collection</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {collections.map((collection) => {
+                      const Icon = collection.icon;
+                      const isActive = selectedCollection === collection.id;
+                      return (
+                        <button
+                          key={collection.id}
+                          onClick={() => setSelectedCollection(collection.id as any)}
+                          className={`relative p-4 rounded-xl border transition-all ${
+                            isActive 
+                              ? 'border-black bg-gray-50 shadow-sm' 
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          {collection.popular && (
+                            <span className="absolute top-2 right-2 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                              popular
+                            </span>
+                          )}
+                          <Icon className={`w-5 h-5 mb-2 ${isActive ? 'text-black' : 'text-gray-400'}`} />
+                          <p className="text-sm font-medium">{collection.name}</p>
+                          <p className="text-xs text-gray-400 mt-1">{collection.description}</p>
+                          <div className="flex gap-1 mt-3">
+                            {collection.colors.map((color, i) => (
+                              <div key={i} className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                            ))}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
+                </div>
 
-          {/* Download Experience */}
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="relative mb-8"
-          >
-            <motion.div
-              animate={{ 
-                scale: [1, 1.02, 1],
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="absolute inset-0 bg-gradient-to-r from-gray-900 to-gray-700 rounded-2xl blur-xl opacity-20"
-            />
+                {/* Finish Selection */}
+                <div>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Finish</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {finishes.map((finish) => {
+                      const Icon = finish.icon;
+                      const isActive = selectedFinish === finish.id;
+                      return (
+                        <button
+                          key={finish.id}
+                          onClick={() => setSelectedFinish(finish.id as any)}
+                          className={`p-4 rounded-xl border transition-all ${
+                            isActive
+                              ? 'border-black bg-gray-50 shadow-sm'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <Icon className={`w-5 h-5 mb-2 ${isActive ? 'text-black' : 'text-gray-400'}`} />
+                          <p className="text-sm font-medium">{finish.name}</p>
+                          <p className="text-xs text-gray-400 mt-1">{finish.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Preview Tab */}
+            {activeTab === 'preview' && (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-white rounded-xl p-6 border border-gray-100"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-gray-700">Preview</h3>
+                  <span className="text-xs text-gray-400">{selectedCollection} · {selectedFinish} finish</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {qrCodes.slice(0, 4).map((qr, i) => (
+                    <motion.div
+                      key={qr.tableId}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm"
+                    >
+                      <img src={qr.qrCode} className="w-full aspect-square mb-2" />
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-gray-500">#{qr.tableNumber}</span>
+                        <span className="text-gray-400">drift</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Tips Tab */}
+            {activeTab === 'tips' && (
+              <motion.div
+                key="tips"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-blue-50/30 rounded-xl p-6 border border-blue-100"
+              >
+                <h3 className="text-sm font-medium text-gray-700 mb-4">How QR codes work</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {educational.steps.map((step, i) => (
+                    <div key={i} className="text-center">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mx-auto mb-3 shadow-sm border border-gray-100">
+                        {step.icon}
+                      </div>
+                      <h4 className="text-xs font-medium text-gray-700 mb-1">{step.title}</h4>
+                      <p className="text-[10px] text-gray-400 mb-1">{step.description}</p>
+                      <p className="text-[8px] text-gray-300">{step.time}</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Download Button */}
+          <motion.div variants={fadeInUp}>
             <button
               onClick={downloadCollection}
-              className="relative w-full bg-gradient-to-r from-gray-900 to-gray-800 text-white py-6 rounded-2xl hover:from-gray-800 hover:to-gray-700 transition-all flex items-center justify-center gap-3 text-xl font-light shadow-xl"
+              className="w-full bg-black text-white py-5 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 shadow-lg"
             >
-              <FileDown className="w-6 h-6" />
-              <span>download {selectedCollection} collection</span>
-              <Sparkles className="w-5 h-5 opacity-70" />
+              <FileDown className="w-5 h-5" />
+              <span className="text-base font-light">Download QR Kit</span>
             </button>
           </motion.div>
 
           {/* Great Lakes Signature */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex items-center justify-center gap-2 mb-8"
-          >
-            <span className="text-sm text-gray-400">made with</span>
-            <motion.div
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              <Heart className="w-4 h-4 text-gray-400" />
-            </motion.div>
-            <span className="text-sm text-gray-400">on the</span>
-            <span className="text-sm text-gray-400 font-light">Great Lakes</span>
-          </motion.div>
-
-          {/* Footer */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-center mb-8"
-          >
-            <p className="text-xs text-gray-300">drift technologies · est. 2024</p>
-            <p className="text-[10px] text-gray-200 mt-1">soc 2 · pci dss · gdpr certified</p>
+          <motion.div variants={fadeInUp} className="flex items-center justify-center gap-2">
+            <span className="text-xs text-gray-400">made with</span>
+            <Heart className="w-3 h-3 text-gray-400" />
+            <span className="text-xs text-gray-400">on the Great Lakes</span>
           </motion.div>
 
           {/* Navigation */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="flex justify-between pt-6 border-t border-gray-100"
-          >
-            <button onClick={onPrev} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+          <motion.div variants={fadeInUp} className="flex justify-between pt-6 border-t border-gray-100">
+            <button onClick={onPrev} className="text-sm text-gray-400 hover:text-gray-600">
               ← back
             </button>
             <button
               onClick={onNext}
-              className="text-sm bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+              className="text-sm bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800"
             >
               complete setup
             </button>
           </motion.div>
-        </>
-      ) : (
+        </motion.div>
+      )}
+
+      {/* Initial State */}
+      {!generating && qrCodes.length === 0 && (
         <motion.button
           initial={{ scale: 0.95 }}
           animate={{ scale: 1 }}
           whileHover={{ scale: 1.02 }}
           onClick={generateQRCodes}
-          className="w-full py-20 bg-gradient-to-br from-gray-50 to-white rounded-2xl border-2 border-dashed border-gray-200 hover:border-black transition-all flex flex-col items-center gap-4"
+          className="w-full py-16 bg-gradient-to-br from-gray-50 to-white rounded-xl border-2 border-dashed border-gray-200 hover:border-black transition-all flex flex-col items-center gap-4"
         >
-          <QrCode className="w-12 h-12 text-gray-300" />
-          <h3 className="text-xl font-light">create your collection</h3>
-          <p className="text-sm text-gray-400">three signature series · premium finishes</p>
+          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
+            <QrCode className="w-8 h-8 text-gray-400" />
+          </div>
+          <span className="text-base text-gray-600">Generate QR codes</span>
+          <span className="text-xs text-gray-400">for {qrCodes.length || 'your'} tables</span>
         </motion.button>
       )}
     </div>
