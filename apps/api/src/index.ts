@@ -11,6 +11,7 @@ import { Pool } from 'pg';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import stripeRouter from './routes/stripe';
 
 // Add this near the top after imports
 console.log('🚀 Starting Drift API...');
@@ -102,6 +103,7 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan('dev'));
 
+
 // Use helmet without CSP for now to avoid blocking issues
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -119,6 +121,8 @@ app.get('/api/test', (req, res) => {
     timestamp: new Date().toISOString() 
   });
 });
+
+app.use('/api', stripeRouter);
 
 // ==================== AUTH MIDDLEWARE ====================
 const authenticateToken = (req: any, res: any, next: any) => {
