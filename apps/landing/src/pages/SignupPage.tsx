@@ -45,15 +45,14 @@ export function SignupPage() {
       }
 
       // Save auth info for later (after onboarding)
-      localStorage.setItem('drift-token', data.token);
-      localStorage.setItem('drift-restaurant-id', data.restaurantId);
-      localStorage.setItem('drift-user-email', formData.email);
+    localStorage.setItem('drift-token', data.token);
+    localStorage.setItem('drift-restaurant-id', data.restaurantId);
+    localStorage.setItem('drift-user-email', formData.email);
 
-      // DIRECT to onboarding - NO LOGIN PAGE
-      // In handleSignup function, after successful signup:
-      const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}&businessName=${encodeURIComponent(formData.businessName)}&email=${encodeURIComponent(formData.email)}`;
-      window.location.href = redirectUrl;
-      console.log('🚀 Redirecting to onboarding:', redirectUrl);
+    // DIRECT to onboarding - NO LOGIN PAGE
+    const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}&businessName=${encodeURIComponent(formData.businessName)}&email=${encodeURIComponent(formData.email)}`;
+    console.log('🚀 Redirecting to onboarding:', redirectUrl);
+    window.location.href = redirectUrl; // ← ONLY ONE REDIRECT
       
       // Use window.location for full page redirect
       window.location.href = redirectUrl;
