@@ -24,11 +24,6 @@ import {
 import { Button } from './../../components/ui/Button';
 import { Card } from './../../components/ui/Card';
 
-// TEMPORARILY COMMENT OUT STRIPE IMPORTS
-// import { loadConnectAndInitialize } from '@stripe/connect-js';
-// import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
-
-
 // Animation variants
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -98,40 +93,66 @@ const TIERS = {
 
 export function StripeStep({ data, onComplete, updateData }) {
   const [loading, setLoading] = useState(false);
-  const [clientSecret, setClientSecret] = useState(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [selectedTier, setSelectedTier] = useState(data?.tier || 'free');
+  const [selectedTier, setSelectedTier] = useState('free');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [annualBilling, setAnnualBilling] = useState(false);
-  // TEMPORARILY COMMENT OUT
-  // const [connectInstance, setConnectInstance] = useState(null);
-  // const [onboardingComplete, setOnboardingComplete] = useState(false);
   
-  // Load saved data with proper type conversion
+  // Load ALL saved data from props and localStorage
   const [savedData, setSavedData] = useState({
-    restaurantName: data?.name || '',
-    email: data?.email || '',
-    tier: data?.tier || 'free',
-    tables: Number(data?.tables) || 5,
-    menuItems: Number(data?.menuItems) || 0,
-    monthlyOrders: Number(data?.monthlyOrders) || 0
+    restaurantName: '',
+    email: '',
+    tier: 'free',
+    tables: 5,
+    menuItems: 0,
+    monthlyOrders: 0
   });
 
-  // Load from localStorage on mount
+  // Comprehensive data loading on mount
   useEffect(() => {
+    console.log('📊 StripeStep received data prop:', data);
+    
+    // Start with empty object
+    let mergedData: any = {};
+    
+    // 1. Load from localStorage first
     const stored = localStorage.getItem('drift_onboarding');
     if (stored) {
-      const parsed = JSON.parse(stored);
-      setSavedData(prev => ({ 
-        ...prev, 
-        ...parsed,
-        tables: Number(parsed.tables) || prev.tables,
-        menuItems: Number(parsed.menuItems) || prev.menuItems,
-        monthlyOrders: Number(parsed.monthlyOrders) || prev.monthlyOrders
-      }));
-      if (parsed.tier) setSelectedTier(parsed.tier);
+      try {
+        const parsed = JSON.parse(stored);
+        console.log('💾 Loaded from localStorage:', parsed);
+        mergedData = { ...mergedData, ...parsed };
+      } catch (e) {
+        console.error('Error parsing localStorage:', e);
+      }
     }
-  }, []);
+    
+    // 2. Props override localStorage (they're more recent)
+    if (data) {
+      console.log('📦 Merging props data:', data);
+      mergedData = { ...mergedData, ...data };
+    }
+    
+    // 3. Set the final merged data
+    setSavedData({
+      restaurantName: mergedData.name || mergedData.restaurantName || 'Your Restaurant',
+      email: mergedData.email || '',
+      tier: mergedData.tier || 'free',
+      tables: Number(mergedData.tables) || 5,
+      menuItems: Number(mergedData.menuItems) || 0,
+      monthlyOrders: Number(mergedData.monthlyOrders) || 0
+    });
+    
+    if (mergedData.tier) {
+      setSelectedTier(mergedData.tier);
+    }
+    
+    console.log('✅ Final savedData:', {
+      restaurantName: mergedData.name || mergedData.restaurantName || 'Your Restaurant',
+      email: mergedData.email || '',
+      tier: mergedData.tier || 'free'
+    });
+    
+  }, [data]);
 
   // Smart tier recommendation based on usage
   const getRecommendedTier = () => {
@@ -171,9 +192,26 @@ export function StripeStep({ data, onComplete, updateData }) {
     setLoading(true);
     
     try {
+      // Validate we have required data
+      if (!savedData.email) {
+        console.error('❌ Missing email. Current state:', savedData);
+        throw new Error('Email address is missing. Please go back to Restaurant Info step.');
+      }
+      
+      if (!savedData.restaurantName) {
+        throw new Error('Restaurant name is missing. Please go back to Restaurant Info step.');
+      }
+      
       let API_URL = import.meta.env.VITE_API_URL;
       if (!API_URL) throw new Error('API_URL not configured');
       API_URL = API_URL.replace('http://', 'https://');
+      
+      console.log('📧 Sending to Stripe API:', {
+        email: savedData.email,
+        name: savedData.restaurantName,
+        restaurantId: data?.restaurantId,
+        tier: selectedTier
+      });
       
       // Save the selected tier
       if (updateData) {
@@ -194,30 +232,22 @@ export function StripeStep({ data, onComplete, updateData }) {
       const response = await res.json();
       if (!res.ok) throw new Error(response.error || 'Failed to connect');
       
-      const { clientSecret, accountId } = response;
-      setClientSecret(clientSecret);
-      
-      // TEMPORARILY COMMENT OUT STRIPE INITIALIZATION
-      // const stripeConnectInstance = loadConnectAndInitialize({
-      //   publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
-      //   fetchClientSecret: async () => clientSecret,
-      // });
-      // 
-      // setConnectInstance(stripeConnectInstance);
-      
-      // Instead of showing onboarding, just complete the step
-      // setShowOnboarding(true);
+      const { accountId } = response;
       
       // Save progress
-      localStorage.setItem('drift_onboarding', JSON.stringify({
+      const onboardingData = {
         ...savedData,
         tier: selectedTier,
         stripeAccountId: accountId,
         stripeConnected: true
-      }));
+      };
       
-      // TEMPORARY: Just complete the step
-      alert('Stripe account created! (Demo mode)');
+      localStorage.setItem('drift_onboarding', JSON.stringify(onboardingData));
+      if (updateData) {
+        await updateData(onboardingData);
+      }
+      
+      alert('✅ Stripe account created successfully!');
       onComplete();
       
     } catch (error) {
@@ -227,14 +257,6 @@ export function StripeStep({ data, onComplete, updateData }) {
       setLoading(false);
     }
   };
-
-  // TEMPORARILY COMMENT OUT
-  // const handleOnboardingExit = () => {
-  //   setShowOnboarding(false);
-  //   if (onboardingComplete) {
-  //     onComplete();
-  //   }
-  // };
 
   // Summary Card
   const SummaryCard = () => (
@@ -261,21 +283,19 @@ export function StripeStep({ data, onComplete, updateData }) {
         <div className="bg-white rounded-xl p-3 shadow-sm">
           <Building2 className="w-4 h-4 text-blue-500 mb-1" />
           <p className="text-xs text-gray-500">Restaurant</p>
-          <p className="font-medium text-sm truncate">{savedData.restaurantName || 'Your Restaurant'}</p>
+          <p className="font-medium text-sm truncate">{savedData.restaurantName}</p>
         </div>
         
         <div className="bg-white rounded-xl p-3 shadow-sm">
           <CreditCard className="w-4 h-4 text-green-500 mb-1" />
-          <p className="text-xs text-gray-500">Current Plan</p>
-          <p className="font-medium text-sm capitalize">
-            {selectedTier === 'pro' ? '🚀 Pro' : '✨ Starter'}
-          </p>
+          <p className="text-xs text-gray-500">Email</p>
+          <p className="font-medium text-sm truncate">{savedData.email || 'Not set'}</p>
         </div>
         
         <div className="bg-white rounded-xl p-3 shadow-sm">
           <Percent className="w-4 h-4 text-purple-500 mb-1" />
-          <p className="text-xs text-gray-500">Your Rate</p>
-          <p className="font-medium text-sm">{TIERS[selectedTier].fee}</p>
+          <p className="text-xs text-gray-500">Plan</p>
+          <p className="font-medium text-sm capitalize">{selectedTier}</p>
         </div>
         
         <div className="bg-white rounded-xl p-3 shadow-sm">
@@ -284,6 +304,16 @@ export function StripeStep({ data, onComplete, updateData }) {
           <p className="font-medium text-sm">{savedData.tables} tables</p>
         </div>
       </div>
+      
+      {/* Debug info - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs font-mono">
+          <p>Email: {savedData.email || '❌ MISSING'}</p>
+          <p>Name: {savedData.restaurantName || '❌ MISSING'}</p>
+          <p>Tables: {savedData.tables}</p>
+          <p>Menu Items: {savedData.menuItems}</p>
+        </div>
+      )}
     </motion.div>
   );
 
@@ -454,7 +484,7 @@ export function StripeStep({ data, onComplete, updateData }) {
             Choose Your Plan
           </h2>
           <p className="text-gray-500 text-lg">
-            Step {data?.currentStep || 6} of 7 • Select how you want to grow
+            Step 6 of 7 • Select how you want to grow
           </p>
           
           {/* Progress bar */}
@@ -500,7 +530,7 @@ export function StripeStep({ data, onComplete, updateData }) {
           <Button
             size="lg"
             onClick={handleConnect}
-            disabled={loading}
+            disabled={loading || !savedData.email}
             className="px-12 relative overflow-hidden group"
           >
             <span className="relative z-10 flex items-center gap-2">
