@@ -8,15 +8,11 @@ import {
   AlertTriangle,
   FileCheck,
   CreditCard,
-  Fingerprint,
   Globe,
   Clock,
-  Users,
-  HardDrive,
   ShieldCheck,
   Eye,
   Bell,
-  Mail
 } from 'lucide-react';
 
 export function Security() {

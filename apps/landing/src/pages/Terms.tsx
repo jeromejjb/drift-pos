@@ -14,7 +14,6 @@ import {
   FileCheck,
   Zap,
   Globe,
-  Mail,
   ArrowRight,
   Building2
 } from 'lucide-react';

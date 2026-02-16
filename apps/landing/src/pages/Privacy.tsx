@@ -10,7 +10,6 @@ import {
   UserCheck,
   Trash2,
   RefreshCw,
-  Bell,
   Fingerprint,
   Globe,
   FileJson
