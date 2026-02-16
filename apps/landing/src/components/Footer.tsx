@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -7,9 +7,8 @@ export function Footer() {
       <div className="container max-w-6xl mx-auto">
         <div className="grid md:grid-cols-4 gap-8">
           <div>
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <Building2 className="w-5 h-5" />
-              <h3 className="text-xl font-light">drift</h3>
+            <Link to="/" className="inline-block">
+              <h3 className="text-xl font-light mb-4 hover:text-gray-600 transition-colors">drift</h3>
             </Link>
             <p className="text-sm text-gray-400">Payments for business. Finally done right.</p>
           </div>
@@ -48,17 +47,22 @@ export function Footer() {
               © 2026 Drift Technologies. All rights reserved.
             </p>
             
-          
-          <div className="flex items-center gap-2">
+            {/* Made with love on the Great Lakes - with image */}
+            <div className="flex items-center gap-2">
               <span className="text-sm text-gray-400">Built with</span>
-              <span className="text-gray-400">♡</span>
+              <Heart className="w-4 h-4 text-gray-400 fill-gray-400" />
               <span className="text-sm text-gray-400">on the</span>
               <img 
                 src="/greatlakes.png" 
                 alt="Great Lakes" 
-                className="h-8 w-auto inline-block opacity-80 hover:opacity-100 transition-opacity"
+                className="h-6 w-auto inline-block opacity-70 hover:opacity-100 transition-opacity"
+                onError={(e) => {
+                  // Fallback if image doesn't load
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.insertAdjacentHTML('afterend', '<span class="text-sm font-medium text-gray-500">Great Lakes</span>');
+                }}
               />
-              </div>
+            </div>
           </div>
         </div>
       </div>

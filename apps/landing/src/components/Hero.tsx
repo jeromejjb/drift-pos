@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Building2, Smartphone, Store, Users, CreditCard, QrCode, Menu, Printer, Banknote, Clock } from 'lucide-react';
+import { ArrowRight, Smartphone, Store, CreditCard, QrCode, Menu, Banknote, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 

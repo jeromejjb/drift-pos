@@ -1,34 +1,37 @@
 import { motion } from 'framer-motion';
-import { QrCode, Smartphone, Users, CreditCard, BarChart3 } from 'lucide-react';
+import { QrCode, Smartphone, Users, CreditCard, BarChart3, Layout, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 
 const steps = [
   {
     icon: <QrCode className="w-8 h-8" />,
-    title: '1. Scan & connect',
-    description: 'Customers scan a QR code at your business. No app download required.',
-    details: 'Works with any smartphone camera. Zero friction.'
+    title: '1. Scan',
+    description: 'Customers scan the QR code at their table',
+    details: 'Works with any smartphone camera. No app download.'
   },
   {
     icon: <Smartphone className="w-8 h-8" />,
-    title: '2. Browse & order',
-    description: 'Customers see your full menu and place orders directly from their phone.',
-    details: 'Real-time updates to your dashboard.'
+    title: '2. Browse',
+    description: 'View the full menu with photos and descriptions',
+    details: 'Real-time updates to the kitchen.'
   },
   {
     icon: <Users className="w-8 h-8" />,
-    title: '3. Split or claim',
-    description: 'Groups split bills by item, equally, or custom amounts.',
-    details: 'Each person pays for exactly what they ordered.'
+    title: '3. Order',
+    description: 'Each person orders from their own phone',
+    details: 'Special requests and modifications handled instantly.'
   },
   {
     icon: <CreditCard className="w-8 h-8" />,
-    title: '4. Pay & go',
-    description: 'One tap pays the bill. Digital receipt via text or email.',
-    details: 'Funds settle instantly in your account.'
+    title: '4. Pay',
+    description: 'One tap pays the bill. Digital receipt via text.',
+    details: 'Split items, split evenly, or pay your own way.'
   }
 ];
 
 export function HowItWorks() {
+  const [activeStep, setActiveStep] = useState(0);
+
   return (
     <section id="how-it-works" className="py-24 px-4 bg-gray-50">
       <div className="container max-w-6xl mx-auto">
@@ -50,7 +53,7 @@ export function HowItWorks() {
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-light mb-4"
           >
-            From scan to settlement{' '}
+            From scan to pay{' '}
             <span className="bg-gradient-to-r from-black to-gray-600 bg-clip-text text-transparent">
               in seconds
             </span>
@@ -63,7 +66,7 @@ export function HowItWorks() {
             transition={{ delay: 0.2 }}
             className="text-gray-400 max-w-2xl mx-auto text-lg"
           >
-            Four simple steps. Zero friction. Maximum efficiency.
+            Scan. Browse. Order. Pay.
           </motion.p>
         </div>
 
@@ -81,25 +84,28 @@ export function HowItWorks() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
                 className="relative"
+                onMouseEnter={() => setActiveStep(i)}
               >
-                {/* Step number - visible on mobile, hidden on desktop */}
-                <div className="lg:hidden text-6xl font-light text-gray-100 absolute -top-6 -left-2">
+                {/* Step number - darker */}
+                <div className="lg:hidden text-7xl font-light text-gray-200 absolute -top-8 -left-2 -z-10">
                   {i + 1}
                 </div>
 
-                <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 relative z-10">
+                <div className={`bg-white rounded-2xl p-8 shadow-sm border transition-all duration-300 relative z-10 h-full flex flex-col ${
+                  activeStep === i ? 'border-black shadow-xl scale-105' : 'border-gray-100 hover:shadow-xl'
+                }`}>
                   {/* Icon */}
                   <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mb-6 text-white">
                     {step.icon}
                   </div>
 
                   <h3 className="text-xl font-medium mb-3">{step.title}</h3>
-                  <p className="text-gray-500 text-sm mb-4 leading-relaxed">{step.description}</p>
-                  <p className="text-xs text-gray-400">{step.details}</p>
+                  <p className="text-gray-500 text-sm mb-4 leading-relaxed flex-grow">{step.description}</p>
+                  <p className="text-xs text-gray-400 mt-auto">{step.details}</p>
                 </div>
 
-                {/* Desktop step number */}
-                <div className="hidden lg:block absolute -bottom-8 left-1/2 -translate-x-1/2 text-5xl font-light text-gray-200">
+                {/* Desktop step number - darker */}
+                <div className="hidden lg:block absolute -bottom-8 left-1/2 -translate-x-1/2 text-6xl font-light text-gray-300">
                   {i + 1}
                 </div>
               </motion.div>
@@ -107,7 +113,7 @@ export function HowItWorks() {
           </div>
         </div>
 
-        {/* Demo preview */}
+        {/* Demo preview - side by side with COOLER business icon */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -120,11 +126,13 @@ export function HowItWorks() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <Smartphone className="w-4 h-4" />
-                Customer experience
+                <span>What diners see</span>
               </div>
               <div className="bg-gray-50 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-black rounded-lg" />
+                  <div className="w-10 h-10 bg-gradient-to-br from-black to-gray-700 rounded-lg flex items-center justify-center">
+                    <Layout className="w-5 h-5 text-white" />
+                  </div>
                   <div>
                     <div className="font-medium">Trattoria Bellini</div>
                     <div className="text-xs text-gray-400">Table 3 · 2 guests</div>
@@ -141,20 +149,29 @@ export function HowItWorks() {
                   </div>
                   <div className="pt-2 border-t border-gray-200">
                     <div className="flex justify-between text-sm font-medium">
-                      <span>Total</span>
-                      <span>$32</span>
+                      <span>Your share</span>
+                      <span>$16</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Business view */}
+            {/* Business view - with COOLER icon and customization hint */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <BarChart3 className="w-4 h-4" />
-                Business dashboard
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <BarChart3 className="w-4 h-4" />
+                  <span>What owners see</span>
+                </div>
+                
+                {/* Customization badge - subtle hint of future feature */}
+                <div className="flex items-center gap-1 text-xs text-gray-300">
+                  <Sparkles className="w-3 h-3" />
+                  <span>Customize in dashboard</span>
+                </div>
               </div>
+              
               <div className="bg-gray-50 rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-sm font-medium">Today's orders</span>
@@ -162,16 +179,22 @@ export function HowItWorks() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Table 3</span>
+                    <span>Table 3 · 2 items</span>
                     <span className="font-medium">$42</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Table 7</span>
+                    <span>Table 7 · 3 items</span>
                     <span className="font-medium">$56</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Table 2</span>
+                    <span>Table 2 · 1 item</span>
                     <span className="font-medium">$22</span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex justify-between text-sm font-medium">
+                    <span>Total today</span>
+                    <span>$2,847</span>
                   </div>
                 </div>
               </div>
