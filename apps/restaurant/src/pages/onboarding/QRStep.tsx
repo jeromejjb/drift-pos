@@ -67,78 +67,100 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     if (perPage === 6) {
       cols = 2; rows = 3;
       cardW = 85; cardH = 60;
-      qrSize = 45; // Bigger QR codes
+      qrSize = 45;
     } else if (perPage === 9) {
       cols = 3; rows = 3;
       cardW = 60; cardH = 55;
-      qrSize = 38; // Bigger QR codes
+      qrSize = 38;
     } else {
       cols = 3; rows = 4;
       cardW = 60; cardH = 48;
-      qrSize = 32; // Bigger QR codes
+      qrSize = 32;
     }
 
     const startX = (pageWidth - (cols * cardW)) / 2;
     const startY = 20;
     const gap = 5;
 
-    // ===== PAGE 1: INSTRUCTIONS =====
+    // ===== PAGE 1: WELCOME & INSTRUCTIONS =====
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Drift in cool font
+    // DRIFT in elegant uppercase
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(42);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('drift', pageWidth / 2, 35, { align: 'center' });
+    pdf.text('DRIFT', pageWidth / 2, 35, { align: 'center' });
 
-    pdf.setFont('helvetica', 'lightitalic');
+    // Restaurant name
+    pdf.setFont('helvetica', 'light');
     pdf.setFontSize(16);
     pdf.setTextColor(100, 100, 100);
     pdf.text(restaurantName, pageWidth / 2, 55, { align: 'center' });
 
-    // Simple steps
-    pdf.setFont('helvetica', 'bold');
+    // Welcome message
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(20);
+    pdf.setTextColor(30, 30, 30);
+    pdf.text('Your Table QR Codes', pageWidth / 2, 80, { align: 'center' });
+
+    // How to use section
+    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(14);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('How to use:', 30, 90);
+    pdf.text('How to use', 30, 110);
 
-    pdf.setFont('helvetica', 'normal');
+    pdf.setFont('helvetica', 'light');
     pdf.setFontSize(11);
     pdf.setTextColor(60, 60, 60);
     
-    pdf.text('1. Print on card stock', 30, 110);
-    pdf.text('2. Cut out each QR code', 30, 125);
-    pdf.text('3. Place on tables', 30, 140);
-    pdf.text('4. Customers scan to order', 30, 155);
+    const steps = [
+      '1. PRINT on card stock (80-100lb recommended)',
+      '2. CUT along the borders of each card',
+      '3. PLACE on tables at eye level',
+      '4. CUSTOMERS SCAN with any phone camera',
+      '5. ORDERS appear instantly in your dashboard'
+    ];
 
-    // What you get
-    pdf.setFont('helvetica', 'bold');
+    steps.forEach((step, index) => {
+      pdf.text(step, 30, 130 + index * 9);
+    });
+
+    // What's inside section
+    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(14);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('What you get:', 30, 185);
+    pdf.text("What's inside", 30, 195);
 
-    pdf.setFont('helvetica', 'normal');
+    pdf.setFont('helvetica', 'light');
     pdf.setFontSize(11);
     pdf.setTextColor(60, 60, 60);
-    pdf.text(`• ${qrCodes.length} unique QR codes`, 30, 205);
-    pdf.text(`• ${perPage} per sheet · ${Math.ceil(qrCodes.length / perPage)} pages`, 30, 220);
+    
+    const features = [
+      `• ${qrCodes.length} unique QR codes — one per table`,
+      `• ${perPage} codes per sheet · ${Math.ceil(qrCodes.length / perPage)} pages total`,
+      '• Each code links directly to your menu',
+      '• No app required — works with any smartphone',
+      '• Real-time orders in your dashboard'
+    ];
 
-    // Great Lakes branding with image
-    try {
-      // This is a simplified version - in a real PDF you'd need to embed the image
-      pdf.setFont('helvetica', 'lightitalic');
-      pdf.setFontSize(10);
-      pdf.setTextColor(140, 140, 140);
-      pdf.text('Made with ♡ on the', pageWidth / 2 - 30, pageHeight - 25, { align: 'center' });
-      pdf.text('Great Lakes', pageWidth / 2 + 15, pageHeight - 25, { align: 'center' });
-    } catch (err) {
-      // Fallback text
-      pdf.setFont('helvetica', 'lightitalic');
-      pdf.setFontSize(10);
-      pdf.setTextColor(140, 140, 140);
-      pdf.text('Made with love on the Great Lakes', pageWidth / 2, pageHeight - 25, { align: 'center' });
-    }
+    features.forEach((feature, index) => {
+      pdf.text(feature, 30, 215 + index * 9);
+    });
+
+    // Great Lakes branding - matching footer exactly
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(9);
+    pdf.setTextColor(140, 140, 140);
+    pdf.text('Made with', pageWidth / 2 - 35, pageHeight - 25, { align: 'center' });
+    pdf.text('♡', pageWidth / 2 - 12, pageHeight - 25, { align: 'center' });
+    pdf.text('on the', pageWidth / 2 - 4, pageHeight - 25, { align: 'center' });
+    pdf.text('Great Lakes', pageWidth / 2 + 15, pageHeight - 25, { align: 'center' });
+
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(8);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('DRIFT TECHNOLOGIES INC.', pageWidth / 2, pageHeight - 12, { align: 'center' });
 
     // ===== QR CODE PAGES =====
     for (let i = 0; i < qrCodes.length; i++) {
@@ -146,6 +168,12 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         if (i > 0) pdf.addPage();
         pdf.setFillColor(255, 255, 255);
         pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+        // Page header
+        pdf.setFont('helvetica', 'light');
+        pdf.setFontSize(9);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(`Table QR Codes · Page ${Math.floor(i / perPage) + 1} of ${Math.ceil(qrCodes.length / perPage)}`, pageWidth / 2, 12, { align: 'center' });
       }
 
       const pos = i % perPage;
@@ -154,12 +182,13 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
       const x = startX + col * cardW;
       const y = startY + row * (cardH + gap);
 
-      // Light border
+      // Subtle card background
+      pdf.setFillColor(252, 252, 252);
       pdf.setDrawColor(230, 230, 230);
       pdf.setLineWidth(0.2);
-      pdf.rect(x, y, cardW - 1, cardH - 1);
+      pdf.roundedRect(x, y, cardW - 1, cardH - 1, 2, 2, 'FD');
 
-      // QR Code - centered with more space
+      // QR Code - centered
       try {
         const qrImage = qrCodes[i].qrCode.split(',')[1];
         pdf.addImage(
@@ -174,88 +203,100 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         console.error('QR error:', err);
       }
 
-      // Table number - top right (small and out of the way)
+      // Table number
       pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(8);
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(`${qrCodes[i].tableNumber}`, x + cardW - 22, y + 20);
+
+      pdf.setFont('helvetica', 'light');
+      pdf.setFontSize(7);
       pdf.setTextColor(150, 150, 150);
-      pdf.text(`#${qrCodes[i].tableNumber}`, x + cardW - 15, y + 12);
+      pdf.text('table', x + cardW - 25, y + 12);
 
-      // Drift Technologies - bottom left (cool font)
-      pdf.setFont('helvetica', 'lightitalic');
-      pdf.setFontSize(6);
-      pdf.setTextColor(160, 160, 160);
-      pdf.text('Drift Technologies', x + 8, y + cardH - 14);
+      // DRIFT in elegant uppercase
+      pdf.setFont('helvetica', 'light');
+      pdf.setFontSize(7);
+      pdf.setTextColor(140, 140, 140);
+      pdf.text('DRIFT', x + 10, y + cardH - 15);
 
-      // Made with love + Great Lakes image representation
+      // Great Lakes branding on each card - matching footer exactly
       pdf.setFont('helvetica', 'light');
       pdf.setFontSize(4);
-      pdf.setTextColor(170, 170, 170);
-      pdf.text('made with ♡ on the', x + 8, y + cardH - 8);
-      pdf.text('Great Lakes', x + 25, y + cardH - 8);
+      pdf.setTextColor(160, 160, 160);
+      
+      // "Made with ♡ on the Great Lakes" split across three lines to match footer style
+      pdf.text('Made with', x + 10, y + cardH - 8);
+      pdf.text('♡', x + 22, y + cardH - 8);
+      pdf.text('on the', x + 26, y + cardH - 8);
+      pdf.text('Great Lakes', x + 40, y + cardH - 8);
     }
 
-    // ===== LAST PAGE: TIPS =====
+    // ===== LAST PAGE: PRO TIPS & SUPPORT =====
     pdf.addPage();
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Drift in cool font
+    // DRIFT in elegant uppercase
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(36);
+    pdf.setFontSize(42);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('drift', pageWidth / 2, 40, { align: 'center' });
+    pdf.text('DRIFT', pageWidth / 2, 45, { align: 'center' });
 
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(18);
-    pdf.setTextColor(30, 30, 30);
-    pdf.text('pro tips', pageWidth / 2, 70, { align: 'center' });
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(14);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('pro tips & support', pageWidth / 2, 65, { align: 'center' });
 
+    // Pro tips section
     pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(16);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('Pro Tips', 30, 100);
+
+    const tips = [
+      '• Use 80-100lb card stock for durability',
+      '• Cut carefully with scissors or a paper cutter',
+      '• Laminate to make them last longer',
+      '• Place at eye level for easy scanning',
+      '• Test each code with your phone first',
+      '• Keep spares for quick replacement'
+    ];
+
+    pdf.setFont('helvetica', 'light');
     pdf.setFontSize(11);
     pdf.setTextColor(80, 80, 80);
     
-    const tips = [
-      '• Use 80-100lb card stock for durability',
-      '• Cut carefully along the borders',
-      '• Laminate to make them last longer',
-      '• Place at eye level for easy scanning',
-      '• Test each code with your phone first'
-    ];
-
     tips.forEach((tip, index) => {
-      pdf.text(tip, 30, 100 + index * 12);
+      pdf.text(tip, 30, 125 + index * 10);
     });
 
-    // Need help section
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('Need help?', 30, 180);
-
+    // Support section
     pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(16);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('Need Help?', 30, 210);
+
+    pdf.setFont('helvetica', 'light');
     pdf.setFontSize(11);
     pdf.setTextColor(80, 80, 80);
-    pdf.text('dashboard.drift.com/support', 30, 200);
-    pdf.text('help@drift.com', 30, 215);
+    pdf.text('📧 help@drift.com', 30, 230);
+    pdf.text('🌐 drift.com/support', 30, 245);
+    pdf.text('📞 1-800-DRIFT-01', 30, 260);
 
-    // Great Lakes branding on last page
-    try {
-      pdf.setFont('helvetica', 'lightitalic');
-      pdf.setFontSize(10);
-      pdf.setTextColor(140, 140, 140);
-      pdf.text('Made with ♡ on the', pageWidth / 2 - 30, pageHeight - 25, { align: 'center' });
-      pdf.text('Great Lakes', pageWidth / 2 + 15, pageHeight - 25, { align: 'center' });
-    } catch (err) {
-      pdf.setFont('helvetica', 'lightitalic');
-      pdf.setFontSize(10);
-      pdf.setTextColor(140, 140, 140);
-      pdf.text('Made with love on the Great Lakes', pageWidth / 2, pageHeight - 25, { align: 'center' });
-    }
+    // Great Lakes branding - matching footer exactly
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(9);
+    pdf.setTextColor(140, 140, 140);
+    pdf.text('Made with', pageWidth / 2 - 35, pageHeight - 25, { align: 'center' });
+    pdf.text('♡', pageWidth / 2 - 12, pageHeight - 25, { align: 'center' });
+    pdf.text('on the', pageWidth / 2 - 4, pageHeight - 25, { align: 'center' });
+    pdf.text('Great Lakes', pageWidth / 2 + 15, pageHeight - 25, { align: 'center' });
 
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(8);
     pdf.setTextColor(150, 150, 150);
-    pdf.text('drift technologies inc.', pageWidth / 2, pageHeight - 12, { align: 'center' });
+    pdf.text('DRIFT TECHNOLOGIES INC.', pageWidth / 2, pageHeight - 12, { align: 'center' });
 
     pdf.save(`${restaurantName}-qr-codes.pdf`);
   };
