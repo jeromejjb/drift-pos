@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { QrCode, Download, Printer, CheckCircle, Loader2, Sparkles, Shield, FileText, ArrowRight } from 'lucide-react';
+import { QrCode, Download, Printer, CheckCircle, Loader2, Sparkles, Shield, FileText, ArrowRight,ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 
