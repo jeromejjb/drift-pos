@@ -23,13 +23,13 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     teamSize: ''
   });
 
-  // Load from localStorage AND props on mount
+  // Load from ALL sources on mount
   useEffect(() => {
     console.log('📊 RestaurantInfoStep received data:', data);
     
     let mergedData: any = {};
     
-    // 1. Load from drift-user-profile first (from signup)
+    // 1. Load from drift-user-profile first (from signup - MOST IMPORTANT)
     const userProfile = localStorage.getItem('drift-user-profile');
     if (userProfile) {
       try {
@@ -60,6 +60,7 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     
     console.log('✅ Final merged data:', mergedData);
     
+    // Set ALL form fields with merged data
     setFormData({
       restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || '',
       email: mergedData.email || '',
@@ -121,10 +122,10 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
         <p className="text-gray-400">Tell us about your restaurant</p>
       </div>
 
-      {/* User info summary from signup - NOW VISIBLE */}
+      {/* User info summary from signup - Shows what was passed */}
       {(formData.fullName || formData.role || formData.teamSize) && (
         <Card className="mb-6 p-4 bg-blue-50 border-blue-100">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-4 text-sm">
             {formData.fullName && (
               <span className="flex items-center gap-1 text-blue-800">
                 <User className="w-4 h-4 text-blue-600" />
@@ -134,7 +135,7 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
             {formData.role && (
               <span className="flex items-center gap-1 text-blue-800">
                 <Briefcase className="w-4 h-4 text-blue-600" />
-                {formData.role}
+                {formData.role.replace('_', ' ')}
               </span>
             )}
             {formData.teamSize && (
@@ -161,6 +162,10 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
               placeholder="e.g., Joe's Pizza"
             />
+            {/* Show source of data for debugging - remove in production */}
+            {formData.restaurantName && (
+              <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
+            )}
           </div>
 
           <div>
@@ -175,6 +180,9 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
               placeholder="contact@joespizza.com"
             />
+            {formData.email && (
+              <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
+            )}
           </div>
 
           <div>
@@ -186,6 +194,9 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
               placeholder="(555) 123-4567"
             />
+            {formData.phone && (
+              <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
+            )}
           </div>
 
           <div>
@@ -199,6 +210,11 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
             />
           </div>
 
+          {/* Hidden fields to preserve signup data */}
+          <input type="hidden" name="fullName" value={formData.fullName} />
+          <input type="hidden" name="role" value={formData.role} />
+          <input type="hidden" name="teamSize" value={formData.teamSize} />
+
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="secondary" onClick={onPrev} className="flex-1">
               <ChevronLeft className="w-4 h-4 mr-2" />
@@ -211,6 +227,13 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
           </div>
         </form>
       </Card>
+
+      {/* Debug info - remove in production */}
+      {import.meta.env.DEV && (
+        <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+          <p className="font-mono">Debug: {JSON.stringify(formData, null, 2)}</p>
+        </div>
+      )}
     </motion.div>
   );
 }
