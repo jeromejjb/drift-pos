@@ -9,13 +9,16 @@ export function StripeStep({ data, onComplete }) {
     setLoading(true);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
+      let API_URL = import.meta.env.VITE_API_URL;
       
       if (!API_URL) {
         throw new Error('API_URL not configured');
       }
 
-      console.log('📡 Connecting to:', `${API_URL}/api/stripe/connect`);
+      // 🔒 FORCE HTTPS - replace http with https
+      API_URL = API_URL.replace('http://', 'https://');
+      
+      console.log('📡 Connecting to (HTTPS enforced):', `${API_URL}/api/stripe/connect`);
       
       const res = await fetch(`${API_URL}/api/stripe/connect`, {
         method: 'POST',
@@ -35,7 +38,7 @@ export function StripeStep({ data, onComplete }) {
       const { url, accountId } = await res.json();
       
       // Save the Stripe account ID
-      await fetch(`${API_URL}/api/restaurant/update`, {
+      const updateRes = await fetch(`${API_URL}/api/restaurant/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -43,6 +46,10 @@ export function StripeStep({ data, onComplete }) {
           stripeAccountId: accountId 
         })
       });
+
+      if (!updateRes.ok) {
+        console.warn('⚠️ Failed to save Stripe account ID, but continuing...');
+      }
       
       // Redirect to Stripe to add bank details
       window.location.href = url;
