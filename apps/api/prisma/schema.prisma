@@ -16,6 +16,7 @@ model Restaurant {
   timezone      String         @default("America/New_York")
   supabaseUserId String?        @unique
   email          String?
+    stripeAccountId String? 
   
   tables        Table[]
   categories    MenuCategory[]
