@@ -9,7 +9,15 @@ export function StripeStep({ data, onComplete }) {
     setLoading(true);
     
     try {
-      const res = await fetch('/api/stripe/connect', {
+      const API_URL = import.meta.env.VITE_API_URL;
+      
+      if (!API_URL) {
+        throw new Error('API_URL not configured');
+      }
+
+      console.log('📡 Connecting to:', `${API_URL}/api/stripe/connect`);
+      
+      const res = await fetch(`${API_URL}/api/stripe/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -19,11 +27,17 @@ export function StripeStep({ data, onComplete }) {
         })
       });
       
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+      
       const { url, accountId } = await res.json();
       
       // Save the Stripe account ID
-      await fetch('/api/restaurant/update', {
+      await fetch(`${API_URL}/api/restaurant/update`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           restaurantId: data.restaurantId,
           stripeAccountId: accountId 
@@ -34,7 +48,8 @@ export function StripeStep({ data, onComplete }) {
       window.location.href = url;
       
     } catch (error) {
-      alert('Failed to connect. Please try again.');
+      console.error('❌ Connection error:', error);
+      alert(`Failed to connect: ${error.message}. Please check console for details.`);
     } finally {
       setLoading(false);
     }

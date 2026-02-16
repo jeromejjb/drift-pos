@@ -47,6 +47,7 @@ const allowedOrigins = [
   'https://drift-diner.onrender.com',
   'https://drift-restaurant.onrender.com',
   'https://drift-landing.onrender.com',
+  'https://drift-api-7vs7.onrender.com'
 ];
 
 // Setup Socket.io with CORS for production
