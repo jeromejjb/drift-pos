@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { QrCode, Download, Heart } from 'lucide-react';
+import { QrCode, Download, Heart, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 
@@ -87,28 +87,41 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(24);
+    pdf.setFontSize(28);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('HOW TO USE', pageWidth / 2, 40, { align: 'center' });
+    pdf.text('YOUR QR CODES', pageWidth / 2, 35, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(12);
-    pdf.setTextColor(60, 60, 60);
-    
-    pdf.text('1. PRINT on card stock', pageWidth / 2, 80, { align: 'center' });
-    pdf.text('2. CUT out each square', pageWidth / 2, 105, { align: 'center' });
-    pdf.text('3. PLACE on tables', pageWidth / 2, 130, { align: 'center' });
-    pdf.text('4. CUSTOMERS SCAN to order', pageWidth / 2, 155, { align: 'center' });
+    pdf.setTextColor(80, 80, 80);
+    pdf.text(restaurantName, pageWidth / 2, 55, { align: 'center' });
 
+    // Simple steps
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
+    pdf.setFontSize(14);
     pdf.setTextColor(0, 0, 0);
-    pdf.text(restaurantName, pageWidth / 2, 200, { align: 'center' });
+    pdf.text('How to use:', 30, 90);
 
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(`${qrCodes.length} tables · ${perPage} per sheet`, pageWidth / 2, 230, { align: 'center' });
+    pdf.setFontSize(11);
+    pdf.setTextColor(60, 60, 60);
+    
+    pdf.text('1. Print this page on card stock', 30, 110);
+    pdf.text('2. Cut out each QR code', 30, 125);
+    pdf.text('3. Place on your tables', 30, 140);
+    pdf.text('4. Customers scan to view menu & order', 30, 155);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('What you get:', 30, 185);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.setTextColor(60, 60, 60);
+    pdf.text(`• ${qrCodes.length} unique QR codes (one per table)`, 30, 205);
+    pdf.text(`• ${perPage} codes per sheet · ${Math.ceil(qrCodes.length / perPage)} pages total`, 30, 220);
+    pdf.text('• Each code links directly to your menu', 30, 235);
 
     // ===== QR CODE PAGES =====
     for (let i = 0; i < qrCodes.length; i++) {
@@ -148,7 +161,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(100, 100, 100);
-      pdf.text(`#${qrCodes[i].tableNumber}`, x + cardW - 15, y + 12);
+      pdf.text(`Table ${qrCodes[i].tableNumber}`, x + 8, y + 15);
 
       // Drift
       pdf.setFont('helvetica', 'normal');
@@ -165,22 +178,34 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(22);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('TIPS', pageWidth / 2, 50, { align: 'center' });
+    pdf.text('PRO TIPS', pageWidth / 2, 40, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(11);
     pdf.setTextColor(80, 80, 80);
-    pdf.text('• Use thick paper (card stock works best)', pageWidth / 2, 90, { align: 'center' });
-    pdf.text('• Cut carefully along the lines', pageWidth / 2, 115, { align: 'center' });
-    pdf.text('• Laminate to make them last longer', pageWidth / 2, 140, { align: 'center' });
-    pdf.text('• Test each code before placing', pageWidth / 2, 165, { align: 'center' });
+    pdf.text('• Use 80-100lb card stock for durability', 30, 70);
+    pdf.text('• Cut with scissors or a paper cutter', 30, 85);
+    pdf.text('• Laminate to make them last longer', 30, 100);
+    pdf.text('• Place at eye level for easy scanning', 30, 115);
+    pdf.text('• Test each code with your phone first', 30, 130);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('Need help?', 30, 165);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.setTextColor(60, 60, 60);
+    pdf.text('Visit dashboard.drift.com/support', 30, 185);
+    pdf.text('or email help@drift.com', 30, 200);
 
     // Great Lakes
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
     pdf.setTextColor(140, 140, 140);
-    pdf.text('made with love on the great lakes', pageWidth / 2, pageHeight - 30, { align: 'center' });
-    pdf.text('drift technologies', pageWidth / 2, pageHeight - 15, { align: 'center' });
+    pdf.text('made with love on the great lakes', pageWidth / 2, pageHeight - 25, { align: 'center' });
+    pdf.text('drift technologies', pageWidth / 2, pageHeight - 12, { align: 'center' });
 
     pdf.save(`${restaurantName}-qr-codes.pdf`);
   };
@@ -193,24 +218,34 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
   return (
     <div className="max-w-md mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center mx-auto mb-2">
-          <QrCode className="w-5 h-5 text-white" />
+      {/* Step indicator */}
+      <div className="text-center mb-2">
+        <span className="text-xs text-gray-300 bg-gray-100 px-3 py-1 rounded-full">
+          Step 6 of 7 · QR Codes
+        </span>
+      </div>
+
+      {/* Header with explanation */}
+      <div className="text-center mb-5">
+        <div className="w-14 h-14 bg-black rounded-xl flex items-center justify-center mx-auto mb-3">
+          <QrCode className="w-6 h-6 text-white" />
         </div>
-        <h1 className="text-xl font-light text-gray-900">qr codes</h1>
-        <p className="text-xs text-gray-400 mt-0.5">{restaurantName}</p>
+        <h1 className="text-2xl font-light text-gray-900 mb-1">Table QR codes</h1>
+        <p className="text-xs text-gray-400 max-w-xs mx-auto">
+          Each table gets its own unique QR code. Print, cut, and place them around your venue.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <Info className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-red-600">{error}</p>
         </div>
       )}
 
       {generating ? (
-        <div className="bg-white rounded-lg p-8 text-center border border-gray-100">
-          <div className="relative w-12 h-12 mx-auto mb-3">
+        <div className="bg-white rounded-xl p-8 text-center border border-gray-100">
+          <div className="relative w-14 h-14 mx-auto mb-4">
             <div className="absolute inset-0 border-2 border-gray-100 rounded-full"></div>
             <motion.div 
               className="absolute inset-0 border-2 border-black rounded-full border-t-transparent"
@@ -218,52 +253,83 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
           </div>
-          <p className="text-xs text-gray-400">{progress}%</p>
+          <p className="text-sm text-gray-600 mb-1">Generating your QR codes...</p>
+          <p className="text-xs text-gray-400">{progress}% · This takes just a moment</p>
         </div>
       ) : qrCodes.length > 0 ? (
         <>
-          {/* Size - simple buttons */}
-          <div className="grid grid-cols-3 gap-2 mb-5">
-            {[
-              { id: '6', label: '6', desc: 'large' },
-              { id: '9', label: '9', desc: 'medium' },
-              { id: '12', label: '12', desc: 'small' }
-            ].map((size) => (
-              <button
-                key={size.id}
-                onClick={() => setCardsPerSheet(size.id as any)}
-                className={`py-2.5 rounded-lg border text-center ${
-                  cardsPerSheet === size.id ? 'border-black bg-gray-50' : 'border-gray-200'
-                }`}
-              >
-                <p className="text-base font-medium">{size.label}</p>
-                <p className="text-[10px] text-gray-400">{size.desc}</p>
-              </button>
-            ))}
+          {/* What's happening */}
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700">
+              <span className="font-medium">✨ {qrCodes.length} unique codes ready</span> — one for each table. Choose your preferred size below.
+            </p>
           </div>
 
-          {/* Mini preview */}
-          <div className="mb-5 p-3 bg-gray-50 rounded-lg">
-            <p className="text-[10px] text-gray-400 mb-2">{qrCodes.length} tables</p>
+          {/* Size selector with clear labels */}
+          <div className="mb-4">
+            <p className="text-xs font-medium text-gray-500 mb-2">CARD SIZE:</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: '6', label: 'Large', desc: '6 per sheet', best: 'easy to read' },
+                { id: '9', label: 'Medium', desc: '9 per sheet', best: 'balanced', default: true },
+                { id: '12', label: 'Small', desc: '12 per sheet', best: 'fits more' }
+              ].map((size) => (
+                <button
+                  key={size.id}
+                  onClick={() => setCardsPerSheet(size.id as any)}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    cardsPerSheet === size.id 
+                      ? 'border-black bg-gray-50' 
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-base font-medium">{size.label}</p>
+                  <p className="text-[10px] text-gray-400">{size.desc}</p>
+                  <p className="text-[8px] text-gray-300 mt-1">{size.best}</p>
+                  {size.default && cardsPerSheet === size.id && (
+                    <span className="text-[8px] bg-black text-white px-1.5 py-0.5 rounded-full mt-1 inline-block">
+                      recommended
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview with count */}
+          <div className="bg-gray-50 rounded-lg p-3 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-medium text-gray-500">PREVIEW</span>
+              <span className="text-xs text-gray-400">{qrCodes.length} codes · {Math.ceil(qrCodes.length / parseInt(cardsPerSheet))} pages</span>
+            </div>
             <div className="grid grid-cols-4 gap-1">
               {qrCodes.slice(0, 4).map((qr) => (
-                <div key={qr.tableId} className="bg-white p-1 rounded border border-gray-100">
+                <div key={qr.tableId} className="bg-white p-2 rounded border border-gray-200">
                   <img src={qr.qrCode} className="w-full aspect-square" />
+                  <p className="text-[8px] text-gray-400 text-center mt-1">Table {qr.tableNumber}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Big download button */}
+          {/* Download button with clear action */}
           <button
             onClick={downloadPDF}
-            className="w-full bg-black text-white py-4 rounded-lg text-sm font-medium mb-5"
+            className="w-full bg-black text-white py-4 rounded-lg text-sm font-medium mb-4 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
           >
-            Download PDF
+            <Download className="w-4 h-4" />
+            Download PDF Kit
           </button>
 
+          {/* What's next */}
+          <div className="text-center mb-4">
+            <p className="text-[10px] text-gray-300">
+              The PDF includes instructions, all {qrCodes.length} QR codes, and pro tips.
+            </p>
+          </div>
+
           {/* Great Lakes */}
-          <div className="flex justify-center items-center gap-2 text-[10px] text-gray-300 mb-5">
+          <div className="flex justify-center items-center gap-2 text-[10px] text-gray-300 mb-4">
             <span>made with</span>
             <Heart className="w-3 h-3" />
             <span>on the great lakes</span>
@@ -271,17 +337,25 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
           {/* Navigation */}
           <div className="flex justify-between pt-4 border-t border-gray-100">
-            <button onClick={onPrev} className="text-xs text-gray-400">← back</button>
-            <button onClick={onNext} className="text-xs bg-black text-white px-4 py-2 rounded">done</button>
+            <button onClick={onPrev} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              ← Back
+            </button>
+            <button 
+              onClick={onNext} 
+              className="text-xs bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Continue to next step
+            </button>
           </div>
         </>
       ) : (
         <button
           onClick={generateQRCodes}
-          className="w-full py-10 bg-gray-50 rounded-lg border border-gray-200 text-center"
+          className="w-full py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:border-black transition-all text-center"
         >
-          <QrCode className="w-6 h-6 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">generate qr codes</p>
+          <QrCode className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-600 mb-1">Generate QR codes</p>
+          <p className="text-xs text-gray-400">Create unique codes for each table</p>
         </button>
       )}
     </div>
