@@ -15,7 +15,8 @@ import {
   Eye,
   EyeOff,
   Globe,
-  Phone
+  Phone,
+  X
 } from 'lucide-react';
 
 export function SignupPage() {
@@ -29,6 +30,8 @@ export function SignupPage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [modalContent, setModalContent] = useState<'terms' | 'privacy'>('terms');
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -779,7 +782,7 @@ export function SignupPage() {
                     </div>
                   </div>
 
-                  {/* Terms agreement */}
+                  {/* Terms agreement - UPDATED with clickable buttons */}
                   <div className="flex items-start gap-3 pt-4">
                     <button
                       type="button"
@@ -794,11 +797,25 @@ export function SignupPage() {
                     </button>
                     <label className="text-sm text-gray-500">
                       I agree to the{' '}
-                      <button type="button" className="text-gray-900 hover:text-gray-700 font-medium">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setModalContent('terms');
+                          setShowTermsModal(true);
+                        }}
+                        className="text-gray-900 hover:text-gray-700 font-medium underline decoration-gray-200 hover:decoration-gray-400 transition-all"
+                      >
                         Terms of Service
                       </button>
                       {' '}and{' '}
-                      <button type="button" className="text-gray-900 hover:text-gray-700 font-medium">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setModalContent('privacy');
+                          setShowTermsModal(true);
+                        }}
+                        className="text-gray-900 hover:text-gray-700 font-medium underline decoration-gray-200 hover:decoration-gray-400 transition-all"
+                      >
                         Privacy Policy
                       </button>
                     </label>
@@ -847,6 +864,86 @@ export function SignupPage() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Terms & Privacy Modal */}
+      <AnimatePresence>
+        {showTermsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowTermsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-2xl font-light">
+                  {modalContent === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+                </h3>
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto max-h-[60vh] prose prose-sm">
+                {modalContent === 'terms' ? (
+                  <>
+                    <h4>1. Agreement to Terms</h4>
+                    <p>By accessing or using Drift, you agree to be bound by these Terms of Service.</p>
+                    
+                    <h4>2. Description of Service</h4>
+                    <p>Drift provides payment processing and restaurant management tools.</p>
+                    
+                    <h4>3. Fees and Payments</h4>
+                    <p>Transaction fees are clearly displayed and deducted automatically.</p>
+                    
+                    <h4>4. User Responsibilities</h4>
+                    <p>You are responsible for maintaining account security and providing accurate information.</p>
+                    
+                    <h4>5. Termination</h4>
+                    <p>You may cancel your account at any time. We may suspend accounts for violations.</p>
+                  </>
+                ) : (
+                  <>
+                    <h4>Your Data Is Yours</h4>
+                    <p>We don't sell your data. Period.</p>
+                    
+                    <h4>What We Collect</h4>
+                    <p>Only what's necessary to process payments: name, email, business information.</p>
+                    
+                    <h4>How We Use It</h4>
+                    <p>To provide services, improve our platform, and communicate important updates.</p>
+                    
+                    <h4>Security</h4>
+                    <p>256-bit encryption, PCI compliant, SOC 2 certified.</p>
+                    
+                    <h4>Your Rights</h4>
+                    <p>You can export or delete your data anytime.</p>
+                  </>
+                )}
+              </div>
+              
+              <div className="p-4 border-t border-gray-100 bg-gray-50">
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="w-full bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition-colors font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
