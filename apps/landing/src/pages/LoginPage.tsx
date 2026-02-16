@@ -9,7 +9,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
 
   // Use environment variable for API URL
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
 const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com';
 
   const handleLogin = async (e: React.FormEvent) => {

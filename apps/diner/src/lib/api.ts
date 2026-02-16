@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3001';
+const API_URL = 'https://drift-api-7vs7.onrender.com';
 
 export interface Restaurant {
   id: string;

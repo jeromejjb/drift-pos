@@ -13,7 +13,7 @@ export function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
   
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
 
   const [profile, setProfile] = useState({
     name: '',

@@ -80,7 +80,7 @@ const handlePayment = async (_method: string) => {
       }
 
       // Create the order in your API
-      const orderResponse = await fetch('http://localhost:3001/api/orders', {
+      const orderResponse = await fetch('https://drift-api-7vs7.onrender.com/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

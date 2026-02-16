@@ -44,7 +44,7 @@ export function MenuPage() {
         setError(null);
         
         // Get restaurant by table ID
-        const tableResponse = await fetch(`http://localhost:3001/api/table/${tableId}/restaurant`);
+        const tableResponse = await fetch(`https://drift-api-7vs7.onrender.com/api/table/${tableId}/restaurant`);
         
         if (!tableResponse.ok) {
           throw new Error('Failed to fetch restaurant');
