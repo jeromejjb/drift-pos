@@ -9,8 +9,7 @@ import {
   Minus,
   FileDown,
   LayoutGrid,
-  Sparkles,
-  ExternalLink
+  Sparkles
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
@@ -33,26 +32,11 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
   
-  // Get restaurant name from multiple sources
+  // Get restaurant name
   const restaurantName = 
     data?.restaurantInfo?.name || 
     localStorage.getItem('drift-restaurant-name') || 
     'Your Business';
-
-  console.log('🏢 Restaurant name in QRStep:', restaurantName);
-  console.log('📦 Data received:', data);
-
-  const styles = [
-    { id: 'classic', icon: Square, label: 'Classic', desc: 'traditional border' },
-    { id: 'minimal', icon: Minus, label: 'Minimal', desc: 'clean edge' },
-    { id: 'prestige', icon: Sparkles, label: 'Prestige', desc: 'signature series' }
-  ];
-
-  const densities = [
-    { id: 'standard', label: 'Standard', perSheet: 6, size: 'business card' },
-    { id: 'compact', label: 'Compact', perSheet: 9, size: 'credit card' },
-    { id: 'professional', label: 'Professional', perSheet: 12, size: 'premium' }
-  ];
 
   const generateQRCodes = async () => {
     setGenerating(true);
@@ -99,7 +83,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     }
   };
 
-  const downloadKit = () => {
+  const downloadKit = async () => {
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -109,14 +93,14 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     
-    // Professional grid layout
+    // Calculate layout based on density
     let cols, rows, cardWidth, cardHeight;
-    const density = densities.find(d => d.id === selectedDensity);
+    const itemsPerPage = selectedDensity === 'standard' ? 6 : selectedDensity === 'compact' ? 9 : 12;
     
-    if (density?.perSheet === 6) {
+    if (itemsPerPage === 6) {
       cols = 2; rows = 3;
       cardWidth = 85; cardHeight = 60;
-    } else if (density?.perSheet === 9) {
+    } else if (itemsPerPage === 9) {
       cols = 3; rows = 3;
       cardWidth = 60; cardHeight = 55;
     } else {
@@ -126,192 +110,156 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
     const margin = 15;
     const startX = (pageWidth - (cols * cardWidth)) / 2;
-    const startY = 25;
+    const startY = 30;
 
-    // Cover page - elegant
+    // ===== COVER PAGE =====
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
     // Drift logo
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(52);
+    pdf.setFontSize(48);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('drift', pageWidth / 2, 80, { align: 'center' });
+    pdf.text('drift', pageWidth / 2, 70, { align: 'center' });
     
     pdf.setFont('helvetica', 'lightitalic');
     pdf.setFontSize(14);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text('qr code portfolio', pageWidth / 2, 105, { align: 'center' });
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('qr code portfolio', pageWidth / 2, 90, { align: 'center' });
 
     // Restaurant name
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(22);
+    pdf.setFontSize(24);
     pdf.setTextColor(30, 30, 30);
-    pdf.text(restaurantName, pageWidth / 2, 150, { align: 'center' });
+    pdf.text(restaurantName, pageWidth / 2, 140, { align: 'center' });
 
-    // Specs
+    // Details
+    pdf.setFont('helvetica', 'light');
+    pdf.setFontSize(10);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(`${qrCodes.length} tables · ${itemsPerPage} per sheet · ${selectedStyle} series`, pageWidth / 2, 170, { align: 'center' });
+
+    // Great Lakes branding
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(9);
     pdf.setTextColor(140, 140, 140);
-    pdf.text(`${qrCodes.length} tables · ${density?.perSheet} per sheet · ${selectedStyle} series`, pageWidth / 2, 175, { align: 'center' });
-
-    // Great Lakes branding - exactly like landing page footer
-    const greatLakesX = pageWidth / 2 - 35;
-    const greatLakesY = pageHeight - 45;
+    pdf.text('Made with ♡ on the Great Lakes', pageWidth / 2, pageHeight - 30, { align: 'center' });
     
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(9);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('Made with', greatLakesX, greatLakesY);
-    pdf.text('♡', greatLakesX + 22, greatLakesY);
-    pdf.text('on the', greatLakesX + 30, greatLakesY);
-    
-    // Simple line representation for Great Lakes (since we can't embed images easily in PDF)
-    pdf.setDrawColor(180, 180, 180);
-    pdf.setLineWidth(0.3);
-    pdf.line(greatLakesX + 50, greatLakesY - 2, greatLakesX + 75, greatLakesY - 2);
-    pdf.setFont('helvetica', 'light');
     pdf.setFontSize(7);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('Great Lakes', greatLakesX + 50, greatLakesY - 8);
-
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(7);
-    pdf.setTextColor(170, 170, 170);
+    pdf.setTextColor(160, 160, 160);
     pdf.text('drift technologies inc. · all rights reserved', pageWidth / 2, pageHeight - 20, { align: 'center' });
 
-    // QR Code pages
+    // ===== QR CODE PAGES =====
     for (let i = 0; i < qrCodes.length; i++) {
-      if (i > 0 && i % density!.perSheet === 0) {
+      // Add new page if needed
+      if (i > 0 && i % itemsPerPage === 0) {
         pdf.addPage();
         pdf.setFillColor(255, 255, 255);
         pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       }
 
-      const posOnPage = i % density!.perSheet;
+      const posOnPage = i % itemsPerPage;
       const row = Math.floor(posOnPage / cols);
       const col = posOnPage % cols;
 
       const x = startX + col * cardWidth;
-      const y = startY + row * (cardHeight + 2);
+      const y = startY + row * (cardHeight + 5);
 
-      // Style-specific card design
+      // Card border based on style
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setLineWidth(0.2);
+      
       if (selectedStyle === 'classic') {
-        pdf.setDrawColor(220, 220, 220);
-        pdf.setLineWidth(0.2);
         pdf.roundedRect(x, y, cardWidth - 2, cardHeight - 2, 2, 2, 'S');
       } else if (selectedStyle === 'minimal') {
-        pdf.setDrawColor(230, 230, 230);
-        pdf.setLineWidth(0.1);
         pdf.line(x, y + cardHeight - 3, x + cardWidth - 2, y + cardHeight - 3);
       } else {
-        // Prestige - subtle embossed effect
+        // Prestige - double border
+        pdf.roundedRect(x, y, cardWidth - 2, cardHeight - 2, 2, 2, 'S');
         pdf.setDrawColor(240, 240, 240);
-        pdf.setLineWidth(0.1);
-        for (let e = 0; e < 2; e++) {
-          pdf.roundedRect(x - e, y - e, cardWidth - 2 + e*2, cardHeight - 2 + e*2, 1, 1, 'S');
-        }
+        pdf.roundedRect(x - 0.5, y - 0.5, cardWidth - 1, cardHeight - 1, 2, 2, 'S');
       }
 
       // QR Code
-      const qrImage = qrCodes[i].qrCode.split(',')[1];
-      const qrSize = Math.min(cardWidth - 20, cardHeight - 35);
-      pdf.addImage(
-        qrImage, 
-        'PNG', 
-        x + (cardWidth - qrSize) / 2, 
-        y + 8, 
-        qrSize, 
-        qrSize
-      );
+      try {
+        const qrImage = qrCodes[i].qrCode.split(',')[1];
+        const qrSize = Math.min(cardWidth - 20, cardHeight - 25);
+        
+        pdf.addImage(
+          qrImage, 
+          'PNG', 
+          x + (cardWidth - qrSize) / 2, 
+          y + 8, 
+          qrSize, 
+          qrSize,
+          undefined,
+          'FAST'
+        );
+      } catch (err) {
+        console.error('Error adding QR image:', err);
+      }
 
       // Table number
       pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(8);
-      pdf.setTextColor(60, 60, 60);
-      pdf.text(`${qrCodes[i].tableNumber.toString().padStart(2, '0')}`, x + cardWidth - 18, y + cardHeight - 12);
+      pdf.setFontSize(9);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text(`${qrCodes[i].tableNumber.toString().padStart(2, '0')}`, x + cardWidth - 18, y + cardHeight - 10);
 
-      // Drift logo on each card
+      // Drift logo
       pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(6);
-      pdf.setTextColor(160, 160, 160);
-      pdf.text('drift', x + 8, y + cardHeight - 12);
-
-      // Made with love on the Great Lakes on each card - matching footer style
-      pdf.setFont('helvetica', 'light');
-      pdf.setFontSize(4);
-      pdf.setTextColor(170, 170, 170);
-      
-      const loveX = x + 8;
-      const loveY = y + cardHeight - 5;
-      pdf.text('Made with', loveX, loveY);
-      pdf.text('♡', loveX + 15, loveY);
-      pdf.text('on the', loveX + 21, loveY);
-      
-      // Tiny line for Great Lakes
-      pdf.setDrawColor(190, 190, 190);
-      pdf.setLineWidth(0.1);
-      pdf.line(loveX + 35, loveY - 1, loveX + 45, loveY - 1);
+      pdf.setFontSize(7);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('drift', x + 8, y + cardHeight - 10);
     }
 
-    // Back cover with instructions
+    // ===== BACK COVER =====
     pdf.addPage();
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(16);
+    pdf.setFontSize(20);
     pdf.setTextColor(30, 30, 30);
     pdf.text('professional use', pageWidth / 2, 100, { align: 'center' });
 
     const instructions = [
-      'print on 80lb card stock for best results',
-      'cut with precision along guidelines',
+      'print on 80lb card stock',
+      'cut along guidelines',
       'place on tables or counters',
-      'customers scan with any smartphone camera',
+      'customers scan with camera',
       '',
-      'for replacement codes · visit dashboard'
+      'for replacement codes:',
+      'dashboard.drift.com'
     ];
 
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(9);
+    pdf.setFontSize(10);
     pdf.setTextColor(100, 100, 100);
     
     instructions.forEach((line, index) => {
-      pdf.text(line, pageWidth / 2, 150 + index * 8, { align: 'center' });
+      pdf.text(line, pageWidth / 2, 150 + index * 10, { align: 'center' });
     });
 
     // Security badges
     pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(7);
-    pdf.setTextColor(160, 160, 160);
+    pdf.setFontSize(8);
+    pdf.setTextColor(140, 140, 140);
     pdf.text('SOC 2 · PCI DSS · GDPR', pageWidth / 2, pageHeight - 50, { align: 'center' });
 
-    // Great Lakes branding on back cover - matching footer style
-    const backLoveX = pageWidth / 2 - 35;
-    const backLoveY = pageHeight - 30;
-    
+    // Great Lakes branding
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(9);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('Made with', backLoveX, backLoveY);
-    pdf.text('♡', backLoveX + 22, backLoveY);
-    pdf.text('on the', backLoveX + 30, backLoveY);
+    pdf.setTextColor(140, 140, 140);
+    pdf.text('Made with ♡ on the Great Lakes', pageWidth / 2, pageHeight - 30, { align: 'center' });
     
-    pdf.setDrawColor(180, 180, 180);
-    pdf.setLineWidth(0.3);
-    pdf.line(backLoveX + 50, backLoveY - 2, backLoveX + 75, backLoveY - 2);
     pdf.setFont('helvetica', 'light');
     pdf.setFontSize(7);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text('Great Lakes', backLoveX + 50, backLoveY - 8);
+    pdf.setTextColor(160, 160, 160);
+    pdf.text('drift technologies inc. · est. 2024', pageWidth / 2, pageHeight - 20, { align: 'center' });
 
-    pdf.setFont('helvetica', 'light');
-    pdf.setFontSize(7);
-    pdf.setTextColor(170, 170, 170);
-    pdf.text('drift technologies inc. · est. 2024', pageWidth / 2, pageHeight - 15, { align: 'center' });
-
-    pdf.save(`${restaurantName.toLowerCase().replace(/\s+/g, '-')}-prestige-qr-kit.pdf`);
+    // Save the PDF
+    pdf.save(`${restaurantName.toLowerCase().replace(/\s+/g, '-')}-qr-kit.pdf`);
   };
 
   useEffect(() => {
@@ -322,7 +270,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      {/* Header with restaurant name */}
+      {/* Header */}
       <div className="text-center mb-12">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -353,36 +301,39 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
           </div>
-          <p className="text-sm text-gray-400">{progress}% · crafting your prestige kit</p>
+          <p className="text-sm text-gray-400">{progress}% · generating QR codes</p>
         </div>
       ) : qrCodes.length > 0 ? (
         <>
-          {/* Style selection */}
+          {/* Style Selection */}
           <div className="grid grid-cols-3 gap-3 mb-8">
-            {styles.map((style) => {
-              const Icon = style.icon;
-              const isActive = selectedStyle === style.id;
-              return (
-                <button
-                  key={style.id}
-                  onClick={() => setSelectedStyle(style.id as any)}
-                  className={`p-5 rounded-xl border transition-all ${
-                    isActive 
-                      ? 'border-black bg-gray-50' 
-                      : 'border-gray-100 hover:border-gray-200 bg-white'
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 mx-auto mb-2 ${isActive ? 'text-black' : 'text-gray-400'}`} />
-                  <p className="text-sm font-light text-center">{style.label}</p>
-                  <p className="text-xs text-gray-400 text-center mt-1">{style.desc}</p>
-                </button>
-              );
-            })}
+            {[
+              { id: 'classic', label: 'Classic', desc: 'traditional border' },
+              { id: 'minimal', label: 'Minimal', desc: 'clean edge' },
+              { id: 'prestige', label: 'Prestige', desc: 'signature series' }
+            ].map((style) => (
+              <button
+                key={style.id}
+                onClick={() => setSelectedStyle(style.id as any)}
+                className={`p-4 rounded-xl border transition-all ${
+                  selectedStyle === style.id 
+                    ? 'border-black bg-gray-50' 
+                    : 'border-gray-100 hover:border-gray-200 bg-white'
+                }`}
+              >
+                <p className="text-sm font-medium text-center">{style.label}</p>
+                <p className="text-xs text-gray-400 text-center mt-1">{style.desc}</p>
+              </button>
+            ))}
           </div>
 
-          {/* Density selection */}
+          {/* Density Selection */}
           <div className="flex justify-center gap-3 mb-8">
-            {densities.map((density) => (
+            {[
+              { id: 'standard', label: 'Standard', count: 6 },
+              { id: 'compact', label: 'Compact', count: 9 },
+              { id: 'professional', label: 'Professional', count: 12 }
+            ].map((density) => (
               <button
                 key={density.id}
                 onClick={() => setSelectedDensity(density.id as any)}
@@ -392,8 +343,8 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
                     : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                 }`}
               >
-                <span className="font-light">{density.label}</span>
-                <span className="text-xs ml-2 opacity-70">{density.perSheet}</span>
+                <span>{density.label}</span>
+                <span className="text-xs ml-2 opacity-70">{density.count}</span>
               </button>
             ))}
           </div>
@@ -401,38 +352,32 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           {/* Preview */}
           <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs text-gray-400 uppercase tracking-wider">preview · {selectedStyle} series</span>
+              <span className="text-xs text-gray-400 uppercase tracking-wider">preview</span>
               <span className="text-xs text-gray-400">{qrCodes.length} codes</span>
             </div>
             <div className="grid grid-cols-4 gap-3">
               {qrCodes.slice(0, 4).map((qr, i) => (
-                <motion.div
-                  key={qr.tableId}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-white rounded-lg p-3 border border-gray-100 shadow-sm"
-                >
+                <div key={qr.tableId} className="bg-white rounded-lg p-3 border border-gray-100">
                   <img src={qr.qrCode} className="w-full aspect-square mb-2" />
-                  <div className="flex items-center justify-between text-[10px]">
+                  <div className="flex justify-between text-[10px]">
                     <span className="text-gray-400">#{qr.tableNumber}</span>
                     <span className="text-gray-300">drift</span>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
 
-          {/* Download button */}
+          {/* Download Button */}
           <button
             onClick={downloadKit}
-            className="w-full bg-gradient-to-r from-gray-900 to-gray-800 text-white py-5 rounded-xl hover:from-gray-800 hover:to-gray-700 transition-all flex items-center justify-center gap-3 mb-8 shadow-md"
+            className="w-full bg-black text-white py-5 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 mb-8 shadow-md"
           >
             <FileDown className="w-5 h-5" />
-            <span className="text-base font-light">download prestige pdf kit</span>
+            <span className="text-base font-light">download pdf kit</span>
           </button>
 
-          {/* Made with love on the Great Lakes - exactly like footer */}
+          {/* Great Lakes Branding */}
           <div className="flex items-center justify-center gap-2 mb-8">
             <span className="text-sm text-gray-400">Made with</span>
             <span className="text-gray-400 text-lg">♡</span>
@@ -444,7 +389,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             />
           </div>
 
-          {/* Footer with company info */}
+          {/* Footer */}
           <div className="text-center mb-6">
             <p className="text-xs text-gray-300">drift technologies inc. · est. 2024</p>
             <p className="text-[10px] text-gray-200 mt-1">SOC 2 · PCI DSS · GDPR certified</p>
@@ -452,12 +397,12 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
           {/* Navigation */}
           <div className="flex justify-between pt-6 border-t border-gray-100">
-            <button onClick={onPrev} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            <button onClick={onPrev} className="text-sm text-gray-400 hover:text-gray-600">
               ← back
             </button>
             <button
               onClick={onNext}
-              className="text-sm bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+              className="text-sm bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800"
             >
               complete setup
             </button>
@@ -469,7 +414,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           className="w-full py-16 bg-gray-50 rounded-xl border border-gray-100 hover:border-black transition-all flex flex-col items-center gap-3"
         >
           <QrCode className="w-8 h-8 text-gray-300" />
-          <span className="text-sm text-gray-400">generate prestige qr codes</span>
+          <span className="text-sm text-gray-400">generate qr codes</span>
         </button>
       )}
     </div>
