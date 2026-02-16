@@ -14,41 +14,20 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [qrCodes, setQrCodes] = useState<any[]>(data.qrCodes || []);
   const [error, setError] = useState('');
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const APP_URL = import.meta.env.VITE_APP_URL || 'https://drift-restaurant.onrender.com';
-  const getToken = () => {
-    const token = localStorage.getItem('drift-token');
-    if (!token) {
-      console.error('No token found');
-      window.location.href = `${APP_URL}/login`;
-      return null;
-    }
-    return token;
-  };
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
 
   const generateQRCodes = async () => {
     setGenerating(true);
     setError('');
     
     try {
-      const token = getToken();
-      if (!token) return;
-
-      console.log('Generating QR codes with token:', token.substring(0, 20) + '...');
-      
+      // NO TOKEN REQUIRED for generating QR codes during onboarding
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/tables/generate-qrs`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         }
       });
-
-      if (response.status === 401) {
-        localStorage.removeItem('drift-token');
-        window.location.href = `${APP_URL}/login`;
-        return;
-      }
 
       if (!response.ok) {
         throw new Error('Failed to generate QR codes');

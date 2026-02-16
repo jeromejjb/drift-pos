@@ -20,19 +20,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
   });
 
   // Use environment variables
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const APP_URL = import.meta.env.VITE_APP_URL || 'https://drift-restaurant.onrender.com';
-  // Get JWT token from localStorage (saved during signup/login)
-  const getToken = () => {
-    const token = localStorage.getItem('drift-token');
-    if (!token) {
-      console.error('No token found - user may need to login again');
-      // Redirect to login if no token
-      window.location.href = `${APP_URL}/login`;
-      return null;
-    }
-    return token;
-  };
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
 
   useEffect(() => {
     fetchRestaurant();
@@ -40,26 +28,8 @@ const APP_URL = import.meta.env.VITE_APP_URL || 'https://drift-restaurant.onrend
 
   const fetchRestaurant = async () => {
     try {
-      const token = getToken();
-      if (!token) return;
-
-      console.log('Fetching restaurant with token:', token.substring(0, 20) + '...');
-      
-      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 401) {
-        console.error('Unauthorized - token may be expired');
-        // Token expired - redirect to login
-        localStorage.removeItem('drift-token');
-        window.location.href = `${APP_URL}/login`;
-        return;
-      }
+      // NO TOKEN REQUIRED for fetching during onboarding
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -70,8 +40,6 @@ const APP_URL = import.meta.env.VITE_APP_URL || 'https://drift-restaurant.onrend
           phone: data.phone || '',
           cuisine: data.cuisine || ''
         });
-      } else {
-        console.error('Failed to fetch restaurant:', await response.text());
       }
     } catch (error) {
       console.error('Error fetching restaurant:', error);
@@ -84,30 +52,14 @@ const APP_URL = import.meta.env.VITE_APP_URL || 'https://drift-restaurant.onrend
     setError('');
     
     try {
-      const token = getToken();
-      if (!token) {
-        setError('Authentication required. Please login again.');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Saving restaurant data with token:', token.substring(0, 20) + '...');
-      
+      // NO TOKEN REQUIRED for saving during onboarding
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
         method: 'PATCH',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(info)
       });
-
-      if (response.status === 401) {
-        console.error('Unauthorized - token may be expired');
-        localStorage.removeItem('drift-token');
-        window.location.href = `${APP_URL}/login`;
-        return;
-      }
 
       if (response.ok) {
         console.log('Restaurant saved successfully');

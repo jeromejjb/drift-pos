@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { 
   QrCode, 
@@ -22,6 +22,7 @@ interface Table {
 
 export function TablesPage() {
   const { restaurantId } = useParams();
+  const navigate = useNavigate();
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -30,16 +31,46 @@ export function TablesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'occupied' | 'reserved'>('all');
 
+  // Use environment variable for API URL
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+
+  // Get auth token
+  const getToken = () => {
+    const token = localStorage.getItem('drift-token');
+    if (!token) {
+      // Redirect to landing login if no token
+      window.location.href = 'https://drift-landing.onrender.com/login';
+      return null;
+    }
+    return token;
+  };
+
   useEffect(() => {
     fetchTables();
   }, [restaurantId]);
 
   const fetchTables = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/restaurant/${restaurantId}/tables`);
+      const token = getToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/tables`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 401) {
+        // Token expired or invalid
+        localStorage.removeItem('drift-token');
+        localStorage.removeItem('drift-restaurant-id');
+        window.location.href = 'https://drift-landing.onrender.com/login';
+        return;
+      }
+
       const data = await response.json();
       
-      // Add mock status for now
+      // Add mock status for now (you can replace with real status from API later)
       const tablesWithStatus = data.map((table: any, index: number) => ({
         ...table,
         status: index % 3 === 0 ? 'occupied' : index % 3 === 1 ? 'reserved' : 'available'
@@ -55,7 +86,22 @@ export function TablesPage() {
 
   const generateQRCode = async (table: Table) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/table/${table.id}/qrcode`);
+      const token = getToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/table/${table.id}/qrcode`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('drift-token');
+        localStorage.removeItem('drift-restaurant-id');
+        window.location.href = 'https://drift-landing.onrender.com/login';
+        return;
+      }
+
       const data = await response.json();
       setQrCode(data.qrCode);
       setSelectedTable(table);
@@ -69,7 +115,22 @@ export function TablesPage() {
     if (!selectedTable) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/table/${selectedTable.id}/qrcode/download`);
+      const token = getToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/table/${selectedTable.id}/qrcode/download`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('drift-token');
+        localStorage.removeItem('drift-restaurant-id');
+        window.location.href = 'https://drift-landing.onrender.com/login';
+        return;
+      }
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
