@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Mail, Phone, MapPin, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, ChevronRight, ChevronLeft, User, Briefcase, Users } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
 interface Props {
-   restaurantId: string; 
+  restaurantId: string;
   data: any;
   updateData: (data: any) => void;
   onNext: () => void;
@@ -14,25 +14,62 @@ interface Props {
 
 export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) {
   const [formData, setFormData] = useState({
-    restaurantName: data?.name || data?.restaurantName || '',
-    email: data?.email || '',
-    phone: data?.phone || '',
-    address: data?.address || ''
+    restaurantName: '',
+    email: '',
+    phone: '',
+    address: '',
+    fullName: '',
+    role: '',
+    teamSize: ''
   });
 
-  // Load from localStorage on mount
+  // Load from localStorage AND props on mount
   useEffect(() => {
-    const stored = localStorage.getItem('drift_onboarding');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      setFormData({
-        restaurantName: parsed.restaurantName || parsed.name || formData.restaurantName,
-        email: parsed.email || formData.email,
-        phone: parsed.phone || formData.phone,
-        address: parsed.address || formData.address
-      });
+    console.log('📊 RestaurantInfoStep received data:', data);
+    
+    let mergedData: any = {};
+    
+    // 1. Load from drift-user-profile first (from signup)
+    const userProfile = localStorage.getItem('drift-user-profile');
+    if (userProfile) {
+      try {
+        const profile = JSON.parse(userProfile);
+        console.log('👤 Loaded user profile:', profile);
+        mergedData = { ...mergedData, ...profile };
+      } catch (e) {
+        console.error('Error parsing user profile:', e);
+      }
     }
-  }, []);
+    
+    // 2. Load from onboarding progress
+    const onboarding = localStorage.getItem('drift_onboarding');
+    if (onboarding) {
+      try {
+        const parsed = JSON.parse(onboarding);
+        console.log('📂 Loaded onboarding:', parsed);
+        mergedData = { ...mergedData, ...parsed };
+      } catch (e) {
+        console.error('Error parsing onboarding:', e);
+      }
+    }
+    
+    // 3. Props override everything (most recent)
+    if (data) {
+      mergedData = { ...mergedData, ...data };
+    }
+    
+    console.log('✅ Final merged data:', mergedData);
+    
+    setFormData({
+      restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || '',
+      email: mergedData.email || '',
+      phone: mergedData.phone || '',
+      address: mergedData.address || '',
+      fullName: mergedData.fullName || '',
+      role: mergedData.role || '',
+      teamSize: mergedData.teamSize || ''
+    });
+  }, [data]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,14 +79,28 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
       name: formData.restaurantName,
       email: formData.email,
       phone: formData.phone,
-      address: formData.address
+      address: formData.address,
+      fullName: formData.fullName,
+      role: formData.role,
+      teamSize: formData.teamSize
     };
     
     console.log('💾 Saving restaurant info:', dataToSave);
     
+    // Update parent
     updateData(dataToSave);
+    
+    // Update onboarding progress
+    const onboarding = JSON.parse(localStorage.getItem('drift_onboarding') || '{}');
     localStorage.setItem('drift_onboarding', JSON.stringify({
-      ...JSON.parse(localStorage.getItem('drift_onboarding') || '{}'),
+      ...onboarding,
+      ...dataToSave
+    }));
+    
+    // Update user profile
+    const profile = JSON.parse(localStorage.getItem('drift-user-profile') || '{}');
+    localStorage.setItem('drift-user-profile', JSON.stringify({
+      ...profile,
       ...dataToSave
     }));
     
@@ -69,6 +120,32 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
         <h2 className="text-3xl font-light mb-2">Restaurant Information</h2>
         <p className="text-gray-400">Tell us about your restaurant</p>
       </div>
+
+      {/* User info summary from signup - NOW VISIBLE */}
+      {(formData.fullName || formData.role || formData.teamSize) && (
+        <Card className="mb-6 p-4 bg-blue-50 border-blue-100">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            {formData.fullName && (
+              <span className="flex items-center gap-1 text-blue-800">
+                <User className="w-4 h-4 text-blue-600" />
+                {formData.fullName}
+              </span>
+            )}
+            {formData.role && (
+              <span className="flex items-center gap-1 text-blue-800">
+                <Briefcase className="w-4 h-4 text-blue-600" />
+                {formData.role}
+              </span>
+            )}
+            {formData.teamSize && (
+              <span className="flex items-center gap-1 text-blue-800">
+                <Users className="w-4 h-4 text-blue-600" />
+                {formData.teamSize} people
+              </span>
+            )}
+          </div>
+        </Card>
+      )}
 
       <Card padding="xl">
         <form onSubmit={handleSubmit} className="space-y-6">
