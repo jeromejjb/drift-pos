@@ -4,7 +4,6 @@ import { HowItWorks } from '../components/HowItWorks'; // Add this import
 import { Features } from '../components/Features';
 import { RestaurantShowcase } from '../components/RestaurantShowcase';
 import { DinerShowcase } from '../components/DinerShowcase';
-import { Testimonials } from '../components/Testimonials';
 import { Pricing } from '../components/Pricing';
 import { FAQ } from '../components/FAQ';
 import { CTA } from '../components/CTA';
