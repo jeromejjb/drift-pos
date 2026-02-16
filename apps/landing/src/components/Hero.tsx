@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ArrowRight, Smartphone, Store, CreditCard, QrCode, Menu, Banknote, Clock } from 'lucide-react';
+import { ArrowRight, Building2, Smartphone, Store, Users, CreditCard, QrCode, Menu, Printer, Banknote, Clock, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function Hero() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'diner' | 'owner'>('diner');
+  const [view, setView] = useState<'diner' | 'owner'>('owner'); // Default to owner
   const [waitlistCount] = useState(47);
 
   const dinerSteps = [
@@ -75,7 +75,7 @@ export function Hero() {
           Built for restaurants, retail, and everything in between.
         </motion.p>
 
-        {/* Toggle - Prominent in hero */}
+        {/* Toggle - Default to owners */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -106,7 +106,7 @@ export function Hero() {
           </div>
         </motion.div>
 
-        {/* Animated steps - ONE WORD each */}
+        {/* Animated steps */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -132,7 +132,7 @@ export function Hero() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Tagline - flows naturally */}
+        {/* Tagline */}
         <motion.div
           key={view}
           initial={{ opacity: 0 }}
@@ -189,18 +189,28 @@ export function Hero() {
           </button>
         </motion.div>
 
-        {/* Great Lakes cities - Milwaukee FIRST! */}
+        {/* Great Lakes cities - BOLD and VISIBLE */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.45 }}
-          className="flex items-center justify-center gap-4 text-xs text-gray-300 flex-wrap"
+          className="flex items-center justify-center gap-6 text-sm font-medium text-gray-600 flex-wrap"
         >
-          <span className="flex items-center gap-1">📍 Milwaukee</span>
-          <span className="flex items-center gap-1">📍 Chicago</span>
-          <span className="flex items-center gap-1">📍 Detroit</span>
-          <span className="flex items-center gap-1">📍 Cleveland</span>
-          <span className="flex items-center gap-1 text-black font-medium">📍 Your city?</span>
+          <span className="flex items-center gap-1">
+            <MapPin className="w-4 h-4 text-gray-400" /> Milwaukee
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin className="w-4 h-4 text-gray-400" /> Chicago
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin className="w-4 h-4 text-gray-400" /> Detroit
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin className="w-4 h-4 text-gray-400" /> Cleveland
+          </span>
+          <span className="flex items-center gap-1 text-black font-semibold">
+            <MapPin className="w-4 h-4 text-gray-400" /> Your city?
+          </span>
         </motion.div>
 
         {/* Fine print */}
@@ -208,7 +218,7 @@ export function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.5 }}
-          className="text-xs text-gray-200 mt-6"
+          className="text-xs text-gray-300 mt-6"
         >
           No credit card required · Free during early access
         </motion.div>
