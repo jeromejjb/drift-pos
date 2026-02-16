@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>You're live, friend 🎉 · Drift</title>
+    <meta name="description" content="Your restaurant is set up and ready. Your customers are going to love this." />
+    <meta name="robots" content="noindex, nofollow" />
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/drift-icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#000000" />
+  </head>
+  <body>
+    <div id="root">
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        font-family: 'Inter', sans-serif;
+        background: white;
+        color: #111;
+        padding: 24px;
+        text-align: center;
+      ">
+        <div style="margin-bottom: 32px;">
+          <div style="
+            width: 80px;
+            height: 80px;
+            background: #000;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            animation: bounce 1s ease;
+          ">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6L9 17L4 12" />
+            </svg>
+          </div>
+        </div>
+        
+        <h1 style="
+          font-size: 32px;
+          font-weight: 500;
+          letter-spacing: -0.02em;
+          margin: 0 0 12px 0;
+        ">
+          You're live, friend 🎉
+        </h1>
+        
+        <p style="
+          font-size: 18px;
+          color: #666;
+          margin: 0 0 40px 0;
+          max-width: 320px;
+          line-height: 1.5;
+        ">
+          Your restaurant is set up and ready. Your customers are going to love this.
+        </p>
+        
+        <div style="
+          width: 40px;
+          height: 40px;
+          border: 2px solid #eee;
+          border-top-color: #000;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        "></div>
+        
+        <p style="
+          color: #999;
+          font-size: 14px;
+          margin-top: 24px;
+        ">
+          preparing your dashboard...
+        </p>
+      </div>
+      
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes bounce {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      </style>
+    </div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

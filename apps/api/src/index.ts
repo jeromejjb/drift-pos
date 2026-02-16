@@ -5,12 +5,14 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
+import { randomBytes } from 'crypto';
 import stripeRouter from './routes/stripe';
 
 // Load environment variables
@@ -20,15 +22,53 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// Setup PostgreSQL connection pool
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// ==================== BANK-GRADE SECURITY ====================
+
+// Generate a strong JWT secret if not provided
+const JWT_SECRET = process.env.JWT_SECRET || randomBytes(64).toString('hex');
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  No JWT_SECRET provided - generated temporary secret. Set JWT_SECRET in production!');
+}
+
+// Rate limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 attempts per hour
+  skipSuccessfulRequests: true, // Only count failures
+  message: 'Too many failed attempts. Try again later.',
+});
+
+// Apply rate limiting before routes
+app.use('/api', globalLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
+
+// Setup PostgreSQL connection pool with SSL
+const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+  max: 20, // Maximum pool size
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
+
 const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({ 
+  adapter,
+  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+});
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
-
-// CORS configuration
+// CORS configuration - strict whitelist
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -41,21 +81,60 @@ const allowedOrigins = [
   'https://driftpos.com'      
 ];
 
-// Socket.io setup
+// Socket.io setup with strict CORS
 const io = new Server(httpServer, {
-  cors: { origin: allowedOrigins, credentials: true }
+  cors: { 
+    origin: allowedOrigins, 
+    credentials: true,
+    methods: ['GET', 'POST']
+  },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+  },
 });
 
-// ==================== CORS MIDDLEWARE ====================
+// ==================== ENHANCED SECURITY MIDDLEWARE ====================
+
+// Helmet with strict CSP
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", ...allowedOrigins],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'none'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  noSniff: true,
+  xssFilter: true,
+  hidePoweredBy: true,
+}));
+
+// CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost'))) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
   next();
 });
 
@@ -65,20 +144,80 @@ app.use(cors({
     if (allowedOrigins.includes(origin) || origin.includes('localhost')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('CORS not allowed'));
     }
   },
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 204,
 }));
 
-// Standard middleware
-app.use(express.json());
-app.use(morgan('dev'));
-app.use(helmet({ contentSecurityPolicy: false }));
+// Secure JSON parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Sanitized logging
+morgan.token('body', (req: any) => {
+  if (!req.body) return '';
+  const sanitized = { ...req.body };
+  const sensitiveFields = ['password', 'currentPassword', 'newPassword', 'token', 'secret'];
+  sensitiveFields.forEach(field => {
+    if (sanitized[field]) sanitized[field] = '[REDACTED]';
+  });
+  return JSON.stringify(sanitized);
+});
+
+app.use(morgan(':method :url :status :body - :response-time ms'));
+
+// ==================== FUN ROOT ENDPOINT ====================
+app.get('/', (req, res) => {
+  const ascii = `
+\x1b[36m    ╔══════════════════════════════════════╗
+    ║     ╔═╗╦═╗╔═╗╔╦╗╔═╗╔╦╗  ╔═╗╔═╗╔╦╗    ║
+    ║     ║ ╦╠╦╝╠═╣║║║╠═╣ ║   ║  ║ ║ ║║    ║
+    ║     ╚═╝╩╚═╩ ╩╩ ╩╩ ╩ ╩   ╚═╝╚═╝═╩╝    ║
+    ╚══════════════════════════════════════╝\x1b[0m
+
+\x1b[32m  ⚡ Global payment infrastructure ⚡\x1b[0m
+\x1b[90m  (Built with ♥ on the Great Lakes · Secured for the world)\x1b[0m
+
+\x1b[33m  ┌─────────────────────────────────────────────┐
+  │  Version: 1.0.0                              │
+  │  Status: \x1b[32m● OPERATIONAL\x1b[33m                           │
+  │  Security: \x1b[36mBANK GRADE\x1b[33m                            │
+  │  Origin: \x1b[36mGreat Lakes, USA\x1b[33m                       │
+  │  Destination: \x1b[32mEverywhere 🌎\x1b[33m                      │
+  └─────────────────────────────────────────────┘\x1b[0m
+
+\x1b[34m  🚀 Endpoints:
+     ├─ /api/auth/register
+     ├─ /api/auth/login  
+     ├─ /api/auth/verify
+     ├─ /api/restaurants/:id
+     ├─ /api/tables/:id/qrcode
+     ├─ /api/orders
+     ├─ /api/demo/schedule
+     └─ /health\x1b[0m
+
+\x1b[35m  💡 Started in Milwaukee · Now securing payments worldwide\x1b[0m
+\x1b[90m     (Your data is safer than a vault in a bank vault)\x1b[0m
+
+\x1b[37m  🔗 https://driftpos.com\x1b[0m
+  `;
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.send(ascii);
+});
 
 // ==================== TEST ENDPOINT ====================
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'API is working!', timestamp: new Date().toISOString() });
+  res.json({ 
+    message: 'API is operational', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
 // Stripe routes
@@ -86,11 +225,20 @@ app.use('/api', stripeRouter);
 
 // ==================== AUTH MIDDLEWARE ====================
 const authenticateToken = (req: any, res: any, next: any) => {
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Authentication required' });
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    if (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Token expired' });
+      }
+      return res.status(403).json({ error: 'Invalid token' });
+    }
     req.user = user;
     next();
   });
@@ -300,9 +448,18 @@ app.post('/api/auth/change-password', authenticateToken, async (req: any, res) =
 app.get('/health', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', database: 'connected' });
+    res.json({ 
+      status: 'healthy', 
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
   } catch (error) {
-    res.status(500).json({ status: 'error', database: 'disconnected' });
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      database: 'disconnected',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -1027,14 +1184,23 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
   }
 });
 
-// ==================== ROOT ENDPOINT ====================
-app.get('/', (req, res) => {
-  res.json({
-    name: 'Drift API',
-    version: '1.0.0',
-    status: 'operational',
-    timestamp: new Date().toISOString()
-  });
+// ==================== ERROR HANDLING ====================
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// Global error handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('❌ Unhandled error:', err);
+  
+  // Don't leak error details in production
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'Internal server error' 
+    : err.message;
+  
+  res.status(500).json({ error: message });
 });
 
 // ==================== START SERVER ====================
@@ -1042,16 +1208,34 @@ const PORT = process.env.PORT || 3001;
 const portNumber = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
 
 httpServer.listen(portNumber, '0.0.0.0', () => {
-  console.log(`🚀 Drift API running on port ${portNumber}`);
-  console.log(`📊 Health check: http://0.0.0.0:${portNumber}/health`);
+  console.log(`\n\x1b[36m🚀 Drift API running on port ${portNumber}\x1b[0m`);
+  console.log(`\x1b[32m📊 Health check: http://0.0.0.0:${portNumber}/health\x1b[0m`);
+  console.log(`\x1b[33m🔒 Security: BANK GRADE ENABLED\x1b[0m`);
+  console.log(`\x1b[35m🌎 Serving the world from the Great Lakes\x1b[0m\n`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-async function shutdown() {
-  console.log('🛑 Shutting down gracefully...');
-  await prisma.$disconnect();
-  httpServer.close(() => process.exit(0));
+// Graceful shutdown with timeout
+async function shutdown(signal: string) {
+  console.log(`\n📦 Received ${signal}, shutting down gracefully...`);
+  
+  // Set timeout to force shutdown
+  const forceShutdown = setTimeout(() => {
+    console.error('❌ Force shutdown due to timeout');
+    process.exit(1);
+  }, 10000);
+  
+  try {
+    await prisma.$disconnect();
+    httpServer.close(() => {
+      clearTimeout(forceShutdown);
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
 }
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

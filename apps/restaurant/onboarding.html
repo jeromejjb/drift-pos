@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>You're about to drift · Welcome</title>
+    <meta name="description" content="Something great is coming. Your business is about to move differently." />
+    <meta name="robots" content="noindex, nofollow" />
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/drift-icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#000000" />
+  </head>
+  <body>
+    <!-- Loading state with brand energy -->
+    <div id="root">
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        font-family: 'Inter', sans-serif;
+        background: white;
+        color: #111;
+        padding: 24px;
+        text-align: center;
+      ">
+        <div style="margin-bottom: 32px; position: relative;">
+          <div style="
+            width: 64px;
+            height: 64px;
+            background: #000;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            animation: pulse 2s infinite;
+          ">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 12L3 15L5 18" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 12L12 15L15 12" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M19 12L21 15L19 18" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        
+        <h1 style="
+          font-size: 32px;
+          font-weight: 500;
+          letter-spacing: -0.02em;
+          margin: 0 0 12px 0;
+          background: linear-gradient(180deg, #111 0%, #444 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+        ">
+          You're about to drift
+        </h1>
+        
+        <p style="
+          font-size: 18px;
+          color: #666;
+          margin: 0 0 32px 0;
+          max-width: 320px;
+          line-height: 1.5;
+        ">
+          Something great is coming. Your business is about to move differently.
+        </p>
+        
+        <div style="
+          width: 40px;
+          height: 40px;
+          border: 2px solid #eee;
+          border-top-color: #000;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 48px;
+        "></div>
+        
+        <div id="loading-message" style="
+          color: #999;
+          font-size: 14px;
+          font-weight: 400;
+          transition: opacity 0.3s;
+        ">
+          gathering the good stuff...
+        </div>
+      </div>
+      
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      </style>
+      
+      <script>
+        const messages = [
+          "gathering the good stuff...",
+          "smoothing out the edges...",
+          "getting you ready to flow...",
+          "almost there...",
+          "freedom incoming..."
+        ];
+        
+        let index = 0;
+        const messageEl = document.getElementById('loading-message');
+        
+        setInterval(() => {
+          messageEl.style.opacity = '0';
+          setTimeout(() => {
+            messageEl.textContent = messages[index];
+            messageEl.style.opacity = '1';
+            index = (index + 1) % messages.length;
+          }, 150);
+        }, 2200);
+      </script>
+    </div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
