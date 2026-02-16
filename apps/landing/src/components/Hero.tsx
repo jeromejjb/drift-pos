@@ -1,9 +1,28 @@
-import { ArrowRight, } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, Building2, Smartphone, Store, Users, CreditCard, QrCode, Menu, Printer, Banknote, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function Hero() {
   const navigate = useNavigate();
+  const [view, setView] = useState<'diner' | 'owner'>('diner');
+  const [waitlistCount] = useState(47);
+
+  const dinerSteps = [
+    { icon: <Smartphone className="w-5 h-5" />, text: 'Scan' },
+    { icon: <Menu className="w-5 h-5" />, text: 'Browse' },
+    { icon: <CreditCard className="w-5 h-5" />, text: 'Order' },
+    { icon: <CreditCard className="w-5 h-5" />, text: 'Pay' },
+  ];
+
+  const ownerSteps = [
+    { icon: <Store className="w-5 h-5" />, text: 'Start' },
+    { icon: <Menu className="w-5 h-5" />, text: 'Menu' },
+    { icon: <QrCode className="w-5 h-5" />, text: 'Print' },
+    { icon: <Banknote className="w-5 h-5" />, text: 'Paid' },
+  ];
+
+  const steps = view === 'diner' ? dinerSteps : ownerSteps;
 
   return (
     <section className="relative pt-32 pb-24 px-4 overflow-hidden bg-white">
@@ -16,9 +35,18 @@ export function Hero() {
       />
 
       <div className="container max-w-5xl mx-auto text-center relative">
-        {/* Removed fake "500+ businesses" badge */}
+        {/* Early access badge */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-800 text-sm px-4 py-2 rounded-full mb-8"
+        >
+          <Clock className="w-4 h-4" />
+          <span>Early access · {waitlistCount}+ restaurants waiting</span>
+        </motion.div>
 
-        {/* Main headline - clean and bold */}
+        {/* Main headline */}
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -35,24 +63,93 @@ export function Hero() {
           </span>
         </motion.h1>
 
-        {/* Clean value proposition */}
+        {/* Value prop */}
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-xl text-gray-400 max-w-2xl mx-auto mb-12"
+          className="text-xl text-gray-400 max-w-2xl mx-auto mb-8"
         >
           One platform. One rate. No hidden fees.
           <br />
           Built for restaurants, retail, and everything in between.
         </motion.p>
 
-        {/* Stats row - honest and forward-looking */}
+        {/* Toggle - Prominent in hero */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.25 }}
-          className="flex justify-center gap-12 mb-12"
+          className="flex justify-center mb-8"
+        >
+          <div className="bg-gray-100 p-1 rounded-full inline-flex shadow-sm">
+            <button
+              onClick={() => setView('diner')}
+              className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
+                view === 'diner' 
+                  ? 'bg-black text-white shadow-md' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              👤 For diners
+            </button>
+            <button
+              onClick={() => setView('owner')}
+              className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
+                view === 'owner' 
+                  ? 'bg-black text-white shadow-md' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🏢 For owners
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Animated steps - ONE WORD each */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="flex justify-center gap-6 mb-8"
+        >
+          <AnimatePresence mode="wait">
+            {steps.map((step, i) => (
+              <motion.div
+                key={`${view}-${i}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex flex-col items-center"
+              >
+                <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white mb-1">
+                  {step.icon}
+                </div>
+                <span className="text-xs text-gray-500">{step.text}</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Tagline - flows naturally */}
+        <motion.div
+          key={view}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-sm text-gray-400 mb-8"
+        >
+          {view === 'diner' 
+            ? 'Scan. Browse. Order. Pay.' 
+            : 'Start. Menu. Print. Paid.'}
+        </motion.div>
+
+        {/* Stats row */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+          className="flex justify-center gap-12 mb-8"
         >
           <div className="text-center">
             <div className="text-2xl font-light text-gray-900">2.5%</div>
@@ -63,17 +160,17 @@ export function Hero() {
             <div className="text-sm text-gray-400">At volume</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-light text-gray-900">Coming 2026</div>
-            <div className="text-sm text-gray-400">First restaurants</div>
+            <div className="text-2xl font-light text-gray-900">Q2 2026</div>
+            <div className="text-sm text-gray-400">Launching Midwest</div>
           </div>
         </motion.div>
 
-        {/* CTA Buttons - premium feel */}
+        {/* CTA Buttons */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="flex flex-col sm:flex-row gap-4 justify-center mb-8"
         >
           <button
             onClick={() => navigate('/signup')}
@@ -92,14 +189,28 @@ export function Hero() {
           </button>
         </motion.div>
 
-        {/* Simple trust signal - honest and transparent */}
+        {/* Great Lakes cities - Milwaukee FIRST! */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="text-sm text-gray-300"
+          transition={{ duration: 0.5, delay: 0.45 }}
+          className="flex items-center justify-center gap-4 text-xs text-gray-300 flex-wrap"
         >
-          <span>Early access · No credit card required</span>
+          <span className="flex items-center gap-1">📍 Milwaukee</span>
+          <span className="flex items-center gap-1">📍 Chicago</span>
+          <span className="flex items-center gap-1">📍 Detroit</span>
+          <span className="flex items-center gap-1">📍 Cleveland</span>
+          <span className="flex items-center gap-1 text-black font-medium">📍 Your city?</span>
+        </motion.div>
+
+        {/* Fine print */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="text-xs text-gray-200 mt-6"
+        >
+          No credit card required · Free during early access
         </motion.div>
       </div>
     </section>
