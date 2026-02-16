@@ -40,9 +40,6 @@ router.post('/stripe/connect', async (req, res) => {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
-      tos_acceptance: {
-        service_agreement: 'recipient',
-      },
     });
     
     console.log('✅ Stripe account created:', account.id);
