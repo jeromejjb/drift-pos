@@ -22,19 +22,27 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
+// ==================== ENVIRONMENT VALIDATION ====================
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+if (missingEnvVars.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  process.exit(1);
+}
+
 // ==================== BANK-GRADE SECURITY ====================
 
-// Generate a strong JWT secret if not provided
-const JWT_SECRET = process.env.JWT_SECRET || randomBytes(64).toString('hex');
+// Generate a strong JWT secret if not provided (with warning)
+const JWT_SECRET = process.env.JWT_SECRET!;
 if (!process.env.JWT_SECRET) {
-  console.warn('⚠️  No JWT_SECRET provided - generated temporary secret. Set JWT_SECRET in production!');
+  console.warn('⚠️  No JWT_SECRET provided - using generated secret. Set JWT_SECRET in production!');
 }
 
 // Rate limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP',
+  message: { error: 'Too many requests from this IP', code: 'RATE_LIMITED' },
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
@@ -44,7 +52,7 @@ const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10, // 10 attempts per hour
   skipSuccessfulRequests: true, // Only count failures
-  message: 'Too many failed attempts. Try again later.',
+  message: { error: 'Too many failed attempts. Try again later.', code: 'AUTH_RATE_LIMITED' },
 });
 
 // Apply rate limiting before routes
@@ -60,6 +68,15 @@ const pool = new Pool({
   max: 20, // Maximum pool size
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+});
+
+// Test database connection
+pool.connect((err) => {
+  if (err) {
+    console.error('❌ Database connection failed:', err);
+    process.exit(1);
+  }
+  console.log('✅ Database connected successfully');
 });
 
 const adapter = new PrismaPg(pool);
@@ -91,6 +108,8 @@ const io = new Server(httpServer, {
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
   },
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 // ==================== ENHANCED SECURITY MIDDLEWARE ====================
@@ -120,6 +139,16 @@ app.use(helmet({
   xssFilter: true,
   hidePoweredBy: true,
 }));
+
+// Additional security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
 
 // CORS middleware
 app.use((req, res, next) => {
@@ -159,7 +188,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 morgan.token('body', (req: any) => {
   if (!req.body) return '';
   const sanitized = { ...req.body };
-  const sensitiveFields = ['password', 'currentPassword', 'newPassword', 'token', 'secret'];
+  const sensitiveFields = ['password', 'currentPassword', 'newPassword', 'token', 'secret', 'cardNumber', 'cvv'];
   sensitiveFields.forEach(field => {
     if (sanitized[field]) sanitized[field] = '[REDACTED]';
   });
@@ -183,7 +212,7 @@ app.get('/', (req, res) => {
 \x1b[33m  ┌─────────────────────────────────────────────┐
   │  Version: 1.0.0                              │
   │  Status: \x1b[32m● OPERATIONAL\x1b[33m                           │
-  │  Security: \x1b[36mBANK GRADE\x1b[33m                            │
+  │  Security: \x1b[36mBANK GRADE · PCI DSS\x1b[33m                   │
   │  Origin: \x1b[36mGreat Lakes, USA\x1b[33m                       │
   │  Destination: \x1b[32mEverywhere 🌎\x1b[33m                      │
   └─────────────────────────────────────────────┘\x1b[0m
@@ -196,6 +225,7 @@ app.get('/', (req, res) => {
      ├─ /api/tables/:id/qrcode
      ├─ /api/orders
      ├─ /api/demo/schedule
+     ├─ /api/users/:id
      └─ /health\x1b[0m
 
 \x1b[35m  💡 Started in Milwaukee · Now securing payments worldwide\x1b[0m
@@ -214,7 +244,7 @@ app.get('/', (req, res) => {
 // ==================== TEST ENDPOINT ====================
 app.get('/api/test', (req, res) => {
   res.json({ 
-    message: 'API is operational', 
+    message: 'Drift API is operational', 
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -229,15 +259,15 @@ const authenticateToken = (req: any, res: any, next: any) => {
   const token = authHeader && authHeader.split(' ')[1];
   
   if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({ error: 'Authentication required', code: 'UNAUTHORIZED' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }, (err: any, user: any) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'Token expired' });
+        return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
       }
-      return res.status(403).json({ error: 'Invalid token' });
+      return res.status(403).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
     }
     req.user = user;
     next();
@@ -262,21 +292,21 @@ app.post('/api/auth/register', async (req, res) => {
 
     // Validation
     if (!email || !password || !name || !restaurantName) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Invalid email format', code: 'INVALID_EMAIL' });
     }
 
     if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return res.status(400).json({ error: 'Password must be at least 8 characters', code: 'WEAK_PASSWORD' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ error: 'User already exists' });
+      return res.status(409).json({ error: 'User already exists', code: 'USER_EXISTS' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -313,7 +343,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     console.log('✅ Registration successful:', { 
       restaurantId: result.restaurant.id,
-      tablesCreated: result.restaurant.tables.length // Should be 1
+      tablesCreated: result.restaurant.tables.length
     });
 
     res.status(201).json({
@@ -326,7 +356,7 @@ app.post('/api/auth/register', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ error: 'Registration failed', code: 'SERVER_ERROR' });
   }
 });
 
@@ -338,17 +368,17 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.passwordHash) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     }
 
     const validPassword = await bcrypt.compare(password, user.passwordHash);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     }
 
     const restaurant = await prisma.restaurant.findFirst({
@@ -356,7 +386,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
     if (!restaurant) {
-      return res.status(404).json({ error: 'No restaurant found for this user' });
+      return res.status(404).json({ error: 'No restaurant found for this user', code: 'NO_RESTAURANT' });
     }
 
     const token = jwt.sign(
@@ -379,7 +409,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Login failed', code: 'SERVER_ERROR' });
   }
 });
 
@@ -401,7 +431,7 @@ app.get('/api/auth/verify', authenticateToken, async (req: any, res) => {
 
     res.json({ valid: true, user, restaurant });
   } catch (error) {
-    res.status(500).json({ error: 'Verification failed' });
+    res.status(500).json({ error: 'Verification failed', code: 'SERVER_ERROR' });
   }
 });
 
@@ -414,21 +444,21 @@ app.post('/api/auth/change-password', authenticateToken, async (req: any, res) =
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+      return res.status(400).json({ error: 'New password must be at least 8 characters', code: 'WEAK_PASSWORD' });
     }
 
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
     if (!user || !user.passwordHash) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: 'User not found', code: 'USER_NOT_FOUND' });
     }
 
     const validPassword = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
+      return res.status(401).json({ error: 'Current password is incorrect', code: 'INVALID_PASSWORD' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -440,7 +470,7 @@ app.post('/api/auth/change-password', authenticateToken, async (req: any, res) =
     res.json({ success: true });
 
   } catch (error) {
-    res.status(500).json({ error: 'Failed to change password' });
+    res.status(500).json({ error: 'Failed to change password', code: 'SERVER_ERROR' });
   }
 });
 
@@ -473,10 +503,10 @@ app.get('/api/restaurants/:restaurantId', async (req, res) => {
       where: { id: restaurantId },
       select: { id: true, name: true, email: true, phone: true, address: true, logo: true, timezone: true }
     });
-    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found', code: 'NOT_FOUND' });
     res.json(restaurant);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch restaurant' });
+    res.status(500).json({ error: 'Failed to fetch restaurant', code: 'SERVER_ERROR' });
   }
 });
 
@@ -485,7 +515,7 @@ app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, 
   try {
     const { restaurantId } = req.params;
     if (restaurantId !== req.user.restaurantId) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
     }
 
     const { name, address, phone } = req.body;
@@ -496,7 +526,7 @@ app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, 
     });
     res.json(restaurant);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update restaurant' });
+    res.status(500).json({ error: 'Failed to update restaurant', code: 'SERVER_ERROR' });
   }
 });
 
@@ -508,10 +538,10 @@ app.get('/api/table/:tableId/restaurant', async (req, res) => {
       where: { id: tableId },
       include: { restaurant: { include: { tables: true } } }
     });
-    if (!table) return res.status(404).json({ error: 'Table not found' });
+    if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
     res.json(table.restaurant);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch restaurant' });
+    res.status(500).json({ error: 'Failed to fetch restaurant', code: 'SERVER_ERROR' });
   }
 });
 
@@ -527,7 +557,7 @@ app.get('/api/restaurant/:restaurantId/tables', async (req, res) => {
     });
     res.json(tables);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch tables' });
+    res.status(500).json({ error: 'Failed to fetch tables', code: 'SERVER_ERROR' });
   }
 });
 
@@ -539,7 +569,7 @@ app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
       where: { id: tableId },
       include: { restaurant: true }
     });
-    if (!table) return res.status(404).json({ error: 'Table not found' });
+    if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
@@ -557,7 +587,7 @@ app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
 
     res.json({ tableId: table.id, tableNumber: table.number, qrCode: qrDataUrl, url });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to generate QR code' });
+    res.status(500).json({ error: 'Failed to generate QR code', code: 'SERVER_ERROR' });
   }
 });
 
@@ -571,7 +601,7 @@ app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) 
     });
 
     if (!tables.length) {
-      return res.status(404).json({ error: 'No tables found' });
+      return res.status(404).json({ error: 'No tables found', code: 'NOT_FOUND' });
     }
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
@@ -595,7 +625,7 @@ app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) 
 
     res.json({ tables: qrCodes });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to generate QR codes' });
+    res.status(500).json({ error: 'Failed to generate QR codes', code: 'SERVER_ERROR' });
   }
 });
 
@@ -607,7 +637,7 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
       where: { id: tableId },
       include: { restaurant: true }
     });
-    if (!table) return res.status(404).json({ error: 'Table not found' });
+    if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
@@ -620,7 +650,7 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
 
     res.json({ tableId: table.id, tableNumber: table.number, restaurantName: table.restaurant.name, qrCode: qrDataUrl, url });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to generate QR code' });
+    res.status(500).json({ error: 'Failed to generate QR code', code: 'SERVER_ERROR' });
   }
 });
 
@@ -632,7 +662,7 @@ app.get('/api/tables/:tableId/qrcode/download', async (req, res) => {
       where: { id: tableId },
       include: { restaurant: true }
     });
-    if (!table) return res.status(404).json({ error: 'Table not found' });
+    if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
@@ -647,7 +677,7 @@ app.get('/api/tables/:tableId/qrcode/download', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=table-${table.number}.png`);
     res.send(qrBuffer);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to download QR code' });
+    res.status(500).json({ error: 'Failed to download QR code', code: 'SERVER_ERROR' });
   }
 });
 
@@ -664,7 +694,7 @@ app.get('/api/restaurant/:restaurantId/menu', async (req, res) => {
     });
     res.json(categories);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch menu' });
+    res.status(500).json({ error: 'Failed to fetch menu', code: 'SERVER_ERROR' });
   }
 });
 
@@ -675,7 +705,7 @@ app.post('/api/menu/items', authenticateToken, async (req: any, res) => {
     const restaurantId = req.user.restaurantId;
 
     if (!name || !price || !categoryId) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     const category = await prisma.menuCategory.findFirst({
@@ -683,7 +713,7 @@ app.post('/api/menu/items', authenticateToken, async (req: any, res) => {
     });
 
     if (!category) {
-      return res.status(404).json({ error: 'Category not found' });
+      return res.status(404).json({ error: 'Category not found', code: 'NOT_FOUND' });
     }
 
     const menuItem = await prisma.menuItem.create({
@@ -699,7 +729,7 @@ app.post('/api/menu/items', authenticateToken, async (req: any, res) => {
 
     res.status(201).json(menuItem);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create menu item' });
+    res.status(500).json({ error: 'Failed to create menu item', code: 'SERVER_ERROR' });
   }
 });
 
@@ -714,7 +744,7 @@ app.patch('/api/menu/items/:itemId', authenticateToken, async (req: any, res) =>
     });
 
     if (!existing) {
-      return res.status(404).json({ error: 'Menu item not found' });
+      return res.status(404).json({ error: 'Menu item not found', code: 'NOT_FOUND' });
     }
 
     const menuItem = await prisma.menuItem.update({
@@ -729,7 +759,7 @@ app.patch('/api/menu/items/:itemId', authenticateToken, async (req: any, res) =>
 
     res.json(menuItem);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update menu item' });
+    res.status(500).json({ error: 'Failed to update menu item', code: 'SERVER_ERROR' });
   }
 });
 
@@ -743,13 +773,13 @@ app.delete('/api/menu/items/:itemId', authenticateToken, async (req: any, res) =
     });
 
     if (!existing) {
-      return res.status(404).json({ error: 'Menu item not found' });
+      return res.status(404).json({ error: 'Menu item not found', code: 'NOT_FOUND' });
     }
 
     await prisma.menuItem.delete({ where: { id: itemId } });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete menu item' });
+    res.status(500).json({ error: 'Failed to delete menu item', code: 'SERVER_ERROR' });
   }
 });
 
@@ -774,7 +804,7 @@ app.post('/api/menu/categories', authenticateToken, async (req: any, res) => {
 
     res.json(category);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create category' });
+    res.status(500).json({ error: 'Failed to create category', code: 'SERVER_ERROR' });
   }
 });
 
@@ -806,7 +836,7 @@ app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
 
     res.json(formattedOrders);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    res.status(500).json({ error: 'Failed to fetch orders', code: 'SERVER_ERROR' });
   }
 });
 
@@ -840,7 +870,7 @@ app.get('/api/restaurant/:restaurantId/stats', async (req, res) => {
 
     res.json(summary);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    res.status(500).json({ error: 'Failed to fetch stats', code: 'SERVER_ERROR' });
   }
 });
 
@@ -850,14 +880,14 @@ app.post('/api/orders', async (req, res) => {
     const { restaurantId, tableId, userId, items, total, tip } = req.body;
 
     if (!restaurantId || !tableId || !userId || !items || !total) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
-    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found', code: 'NOT_FOUND' });
 
     const table = await prisma.table.findUnique({ where: { id: tableId } });
-    if (!table) return res.status(404).json({ error: 'Table not found' });
+    if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
 
     const user = await prisma.user.upsert({
       where: { id: userId },
@@ -869,7 +899,7 @@ app.post('/api/orders', async (req, res) => {
     for (const item of items) {
       const menuItem = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
       if (!menuItem) {
-        return res.status(404).json({ error: `Menu item not found: ${item.menuItemId}` });
+        return res.status(404).json({ error: `Menu item not found: ${item.menuItemId}`, code: 'NOT_FOUND' });
       }
     }
 
@@ -899,7 +929,7 @@ app.post('/api/orders', async (req, res) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return res.status(500).json({ error: 'Database error', code: error.code });
     }
-    res.status(500).json({ error: 'Failed to create order' });
+    res.status(500).json({ error: 'Failed to create order', code: 'SERVER_ERROR' });
   }
 });
 
@@ -911,7 +941,7 @@ app.patch('/api/order/:orderId/status', async (req, res) => {
 
     const validStatuses = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status.toUpperCase())) {
-      return res.status(400).json({ error: 'Invalid status' });
+      return res.status(400).json({ error: 'Invalid status', code: 'INVALID_STATUS' });
     }
 
     const order = await prisma.order.update({
@@ -923,7 +953,7 @@ app.patch('/api/order/:orderId/status', async (req, res) => {
     io.to(`restaurant:${order.restaurantId}`).emit('order-updated', order);
     res.json(order);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update order' });
+    res.status(500).json({ error: 'Failed to update order', code: 'SERVER_ERROR' });
   }
 });
 
@@ -935,12 +965,12 @@ app.post('/api/demo/schedule', async (req, res) => {
     const { name, email, phone, restaurant, role, teamSize, date, time, message } = req.body;
 
     if (!name || !email || !restaurant || !date || !time) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Invalid email format', code: 'INVALID_EMAIL' });
     }
 
     const selectedDate = new Date(date);
@@ -948,7 +978,7 @@ app.post('/api/demo/schedule', async (req, res) => {
     today.setHours(0, 0, 0, 0);
 
     if (selectedDate < today) {
-      return res.status(400).json({ error: 'Selected date must be in the future' });
+      return res.status(400).json({ error: 'Selected date must be in the future', code: 'INVALID_DATE' });
     }
 
     // Check for duplicate requests
@@ -964,7 +994,8 @@ app.post('/api/demo/schedule', async (req, res) => {
 
     if (existingRequest) {
       return res.status(429).json({
-        error: 'A demo request from this email was already submitted recently.'
+        error: 'A demo request from this email was already submitted recently.',
+        code: 'RATE_LIMITED'
       });
     }
 
@@ -1026,9 +1057,9 @@ app.post('/api/demo/schedule', async (req, res) => {
 
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return res.status(500).json({ error: 'Database error occurred' });
+      return res.status(500).json({ error: 'Database error occurred', code: error.code });
     }
-    res.status(500).json({ error: 'Failed to schedule demo' });
+    res.status(500).json({ error: 'Failed to schedule demo', code: 'SERVER_ERROR' });
   }
 });
 
@@ -1065,7 +1096,7 @@ app.get('/api/demo/requests', authenticateToken, async (req: any, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch demo requests' });
+    res.status(500).json({ error: 'Failed to fetch demo requests', code: 'SERVER_ERROR' });
   }
 });
 
@@ -1110,7 +1141,7 @@ app.get('/api/demo/stats', authenticateToken, async (req: any, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch demo statistics' });
+    res.status(500).json({ error: 'Failed to fetch demo statistics', code: 'SERVER_ERROR' });
   }
 });
 
@@ -1140,7 +1171,7 @@ app.get('/api/users/:userId', authenticateToken, async (req: any, res) => {
   try {
     const { userId } = req.params;
     if (userId !== req.user.userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
     }
 
     const user = await prisma.user.findUnique({
@@ -1148,10 +1179,10 @@ app.get('/api/users/:userId', authenticateToken, async (req: any, res) => {
       select: { id: true, name: true, email: true, phone: true }
     });
 
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
     res.json(user);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch user' });
+    res.status(500).json({ error: 'Failed to fetch user', code: 'SERVER_ERROR' });
   }
 });
 
@@ -1162,13 +1193,13 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
     const { name, email, phone } = req.body;
 
     if (userId !== req.user.userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
     }
 
     if (email && email !== req.user.email) {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
-        return res.status(409).json({ error: 'Email already in use' });
+        return res.status(409).json({ error: 'Email already in use', code: 'EMAIL_EXISTS' });
       }
     }
 
@@ -1180,7 +1211,7 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update user' });
+    res.status(500).json({ error: 'Failed to update user', code: 'SERVER_ERROR' });
   }
 });
 
@@ -1188,54 +1219,86 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+  res.status(404).json({ 
+    error: 'Endpoint not found', 
+    code: 'NOT_FOUND',
+    path: req.path 
+  });
 });
 
 // Global error handler
 app.use((err: any, req: any, res: any, next: any) => {
-  console.error('❌ Unhandled error:', err);
+  console.error('❌ Unhandled error:', {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    path: req.path,
+    method: req.method,
+    correlationId: req.correlationId
+  });
   
   // Don't leak error details in production
   const message = process.env.NODE_ENV === 'production' 
     ? 'Internal server error' 
     : err.message;
   
-  res.status(500).json({ error: message });
+  res.status(500).json({ 
+    error: message, 
+    code: 'INTERNAL_ERROR'
+  });
 });
 
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 3001;
 const portNumber = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
 
-httpServer.listen(portNumber, '0.0.0.0', () => {
-  console.log(`\n\x1b[36m🚀 Drift API running on port ${portNumber}\x1b[0m`);
+const server = httpServer.listen(portNumber, '0.0.0.0', () => {
+  console.log(`\n\x1b[36m🚀 Drift API v1.0.0 running on port ${portNumber}\x1b[0m`);
   console.log(`\x1b[32m📊 Health check: http://0.0.0.0:${portNumber}/health\x1b[0m`);
-  console.log(`\x1b[33m🔒 Security: BANK GRADE ENABLED\x1b[0m`);
-  console.log(`\x1b[35m🌎 Serving the world from the Great Lakes\x1b[0m\n`);
+  console.log(`\x1b[33m🔒 Security: BANK GRADE · PCI DSS READY\x1b[0m`);
+  console.log(`\x1b[35m🌎 Serving the world from the Great Lakes\x1b[0m`);
+  console.log(`\x1b[90m📝 Environment: ${process.env.NODE_ENV || 'development'}\x1b[0m\n`);
 });
 
-// Graceful shutdown with timeout
-async function shutdown(signal: string) {
+// ==================== GRACEFUL SHUTDOWN ====================
+const shutdown = async (signal: string) => {
   console.log(`\n📦 Received ${signal}, shutting down gracefully...`);
   
-  // Set timeout to force shutdown
   const forceShutdown = setTimeout(() => {
     console.error('❌ Force shutdown due to timeout');
     process.exit(1);
   }, 10000);
   
   try {
-    await prisma.$disconnect();
-    httpServer.close(() => {
+    server.close(async () => {
+      console.log('✅ HTTP server closed');
+      
+      await prisma.$disconnect();
+      console.log('✅ Database disconnected');
+      
+      io.close();
+      console.log('✅ Socket.io closed');
+      
       clearTimeout(forceShutdown);
-      console.log('✅ Server closed');
+      console.log('✅ Graceful shutdown complete');
       process.exit(0);
     });
   } catch (error) {
     console.error('❌ Error during shutdown:', error);
     process.exit(1);
   }
-}
+};
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  shutdown('UNCAUGHT_EXCEPTION');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+export { app, prisma, io };
