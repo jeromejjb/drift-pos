@@ -9,6 +9,9 @@ import {
   CreditCard, 
   CheckCircle,
   ArrowLeft,
+  ChefHat,
+  Sparkles,
+  ScrollText
 } from 'lucide-react';
 import { RestaurantInfoStep } from './onboarding/RestaurantInfoStep';
 import { TablesStep } from './onboarding/TablesStep';
@@ -19,13 +22,55 @@ import { StripeStep } from './onboarding/StripeStep';
 import { CompleteStep } from './onboarding/CompleteStep';
 
 const steps = [
-  { id: 'info', title: 'Restaurant Info', icon: Store, component: RestaurantInfoStep },
-  { id: 'tables', title: 'Table Setup', icon: Table2, component: TablesStep },
-  { id: 'menu', title: 'Import Menu', icon: Utensils, component: MenuImportStep },
-  { id: 'review', title: 'Review Menu', icon: Utensils, component: MenuReviewStep },
-  { id: 'qr', title: 'QR Codes', icon: QrCode, component: QRStep },
-  { id: 'stripe', title: 'Payments', icon: CreditCard, component: StripeStep },
-  { id: 'complete', title: 'Done!', icon: CheckCircle, component: CompleteStep },
+  { 
+    id: 'info', 
+    title: 'Restaurant Info', 
+    icon: Store, 
+    component: RestaurantInfoStep,
+    description: 'Tell us about your business'
+  },
+  { 
+    id: 'tables', 
+    title: 'Table Setup', 
+    icon: Table2, 
+    component: TablesStep,
+    description: 'Add your tables'
+  },
+  { 
+    id: 'menu', 
+    title: 'Import Menu', 
+    icon: Utensils, 
+    component: MenuImportStep,
+    description: 'Add your items'
+  },
+  { 
+    id: 'review', 
+    title: 'Review Menu', 
+    icon: ScrollText, 
+    component: MenuReviewStep,
+    description: 'Check everything'
+  },
+  { 
+    id: 'qr', 
+    title: 'QR Codes', 
+    icon: QrCode, 
+    component: QRStep,
+    description: 'Generate table codes'
+  },
+  { 
+    id: 'stripe', 
+    title: 'Payments', 
+    icon: CreditCard, 
+    component: StripeStep,
+    description: 'Connect Stripe'
+  },
+  { 
+    id: 'complete', 
+    title: 'Done!', 
+    icon: CheckCircle, 
+    component: CompleteStep,
+    description: 'You\'re all set'
+  },
 ];
 
 interface OnboardingData {
@@ -45,32 +90,21 @@ export function OnboardingPage() {
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
   useEffect(() => {
-    // Get all params from URL
     const id = searchParams.get('restaurantId');
     const businessName = searchParams.get('businessName');
     const email = searchParams.get('email');
     const token = searchParams.get('token');
     
-    console.log('📦 ===== ONSOARDING PAGE LOADED =====');
-    console.log('Full URL:', window.location.href);
-    console.log('Restaurant ID from URL:', id);
-    console.log('Business Name from URL:', businessName);
-    console.log('Email from URL:', email);
-    console.log('Token in URL:', token ? '✅ YES' : '❌ NO');
+    console.log('📦 Onboarding page loaded with:', { 
+      restaurantId: id, 
+      businessName, 
+      email,
+      token: token ? '✅ Present' : '❌ Missing'
+    });
     
-    // CRITICAL: Save token to localStorage if present in URL
     if (token) {
-      console.log('🔑 Saving token to localStorage from URL');
+      console.log('🔑 Saving token to localStorage');
       localStorage.setItem('drift-token', decodeURIComponent(token));
-      
-      // Verify it was saved
-      const savedToken = localStorage.getItem('drift-token');
-      console.log('✅ Token saved to localStorage:', savedToken ? 'Success' : 'Failed');
-      console.log('🔑 Token preview:', savedToken?.substring(0, 30) + '...');
-    } else {
-      console.log('❌ No token in URL - checking localStorage');
-      const existingToken = localStorage.getItem('drift-token');
-      console.log('🔑 Token in localStorage:', existingToken ? '✅ Present' : '❌ Missing');
     }
     
     if (!id) {
@@ -80,9 +114,7 @@ export function OnboardingPage() {
     
     setRestaurantId(id);
 
-    // Pre-fill restaurant info with data from signup
     if (businessName || email) {
-      console.log('📝 Pre-filling restaurant info from URL');
       setOnboardingData(prev => ({
         ...prev,
         restaurantInfo: {
@@ -93,7 +125,6 @@ export function OnboardingPage() {
       }));
     }
 
-    // Load saved progress from localStorage
     const saved = localStorage.getItem(`onboarding-${id}`);
     if (saved) {
       try {
@@ -108,8 +139,6 @@ export function OnboardingPage() {
         console.error('Error loading saved progress:', e);
       }
     }
-    
-    console.log('=====================================\n');
   }, [searchParams]);
 
   useEffect(() => {
@@ -118,7 +147,6 @@ export function OnboardingPage() {
         step: currentStep,
         data: onboardingData
       }));
-      console.log('💾 Saved progress:', { step: currentStep, data: onboardingData });
     }
   }, [currentStep, onboardingData, restaurantId]);
 
@@ -143,7 +171,6 @@ export function OnboardingPage() {
   const CurrentStepComponent = steps[currentStep].component;
   const progress = ((currentStep + 1) / steps.length) * 100;
 
-  // If no restaurantId yet, show error
   if (!restaurantId) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -151,7 +178,7 @@ export function OnboardingPage() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">⚠️</span>
           </div>
-          <h2 className="text-2xl font-light mb-2">Missing Restaurant ID</h2>
+          <h2 className="text-2xl font-light mb-2">Something went wrong</h2>
           <p className="text-gray-400 mb-4">No restaurant ID provided. Please go back to signup.</p>
           <button
             onClick={() => window.location.href = 'https://drift-landing.onrender.com/signup'}
@@ -178,7 +205,7 @@ export function OnboardingPage() {
 
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             {currentStep > 0 && (
               <button
@@ -195,7 +222,7 @@ export function OnboardingPage() {
             </div>
           </div>
           
-          {/* Step Indicator */}
+          {/* Step counter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400">
               Step {currentStep + 1} of {steps.length}
@@ -204,36 +231,77 @@ export function OnboardingPage() {
         </div>
       </header>
 
-      {/* Step Navigation Tabs */}
+      {/* Beautiful Step Navigation */}
       <div className="border-b border-gray-100 bg-white">
-        <div className="max-w-4xl mx-auto px-6 overflow-x-auto">
-          <div className="flex gap-8 min-w-max">
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="grid grid-cols-7 gap-2">
             {steps.map((step, index) => {
               const StepIcon = step.icon;
               const isActive = index === currentStep;
               const isComplete = index < currentStep;
+              const isFuture = index > currentStep;
               
               return (
-                <div
+                <motion.div
                   key={step.id}
-                  className={`py-4 flex items-center gap-2 border-b-2 transition-colors ${
-                    isActive 
-                      ? 'border-black text-black' 
-                      : isComplete
-                      ? 'border-green-500 text-green-600'
-                      : 'border-transparent text-gray-300'
-                  }`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="relative"
                 >
-                  <StepIcon className="w-4 h-4" />
-                  <span className="text-sm font-medium whitespace-nowrap">
-                    {step.title}
-                  </span>
-                  {isComplete && (
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                  )}
-                </div>
+                  <div className="flex flex-col items-center text-center">
+                    {/* Icon circle */}
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-all ${
+                        isActive
+                          ? 'bg-black text-white shadow-lg scale-110'
+                          : isComplete
+                          ? 'bg-green-100 text-green-600'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}
+                    >
+                      {isComplete ? (
+                        <CheckCircle className="w-5 h-5" />
+                      ) : (
+                        <StepIcon className="w-5 h-5" />
+                      )}
+                    </div>
+                    
+                    {/* Title */}
+                    <span
+                      className={`text-xs font-medium mb-0.5 ${
+                        isActive
+                          ? 'text-black'
+                          : isComplete
+                          ? 'text-green-600'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {step.title}
+                    </span>
+                    
+                    {/* Description - hidden on small screens, visible on hover */}
+                    <span className="text-[10px] text-gray-300 hidden md:block">
+                      {step.description}
+                    </span>
+
+                    {/* Active indicator line */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeStep"
+                        className="absolute -bottom-3 left-0 right-0 h-0.5 bg-black"
+                        transition={{ duration: 0.2 }}
+                      />
+                    )}
+                  </div>
+                </motion.div>
               );
             })}
+          </div>
+
+          {/* Current step description - visible on mobile */}
+          <div className="mt-4 text-center md:hidden">
+            <p className="text-sm text-gray-500">{steps[currentStep].description}</p>
           </div>
         </div>
       </div>
@@ -259,7 +327,7 @@ export function OnboardingPage() {
         </AnimatePresence>
       </main>
 
-      {/* Footer with Save Status */}
+      {/* Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 py-3 px-6">
         <div className="max-w-4xl mx-auto flex justify-between items-center text-sm text-gray-400">
           <span>✨ Your progress is automatically saved</span>
