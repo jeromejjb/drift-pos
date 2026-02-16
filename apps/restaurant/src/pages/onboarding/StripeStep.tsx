@@ -45,7 +45,7 @@ const stagger = {
   }
 };
 
-// Tier configurations
+// Tier configurations - UPDATED PRICING
 const TIERS = {
   free: {
     name: 'Starter',
@@ -72,7 +72,7 @@ const TIERS = {
   },
   pro: {
     name: 'Pro',
-    price: '$49',
+    price: '$97', // Updated from $49 to $97
     period: '/month',
     fee: '2.5%',
     feeValue: 0.025,
@@ -131,6 +131,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     if (userProfile) {
       try {
         const profile = JSON.parse(userProfile);
+        console.log('👤 Loaded user profile:', profile);
         mergedData = { ...mergedData, ...profile };
       } catch (e) {
         console.error('Error parsing user profile:', e);
@@ -142,6 +143,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     if (onboarding) {
       try {
         const parsed = JSON.parse(onboarding);
+        console.log('📂 Loaded onboarding:', parsed);
         mergedData = { ...mergedData, ...parsed };
       } catch (e) {
         console.error('Error parsing onboarding:', e);
@@ -152,6 +154,8 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     if (data) {
       mergedData = { ...mergedData, ...data };
     }
+    
+    console.log('✅ Final merged data:', mergedData);
     
     setSavedData({
       restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || 'Your Restaurant',
@@ -178,19 +182,19 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
 
   const recommendedTier = getRecommendedTier();
 
-  // Calculate annual savings
+  // Calculate annual savings - UPDATED to $97
   const calculateSavings = () => {
     if (annualBilling) {
-      return (49 * 12 * 0.2).toFixed(0);
+      return (97 * 12 * 0.2).toFixed(0); // 20% off $97/year
     }
     return 0;
   };
 
-  // Calculate estimated monthly fees
+  // Calculate estimated monthly fees - UPDATED with $97 pro price
   const calculateEstimatedFees = (avgOrderValue = 45, ordersPerMonth = 100) => {
     const monthlyVolume = avgOrderValue * ordersPerMonth;
     const freeFees = monthlyVolume * 0.035;
-    const proFees = (monthlyVolume * 0.025) + 49;
+    const proFees = (monthlyVolume * 0.025) + 97; // Updated from 49 to 97
     const savings = freeFees - proFees;
     
     return {
@@ -367,7 +371,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     </motion.div>
   );
 
-  // Tier Card
+  // Tier Card - UPDATED to show correct pricing
   const TierCard = ({ tierId, tier }) => {
     const TierIcon = tier.icon;
     const isSelected = selectedTier === tierId;
@@ -440,7 +444,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     );
   };
 
-  // Upgrade Modal
+  // Upgrade Modal - UPDATED with correct pricing
   const UpgradeModal = () => (
     <AnimatePresence>
       {showUpgradeModal && (
@@ -481,7 +485,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
                 <span className="font-medium">${estimated.free}/mo</span>
               </div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-600">Pro (2.5% + $49)</span>
+                <span className="text-sm text-gray-600">Pro (2.5% + $97)</span> {/* Updated from $49 to $97 */}
                 <span className="font-medium text-purple-700">${estimated.pro}/mo</span>
               </div>
               {Number(estimated.savings) > 0 && (
@@ -528,7 +532,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
           <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <Shield className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-3xl font-light mb-2">Secure Payment Setup</h2>
+          <h2 className="text-3xl font-light mb-2">Connect Your Bank Account</h2>
           <p className="text-gray-500">
             Just a few details to verify your identity and connect your bank account.
           </p>
@@ -702,7 +706,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
           <TierCard tierId="pro" tier={TIERS.pro} />
         </motion.div>
 
-        {/* Fee Comparison */}
+        {/* Fee Comparison - UPDATED text */}
         <motion.div variants={fadeInUp} className="mb-8">
           <Card className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-0">
             <div className="flex items-center gap-3">
@@ -710,7 +714,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
               <div>
                 <p className="text-sm">
                   <span className="font-medium">Smart pricing:</span> The more you grow, the less you pay. 
-                  {selectedTier === 'free' && ' Upgrade to Pro to save 1% on every transaction!'}
+                  {selectedTier === 'free' && ' Upgrade to Pro ($97/mo) to save 1% on every transaction!'}
                   {selectedTier === 'pro' && ' You\'re saving 1% compared to Starter!'}
                 </p>
               </div>

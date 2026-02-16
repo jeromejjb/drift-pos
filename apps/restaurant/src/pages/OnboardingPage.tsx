@@ -21,7 +21,7 @@ import { TablesStep } from './onboarding/TablesStep';
 import { MenuImportStep } from './onboarding/MenuImportStep';
 import { MenuReviewStep } from './onboarding/MenuReviewStep';
 import { QRStep } from './onboarding/QRStep';
-import { StripeStep } from './onboarding/StripeStep';
+import { StripeStep } from './onboarding/StripeStep'; // We'll keep the filename but change the display name
 import { CompleteStep } from './onboarding/CompleteStep';
 
 const steps = [
@@ -61,11 +61,11 @@ const steps = [
     description: 'Generate table codes'
   },
   { 
-    id: 'stripe', 
-    title: 'Payments', 
+    id: 'bank',  // Changed from 'stripe' to 'bank'
+    title: 'Bank Account',  // Changed from 'Payments' to 'Bank Account'
     icon: CreditCard, 
-    component: StripeStep,
-    description: 'Connect Stripe'
+    component: StripeStep,  // Keep the same component
+    description: 'Connect your bank'  // Changed description
   },
   { 
     id: 'complete', 
