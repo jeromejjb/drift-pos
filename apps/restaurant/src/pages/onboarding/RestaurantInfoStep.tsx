@@ -1,6 +1,20 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Mail, Phone, MapPin, ChevronRight, ChevronLeft, User, Briefcase, Users, CheckCircle, AlertCircle } from 'lucide-react';
+import { 
+  Building2, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  ChevronRight, 
+  ChevronLeft, 
+  User, 
+  Briefcase, 
+  Users, 
+  CheckCircle, 
+  AlertCircle,
+  Heart,
+  Sparkles
+} from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
@@ -27,13 +41,9 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
 
   // Phone number formatting function
   const formatPhoneNumber = (value: string) => {
-    // Remove all non-numeric characters
     const numbers = value.replace(/\D/g, '');
-    
-    // Limit to 10 digits for US/Canada numbers
     const limited = numbers.slice(0, 10);
     
-    // Format based on length
     if (limited.length <= 3) {
       return limited;
     } else if (limited.length <= 6) {
@@ -46,7 +56,7 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
   // Phone validation
   const validatePhone = (phone: string) => {
     const numbers = phone.replace(/\D/g, '');
-    if (numbers.length === 0) return true; // Optional field
+    if (numbers.length === 0) return true;
     if (numbers.length !== 10) {
       setPhoneError('Phone number must have 10 digits');
       return false;
@@ -75,12 +85,11 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     
     let mergedData: any = {};
     
-    // 1. Load from drift-user-profile first (from signup - MOST IMPORTANT)
+    // 1. Load from drift-user-profile first (from signup)
     const userProfile = localStorage.getItem('drift-user-profile');
     if (userProfile) {
       try {
         const profile = JSON.parse(userProfile);
-        console.log('👤 Loaded user profile:', profile);
         mergedData = { ...mergedData, ...profile };
       } catch (e) {
         console.error('Error parsing user profile:', e);
@@ -92,31 +101,29 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     if (onboarding) {
       try {
         const parsed = JSON.parse(onboarding);
-        console.log('📂 Loaded onboarding:', parsed);
         mergedData = { ...mergedData, ...parsed };
       } catch (e) {
         console.error('Error parsing onboarding:', e);
       }
     }
     
-    // 3. Props override everything (most recent)
+    // 3. Props override everything
     if (data) {
       mergedData = { ...mergedData, ...data };
     }
     
-    console.log('✅ Final merged data:', mergedData);
-    
-    // Format phone number if it exists (remove any existing formatting and reapply)
+    // Format phone number if it exists
     let phoneNumber = mergedData.phone || '';
     if (phoneNumber) {
-      // Remove any existing formatting and reapply our standard format
-      const numbers = phoneNumber.replace(/\D/g, '');
-      if (numbers.length > 0) {
-        phoneNumber = formatPhoneNumber(numbers);
+      // Check if it needs formatting
+      if (!phoneNumber.includes('(') && !phoneNumber.includes('-')) {
+        const numbers = phoneNumber.replace(/\D/g, '');
+        if (numbers.length > 0) {
+          phoneNumber = formatPhoneNumber(numbers);
+        }
       }
     }
     
-    // Set ALL form fields with merged data
     setFormData({
       restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || '',
       email: mergedData.email || '',
@@ -131,35 +138,28 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate phone before submit
     if (formData.phone && !validatePhone(formData.phone)) {
       return;
     }
     
-    // Save to parent and localStorage
     const dataToSave = {
       name: formData.restaurantName,
       email: formData.email,
-      phone: formData.phone, // Store formatted version
+      phone: formData.phone,
       address: formData.address,
       fullName: formData.fullName,
       role: formData.role,
       teamSize: formData.teamSize
     };
     
-    console.log('💾 Saving restaurant info:', dataToSave);
-    
-    // Update parent
     updateData(dataToSave);
     
-    // Update onboarding progress
     const onboarding = JSON.parse(localStorage.getItem('drift_onboarding') || '{}');
     localStorage.setItem('drift_onboarding', JSON.stringify({
       ...onboarding,
       ...dataToSave
     }));
     
-    // Update user profile
     const profile = JSON.parse(localStorage.getItem('drift-user-profile') || '{}');
     localStorage.setItem('drift-user-profile', JSON.stringify({
       ...profile,
@@ -176,16 +176,20 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
       className="max-w-2xl mx-auto"
     >
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <Building2 className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-3xl font-light mb-2">Restaurant Information</h2>
         <p className="text-gray-400">Tell us about your restaurant</p>
       </div>
 
-      {/* User info summary from signup - Shows what was passed */}
+      {/* User info summary from signup - Beautiful card */}
       {(formData.fullName || formData.role || formData.teamSize) && (
-        <Card className="mb-6 p-4 bg-blue-50 border-blue-100">
+        <Card className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-medium text-blue-600 uppercase tracking-wider">From your signup</span>
+          </div>
           <div className="flex flex-wrap items-center gap-4 text-sm">
             {formData.fullName && (
               <span className="flex items-center gap-1 text-blue-800">
@@ -209,8 +213,9 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
         </Card>
       )}
 
-      <Card padding="xl">
+      <Card padding="xl" className="border-2 border-gray-100 hover:border-gray-200 transition-all">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Restaurant Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Restaurant Name <span className="text-red-500">*</span>
@@ -220,14 +225,17 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               required
               value={formData.restaurantName}
               onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black transition-all"
               placeholder="e.g., Joe's Pizza"
             />
-            {formData.restaurantName && (
-              <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
+            {formData.restaurantName && formData.restaurantName !== data?.name && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Ready to save
+              </p>
             )}
           </div>
 
+          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email Address <span className="text-red-500">*</span>
@@ -237,14 +245,12 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black transition-all"
               placeholder="contact@joespizza.com"
             />
-            {formData.email && (
-              <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
-            )}
           </div>
 
+          {/* Phone with validation */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Phone Number <span className="text-gray-400">(optional)</span>
@@ -258,10 +264,12 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
                 value={formData.phone}
                 onChange={handlePhoneChange}
                 onBlur={handlePhoneBlur}
-                maxLength={14} // (123) 456-7890 is 14 characters
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black ${
+                maxLength={14}
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black transition-all ${
                   phoneError 
                     ? 'border-red-300 bg-red-50' 
+                    : formData.phone && !phoneError
+                    ? 'border-green-300 bg-green-50'
                     : 'border-gray-200'
                 }`}
                 placeholder="(555) 123-4567"
@@ -276,21 +284,19 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
                 {phoneError}
               </p>
             )}
-            {formData.phone && !phoneError && (
-              <p className="text-xs text-green-600 mt-1">✓ Format looks good</p>
-            )}
             <p className="text-xs text-gray-400 mt-1">
               Enter 10-digit US/Canada number
             </p>
           </div>
 
+          {/* Address */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
             <input
               type="text"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black transition-all"
               placeholder="123 Main St, New York, NY 10001"
             />
           </div>
@@ -300,29 +306,29 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
           <input type="hidden" name="role" value={formData.role} />
           <input type="hidden" name="teamSize" value={formData.teamSize} />
 
+          {/* Navigation */}
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onPrev} className="flex-1">
-              <ChevronLeft className="w-4 h-4 mr-2" />
+            <Button type="button" variant="secondary" onClick={onPrev} className="flex-1 group">
+              <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               Back
             </Button>
             <Button 
               type="submit" 
-              className="flex-1"
+              className="flex-1 group"
               disabled={!!phoneError}
             >
               Continue
-              <ChevronRight className="w-4 h-4 ml-2" />
+              <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>
         </form>
       </Card>
 
-      {/* Debug info - remove in production */}
-      {import.meta.env.DEV && (
-        <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
-          <p className="font-mono">Debug: {JSON.stringify(formData, null, 2)}</p>
-        </div>
-      )}
+      {/* Great Lakes pride */}
+      <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-300">
+        <Heart className="w-3 h-3" />
+        <span>Built on the Great Lakes</span>
+      </div>
     </motion.div>
   );
 }

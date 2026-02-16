@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { loadConnectAndInitialize } from '@stripe/connect-js';
+import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
 import { 
   Building2, 
   CreditCard, 
   Landmark, 
   Shield, 
-  Zap, 
   CheckCircle2,
   ArrowRight,
   ChevronRight,
@@ -20,12 +21,14 @@ import {
   BarChart3,
   Users,
   X,
-  Loader2
+  AlertCircle,
+  Mail,
+  Loader2,
+  Heart,
+  Fingerprint
 } from 'lucide-react';
 import { Button } from './../../components/ui/Button';
 import { Card } from './../../components/ui/Card';
-import { loadConnectAndInitialize } from '@stripe/connect-js';
-import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
 
 // Animation variants
 const fadeInUp = {
@@ -104,8 +107,8 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
   const [clientSecret, setClientSecret] = useState(null);
   const [connectInstance, setConnectInstance] = useState(null);
   const [accountId, setAccountId] = useState(null);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'failed' | null>(null);
+  const [error, setError] = useState('');
+  const [errorType, setErrorType] = useState<'duplicate' | 'generic' | null>(null);
   
   // Load ALL saved data from props and localStorage
   const [savedData, setSavedData] = useState({
@@ -123,27 +126,35 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     
     let mergedData: any = {};
     
-    // 1. Load from localStorage first
-    const stored = localStorage.getItem('drift_onboarding');
-    if (stored) {
+    // 1. Load from drift-user-profile first (from signup - MOST IMPORTANT)
+    const userProfile = localStorage.getItem('drift-user-profile');
+    if (userProfile) {
       try {
-        const parsed = JSON.parse(stored);
-        console.log('💾 Loaded from localStorage:', parsed);
-        mergedData = { ...mergedData, ...parsed };
+        const profile = JSON.parse(userProfile);
+        mergedData = { ...mergedData, ...profile };
       } catch (e) {
-        console.error('Error parsing localStorage:', e);
+        console.error('Error parsing user profile:', e);
       }
     }
     
-    // 2. Props override localStorage
+    // 2. Load from onboarding progress
+    const onboarding = localStorage.getItem('drift_onboarding');
+    if (onboarding) {
+      try {
+        const parsed = JSON.parse(onboarding);
+        mergedData = { ...mergedData, ...parsed };
+      } catch (e) {
+        console.error('Error parsing onboarding:', e);
+      }
+    }
+    
+    // 3. Props override everything (most recent)
     if (data) {
-      console.log('📦 Merging props data:', data);
       mergedData = { ...mergedData, ...data };
     }
     
-    // 3. Set the final merged data
     setSavedData({
-      restaurantName: mergedData.name || mergedData.restaurantName || 'Your Restaurant',
+      restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || 'Your Restaurant',
       email: mergedData.email || '',
       tier: mergedData.tier || 'free',
       tables: Number(mergedData.tables) || 5,
@@ -153,12 +164,6 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     
     if (mergedData.tier) {
       setSelectedTier(mergedData.tier);
-    }
-    
-    // Check if we already have a Stripe account in progress
-    if (mergedData.stripeAccountId && mergedData.stripeConnectInProgress) {
-      setAccountId(mergedData.stripeAccountId);
-      // Resume onboarding if needed
     }
     
   }, [data]);
@@ -197,12 +202,38 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
 
   const estimated = calculateEstimatedFees(45, savedData.monthlyOrders || 100);
 
-  // Create Stripe Connect account
+  // Check account status after onboarding
+  const checkAccountStatus = async (id: string) => {
+    setVerifying(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${API_URL}/api/stripe/account-status/${id}`);
+      const status = await res.json();
+      
+      if (status.isOnboardingComplete) {
+        // Short delay to show success
+        setTimeout(() => {
+          setVerifying(false);
+          onComplete();
+        }, 1000);
+      } else {
+        setVerifying(false);
+        // If not complete, show onboarding again
+        setShowOnboarding(true);
+      }
+    } catch (error) {
+      console.error('Error checking status:', error);
+      setVerifying(false);
+    }
+  };
+
   const handleConnect = async () => {
     setLoading(true);
+    setError('');
+    setErrorType(null);
     
     try {
-      // Validate required data
+      // Validate we have required data
       if (!savedData.email) {
         throw new Error('Email address is missing. Please go back to Restaurant Info step.');
       }
@@ -215,29 +246,32 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
       if (!API_URL) throw new Error('API_URL not configured');
       API_URL = API_URL.replace('http://', 'https://');
       
-      console.log('📧 Creating Stripe account for:', {
-        email: savedData.email,
-        name: savedData.restaurantName
-      });
-      
       // Save the selected tier
       if (updateData) {
         await updateData({ tier: selectedTier });
       }
       
-      // Call API to create Stripe Connect account
       const res = await fetch(`${API_URL}/api/stripe/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: savedData.email,
           name: savedData.restaurantName,
-          restaurantId: data?.restaurantId,
+          restaurantId,
           tier: selectedTier
         })
       });
       
       const response = await res.json();
+      
+      // Handle duplicate email error gracefully
+      if (res.status === 400 && response.code === 'duplicate_email') {
+        setErrorType('duplicate');
+        setError(response.error);
+        setLoading(false);
+        return;
+      }
+      
       if (!res.ok) throw new Error(response.error || 'Failed to connect');
       
       const { clientSecret, accountId } = response;
@@ -265,79 +299,22 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
         await updateData(onboardingData);
       }
       
-      // Show embedded onboarding
       setShowOnboarding(true);
       setLoading(false);
       
     } catch (error) {
       console.error('❌ Connection error:', error);
-      alert(`Failed to connect: ${error.message}`);
+      setErrorType('generic');
+      setError(error.message);
       setLoading(false);
     }
   };
 
-  // Handle onboarding exit
   const handleOnboardingExit = () => {
     setShowOnboarding(false);
-    
-    // If we have an account ID, check if onboarding was completed
+    // Check status when they exit
     if (accountId) {
       checkAccountStatus(accountId);
-    }
-  };
-
-  // Check account status to verify all details are submitted
-  const checkAccountStatus = async (id: string) => {
-    setVerifying(true);
-    
-    try {
-      const API_URL = import.meta.env.VITE_API_URL?.replace('http://', 'https://');
-      const res = await fetch(`${API_URL}/api/stripe/account-status/${id}`);
-      const status = await res.json();
-      
-      if (status.details_submitted && status.charges_enabled) {
-        // Account is fully verified!
-        setVerificationStatus('verified');
-        setOnboardingComplete(true);
-        
-        // Update stored data
-        const onboardingData = {
-          ...savedData,
-          tier: selectedTier,
-          stripeAccountId: accountId,
-          stripeConnected: true,
-          stripeConnectInProgress: false
-        };
-        
-        localStorage.setItem('drift_onboarding', JSON.stringify(onboardingData));
-        if (updateData) {
-          await updateData(onboardingData);
-        }
-        
-        // Show success message briefly then complete
-        setTimeout(() => {
-          setVerifying(false);
-          onComplete();
-        }, 1500);
-        
-      } else {
-        // Account needs more info
-        setVerificationStatus('pending');
-        setVerifying(false);
-        
-        // Ask user to complete onboarding
-        const shouldContinue = window.confirm(
-          'Your payment setup needs a few more details. Would you like to continue?'
-        );
-        
-        if (shouldContinue) {
-          setShowOnboarding(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking account status:', error);
-      setVerificationStatus('failed');
-      setVerifying(false);
     }
   };
 
@@ -370,7 +347,7 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
         </div>
         
         <div className="bg-white rounded-xl p-3 shadow-sm">
-          <CreditCard className="w-4 h-4 text-green-500 mb-1" />
+          <Mail className="w-4 h-4 text-green-500 mb-1" />
           <p className="text-xs text-gray-500">Email</p>
           <p className="font-medium text-sm truncate">{savedData.email || 'Not set'}</p>
         </div>
@@ -538,44 +515,42 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
     </AnimatePresence>
   );
 
-  // Success state
-  if (verificationStatus === 'verified') {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md mx-auto p-6 text-center"
-      >
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-10 h-10 text-green-600" />
-        </div>
-        <h2 className="text-3xl font-light mb-2">Payment setup complete!</h2>
-        <p className="text-gray-400 mb-8">
-          Your account is ready to accept payments.
-        </p>
-        <Button onClick={onComplete} size="lg">
-          Continue to Dashboard
-        </Button>
-      </motion.div>
-    );
-  }
-
   // Embedded onboarding view
   if (showOnboarding && connectInstance && clientSecret) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="max-w-2xl mx-auto p-6"
+        className="max-w-3xl mx-auto p-6"
       >
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-light mb-2">Complete your payment setup</h2>
-          <p className="text-gray-400">
-            Just a few more details to start accepting payments.
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <Shield className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-3xl font-light mb-2">Secure Payment Setup</h2>
+          <p className="text-gray-500">
+            Just a few details to verify your identity and connect your bank account.
           </p>
         </div>
 
-        <Card className="p-6">
+        {/* What we're collecting - transparency */}
+        <div className="grid grid-cols-3 gap-3 mb-6 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
+          <div className="flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-green-500" />
+            <span>Identity verification</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-green-500" />
+            <span>Bank account</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-green-500" />
+            <span>Tax information</span>
+          </div>
+        </div>
+
+        <Card className="p-6 border-2 border-gray-100">
           <ConnectComponentsProvider connectInstance={connectInstance}>
             <ConnectAccountOnboarding
               onExit={handleOnboardingExit}
@@ -583,36 +558,47 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
           </ConnectComponentsProvider>
         </Card>
 
-        {verifying && (
-          <div className="mt-4 text-center text-sm text-gray-400">
-            <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-            Verifying your information...
-          </div>
-        )}
-      </motion.div>
-    );
-  }
-
-  // Verifying status after onboarding
-  if (verifying) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="max-w-md mx-auto p-6 text-center"
-      >
-        <div className="relative w-20 h-20 mx-auto mb-6">
-          <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-          <motion.div 
-            className="absolute inset-0 border-4 border-black rounded-full border-t-transparent"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          />
+        {/* Trust badges */}
+        <div className="mt-6 flex items-center justify-center gap-6 text-xs text-gray-400">
+          <span className="flex items-center gap-1">
+            <Lock className="w-3 h-3" /> 256-bit Encryption
+          </span>
+          <span className="flex items-center gap-1">
+            <Fingerprint className="w-3 h-3" /> PCI Compliant
+          </span>
+          <span className="flex items-center gap-1">
+            <Heart className="w-3 h-3" /> Built on the Great Lakes
+          </span>
         </div>
-        <h2 className="text-2xl font-light mb-2">Verifying your information</h2>
-        <p className="text-gray-400">
-          This will just take a moment...
+
+        <p className="text-xs text-gray-400 text-center mt-4">
+          🔒 All information is encrypted and securely transmitted. We never see your full bank details.
         </p>
+
+        {/* Verification overlay */}
+        <AnimatePresence>
+          {verifying && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50"
+            >
+              <div className="text-center">
+                <div className="relative w-20 h-20 mx-auto mb-4">
+                  <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+                  <motion.div 
+                    className="absolute inset-0 border-4 border-black rounded-full border-t-transparent"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                </div>
+                <p className="text-lg font-light">Verifying your information...</p>
+                <p className="text-sm text-gray-400">This will just take a moment</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   }
@@ -652,6 +638,61 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
         {/* Summary from previous steps */}
         <SummaryCard />
 
+        {/* Custom error handling */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-6"
+            >
+              {errorType === 'duplicate' ? (
+                <Card className="p-6 bg-amber-50 border-amber-200">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <AlertCircle className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-amber-800 mb-1">
+                        Account already exists
+                      </h3>
+                      <p className="text-sm text-amber-700 mb-4">
+                        {error}
+                      </p>
+                      <div className="flex gap-3">
+                        <Button
+                          variant="secondary"
+                          onClick={() => window.location.href = '/login'}
+                          className="bg-white hover:bg-gray-50"
+                        >
+                          Sign in instead
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setError('');
+                            setErrorType(null);
+                          }}
+                          className="bg-amber-600 hover:bg-amber-700"
+                        >
+                          Try another email
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-4 bg-red-50 border-red-200">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                </Card>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Tier Selection Grid */}
         <motion.div 
           variants={fadeInUp}
@@ -677,6 +718,19 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
           </Card>
         </motion.div>
 
+        {/* Email confirmation */}
+        <motion.div variants={fadeInUp} className="mb-6">
+          <Card className="p-4 bg-gray-50 border-gray-200">
+            <div className="flex items-center gap-3">
+              <Mail className="w-5 h-5 text-gray-500" />
+              <div>
+                <p className="text-sm text-gray-500">You'll connect using:</p>
+                <p className="font-medium">{savedData.email || 'Not provided'}</p>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
         {/* Action Button */}
         <motion.div variants={fadeInUp} className="text-center">
           <Button
@@ -688,8 +742,8 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
             <span className="relative z-10 flex items-center gap-2">
               {loading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Setting up...
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Setting up secure connection...
                 </>
               ) : (
                 <>
@@ -700,8 +754,9 @@ export function StripeStep({ restaurantId, data, onComplete, updateData }) {
             </span>
           </Button>
           
-          <p className="text-xs text-gray-400 mt-3">
-            No credit card required for Starter. Cancel anytime.
+          <p className="text-xs text-gray-400 mt-3 flex items-center justify-center gap-1">
+            <Lock className="w-3 h-3" /> 
+            Secured by industry-leading encryption
           </p>
         </motion.div>
       </motion.div>

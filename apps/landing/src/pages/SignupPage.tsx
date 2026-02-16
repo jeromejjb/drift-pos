@@ -17,7 +17,14 @@ import {
   Globe,
   Phone,
   X,
-  Loader2
+  Loader2,
+  Heart,
+  Sparkles,
+  Shield,
+  TrendingUp,
+  Zap,
+  Clock,
+  BarChart3
 } from 'lucide-react';
 
 export function SignupPage() {
@@ -52,17 +59,17 @@ export function SignupPage() {
 
   // Business types with icons
   const businessTypes = [
-    { id: 'restaurant', label: 'Restaurant', icon: '🍽️', color: 'bg-orange-50 text-orange-600' },
-    { id: 'cafe', label: 'Café', icon: '☕', color: 'bg-amber-50 text-amber-600' },
-    { id: 'bar', label: 'Bar / Pub', icon: '🍺', color: 'bg-yellow-50 text-yellow-600' },
-    { id: 'foodtruck', label: 'Food Truck', icon: '🚚', color: 'bg-blue-50 text-blue-600' },
-    { id: 'bakery', label: 'Bakery', icon: '🥐', color: 'bg-rose-50 text-rose-600' },
-    { id: 'brewery', label: 'Brewery', icon: '🍺', color: 'bg-amber-50 text-amber-600' },
-    { id: 'winery', label: 'Winery', icon: '🍷', color: 'bg-purple-50 text-purple-600' },
-    { id: 'popup', label: 'Pop-up', icon: '🎪', color: 'bg-pink-50 text-pink-600' },
-    { id: 'retail', label: 'Retail', icon: '🏪', color: 'bg-green-50 text-green-600' },
-    { id: 'services', label: 'Services', icon: '💼', color: 'bg-blue-50 text-blue-600' },
-    { id: 'other', label: 'Other', icon: '✨', color: 'bg-gray-50 text-gray-600' }
+    { id: 'restaurant', label: 'Restaurant', icon: '🍽️', color: 'bg-orange-50 text-orange-600', gradient: 'from-orange-500 to-red-500' },
+    { id: 'cafe', label: 'Café', icon: '☕', color: 'bg-amber-50 text-amber-600', gradient: 'from-amber-500 to-yellow-500' },
+    { id: 'bar', label: 'Bar / Pub', icon: '🍺', color: 'bg-yellow-50 text-yellow-600', gradient: 'from-yellow-500 to-amber-500' },
+    { id: 'foodtruck', label: 'Food Truck', icon: '🚚', color: 'bg-blue-50 text-blue-600', gradient: 'from-blue-500 to-cyan-500' },
+    { id: 'bakery', label: 'Bakery', icon: '🥐', color: 'bg-rose-50 text-rose-600', gradient: 'from-rose-500 to-pink-500' },
+    { id: 'brewery', label: 'Brewery', icon: '🍺', color: 'bg-amber-50 text-amber-600', gradient: 'from-amber-500 to-orange-500' },
+    { id: 'winery', label: 'Winery', icon: '🍷', color: 'bg-purple-50 text-purple-600', gradient: 'from-purple-500 to-indigo-500' },
+    { id: 'popup', label: 'Pop-up', icon: '🎪', color: 'bg-pink-50 text-pink-600', gradient: 'from-pink-500 to-rose-500' },
+    { id: 'retail', label: 'Retail', icon: '🏪', color: 'bg-green-50 text-green-600', gradient: 'from-green-500 to-emerald-500' },
+    { id: 'services', label: 'Services', icon: '💼', color: 'bg-blue-50 text-blue-600', gradient: 'from-blue-500 to-indigo-500' },
+    { id: 'other', label: 'Other', icon: '✨', color: 'bg-gray-50 text-gray-600', gradient: 'from-gray-500 to-gray-600' }
   ];
 
   const roleOptions = [
@@ -103,13 +110,9 @@ export function SignupPage() {
 
   // Phone number formatting function
   const formatPhoneNumber = (value: string) => {
-    // Remove all non-numeric characters
     const numbers = value.replace(/\D/g, '');
-    
-    // Limit to 10 digits for US/Canada numbers
     const limited = numbers.slice(0, 10);
     
-    // Format based on length
     if (limited.length <= 3) {
       return limited;
     } else if (limited.length <= 6) {
@@ -122,7 +125,7 @@ export function SignupPage() {
   // Phone validation
   const validatePhone = (phone: string) => {
     const numbers = phone.replace(/\D/g, '');
-    if (numbers.length === 0) return true; // Optional field
+    if (numbers.length === 0) return true;
     if (numbers.length !== 10) {
       setPhoneError('Phone number must have 10 digits');
       return false;
@@ -218,7 +221,7 @@ export function SignupPage() {
       formData.businessType !== '' &&
       formData.role !== '' &&
       formData.teamSize !== '' &&
-      !phoneError // Make sure phone is valid if provided
+      !phoneError
     );
   };
 
@@ -242,7 +245,9 @@ export function SignupPage() {
     setError('');
     
     try {
-      // Remove formatting before sending
+      // Store formatted phone for display
+      const phoneToStore = formData.phone || '';
+      // Send digits to API
       const phoneDigits = formData.phone ? formData.phone.replace(/\D/g, '') : '';
       
       const response = await fetch(`${API_URL}/api/auth/register`, {
@@ -263,7 +268,6 @@ export function SignupPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create account');
 
-      // Show minimal redirect overlay
       setRedirecting(true);
       setLoading(false);
 
@@ -274,7 +278,7 @@ export function SignupPage() {
         role: formData.role,
         businessType: formData.businessType,
         teamSize: formData.teamSize,
-        phone: phoneDigits || null,
+        phone: phoneToStore, // Store formatted version
         userId: data.userId,
         restaurantId: data.restaurantId
       };
@@ -291,11 +295,10 @@ export function SignupPage() {
         fullName: formData.fullName,
         role: formData.role,
         teamSize: formData.teamSize,
-        phone: phoneDigits || '',
+        phone: phoneToStore, // Pass formatted version
         token: data.token
       }).toString();
       
-      // Slight delay for smooth transition
       setTimeout(() => {
         window.location.href = redirectUrl;
       }, 300);
@@ -309,7 +312,7 @@ export function SignupPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex">
-      {/* Minimal Redirect Overlay */}
+      {/* Redirect Overlay */}
       <AnimatePresence>
         {redirecting && (
           <motion.div
@@ -322,7 +325,6 @@ export function SignupPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="bg-white/90 backdrop-blur-md rounded-2xl p-8 shadow-2xl flex flex-col items-center"
             >
               <div className="relative">
@@ -337,9 +339,9 @@ export function SignupPage() {
         )}
       </AnimatePresence>
 
-      {/* Left panel - Enhanced value proposition */}
+      {/* Left panel - DRIFT Branded */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden p-12 text-white flex-col">
-        {/* Animated background pattern */}
+        {/* Great Lakes pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
             backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
@@ -370,12 +372,11 @@ export function SignupPage() {
             </button>
           </motion.div>
           
-          {/* Main headline - Dynamic based on step */}
+          {/* Dynamic headline */}
           <motion.div
             key={step}
             initial={{ opacity: 0, x: step === 1 ? -20 : 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
             className="mb-12"
           >
             <h1 className="text-5xl font-light leading-tight mb-4">
@@ -404,7 +405,7 @@ export function SignupPage() {
             </p>
           </motion.div>
           
-          {/* Progress indicator */}
+          {/* Progress with DRIFT style */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-white/40">Step {step} of 2</span>
@@ -422,14 +423,13 @@ export function SignupPage() {
             </div>
           </div>
           
-          {/* Feature list - Updated without trial */}
+          {/* Feature list - DRIFT style */}
           <div className="space-y-4 mb-12">
             {step === 1 ? (
-              // Account benefits
               [
-                { icon: '🚀', text: 'Get started in minutes' },
-                { icon: '💳', text: 'No credit card required' },
-                { icon: '🔒', text: '256-bit encryption' }
+                { icon: <Zap className="w-5 h-5" />, text: 'Get started in minutes' },
+                { icon: <TrendingUp className="w-5 h-5" />, text: 'Pay as you grow' },
+                { icon: <Shield className="w-5 h-5" />, text: '256-bit encryption' }
               ].map((feature, i) => (
                 <motion.div
                   key={i}
@@ -438,16 +438,17 @@ export function SignupPage() {
                   transition={{ delay: 0.2 + i * 0.1 }}
                   className="flex items-center gap-3"
                 >
-                  <span className="text-xl">{feature.icon}</span>
+                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
+                    {feature.icon}
+                  </div>
                   <span className="text-white/80">{feature.text}</span>
                 </motion.div>
               ))
             ) : (
-              // Business benefits
               [
-                { icon: '📊', text: 'Tailored analytics' },
-                { icon: '🎯', text: 'Personalized recommendations' },
-                { icon: '⚡', text: 'Faster onboarding' }
+                { icon: <BarChart3 className="w-5 h-5" />, text: 'Tailored analytics' },
+                { icon: <Sparkles className="w-5 h-5" />, text: 'Personalized recommendations' },
+                { icon: <Clock className="w-5 h-5" />, text: 'Faster onboarding' }
               ].map((feature, i) => (
                 <motion.div
                   key={i}
@@ -456,21 +457,27 @@ export function SignupPage() {
                   transition={{ delay: 0.2 + i * 0.1 }}
                   className="flex items-center gap-3"
                 >
-                  <span className="text-xl">{feature.icon}</span>
+                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
+                    {feature.icon}
+                  </div>
                   <span className="text-white/80">{feature.text}</span>
                 </motion.div>
               ))
             )}
           </div>
           
-          {/* Trust badges */}
+          {/* Great Lakes pride */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
             className="mt-auto"
           >
-            <div className="flex gap-6 text-white/20 text-xs">
+            <div className="flex items-center gap-2 text-white/40 text-sm">
+              <Heart className="w-4 h-4" />
+              <span>Built on the Great Lakes</span>
+            </div>
+            <div className="flex gap-6 text-white/20 text-xs mt-2">
               <span>SOC 2 Type II</span>
               <span>PCI DSS Level 1</span>
               <span>GDPR Compliant</span>
@@ -479,7 +486,7 @@ export function SignupPage() {
         </div>
       </div>
 
-      {/* Right panel - Progressive form */}
+      {/* Right panel - Form */}
       <div className="w-full lg:w-1/2 flex items-start justify-center p-6 lg:p-12 overflow-y-auto">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -763,7 +770,7 @@ export function SignupPage() {
                     </div>
                   </div>
 
-                  {/* Business Type */}
+                  {/* Business Type - Beautiful grid */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Business type <span className="text-red-400">*</span>
@@ -776,11 +783,13 @@ export function SignupPage() {
                           onClick={() => setFormData({...formData, businessType: type.id})}
                           className={`p-3 rounded-xl border-2 transition-all ${
                             formData.businessType === type.id
-                              ? 'border-black bg-gray-50 scale-105'
+                              ? `border-black bg-gradient-to-br ${type.gradient} text-white scale-105 shadow-lg`
                               : 'border-gray-100 hover:border-gray-200 bg-white'
                           }`}
                         >
-                          <div className={`w-8 h-8 ${type.color} rounded-lg flex items-center justify-center mx-auto mb-1 text-lg`}>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto mb-1 text-lg ${
+                            formData.businessType === type.id ? 'text-white' : type.color
+                          }`}>
                             {type.icon}
                           </div>
                           <span className="text-xs">{type.label}</span>
@@ -837,7 +846,7 @@ export function SignupPage() {
                     </div>
                   </div>
 
-                  {/* Phone with auto-formatting and validation */}
+                  {/* Phone with auto-formatting */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone number <span className="text-gray-400">(optional)</span>
@@ -939,7 +948,7 @@ export function SignupPage() {
                     <button
                       type="submit"
                       disabled={loading || !isStep2Valid() || !formData.agreeTerms}
-                      className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden"
+                      className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden relative"
                     >
                       {loading ? (
                         <span className="flex items-center justify-center gap-2">
@@ -1007,16 +1016,12 @@ export function SignupPage() {
                   <>
                     <h4>1. Agreement to Terms</h4>
                     <p>By accessing or using Drift, you agree to be bound by these Terms of Service.</p>
-                    
                     <h4>2. Description of Service</h4>
                     <p>Drift provides payment processing and restaurant management tools.</p>
-                    
                     <h4>3. Fees and Payments</h4>
                     <p>Transaction fees are clearly displayed and deducted automatically.</p>
-                    
                     <h4>4. User Responsibilities</h4>
                     <p>You are responsible for maintaining account security and providing accurate information.</p>
-                    
                     <h4>5. Termination</h4>
                     <p>You may cancel your account at any time. We may suspend accounts for violations.</p>
                   </>
@@ -1024,16 +1029,12 @@ export function SignupPage() {
                   <>
                     <h4>Your Data Is Yours</h4>
                     <p>We don't sell your data. Period.</p>
-                    
                     <h4>What We Collect</h4>
                     <p>Only what's necessary to process payments: name, email, business information.</p>
-                    
                     <h4>How We Use It</h4>
                     <p>To provide services, improve our platform, and communicate important updates.</p>
-                    
                     <h4>Security</h4>
                     <p>256-bit encryption, PCI compliant, SOC 2 certified.</p>
-                    
                     <h4>Your Rights</h4>
                     <p>You can export or delete your data anytime.</p>
                   </>

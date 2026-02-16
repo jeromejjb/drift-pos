@@ -100,8 +100,8 @@ const allowedOrigins = [
   'https://drift-api-7vs7.onrender.com',
   'https://www.driftpos.com',
   'https://driftpos.com',
-  'restaurant.driftpos.com',
-  'app.driftpos.com',
+  'https://restaurant.driftpos.com',
+  'https://app.driftpos.com',
      
 ];
 
@@ -190,6 +190,7 @@ app.use(cors({
 // Secure JSON parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
 // Sanitized logging
 morgan.token('body', (req: any) => {
