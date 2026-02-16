@@ -61,14 +61,9 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Manual menu state
+  // Manual menu state - START WITH EMPTY ARRAY, no default categories
   const [categories, setCategories] = useState<MenuCategory[]>(
-    data?.menu?.categories || [
-      { id: '1', name: 'Appetizers', items: [] },
-      { id: '2', name: 'Main Courses', items: [] },
-      { id: '3', name: 'Desserts', items: [] },
-      { id: '4', name: 'Drinks', items: [] },
-    ]
+    data?.menu?.categories || [] // Empty by default
   );
   
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -78,7 +73,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
     name: '',
     description: '',
     price: 0,
-    category: categories[0]?.id || '',
+    category: '',
     popular: false,
     available: true
   });
@@ -177,9 +172,9 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
     },
   ];
 
-  // Generate CSV template
+  // Generate CSV template (this is just a downloadable template, not actual data)
   const generateCSVTemplate = () => {
-    const headers = ['Category', 'Item Name', 'Description', 'Price', 'Popular (yes/no)'];
+    const headers = ['Category', 'Item Name', 'Description', 'Price', 'Popular'];
     const sampleData = [
       ['Appetizers', 'Bruschetta', 'Toasted bread with tomatoes', '9.99', 'yes'],
       ['Appetizers', 'Calamari', 'Fried squid with marinara', '12.99', 'no'],
@@ -188,9 +183,17 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
       ['Drinks', 'House Wine', 'Glass of red or white', '8.99', 'no'],
     ];
     
+    // Create CSV content with proper quoting for commas in descriptions
     const csvContent = [
       headers.join(','),
-      ...sampleData.map(row => row.join(','))
+      ...sampleData.map(row => {
+        // Quote the description if it contains commas
+        const quotedRow = [...row];
+        if (quotedRow[2].includes(',')) {
+          quotedRow[2] = `"${quotedRow[2]}"`;
+        }
+        return quotedRow.join(',');
+      })
     ].join('\n');
     
     setCsvTemplate(csvContent);
@@ -226,15 +229,31 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
           // Parse CSV
           const text = data as string;
           const lines = text.split('\n');
-          const headers = lines[0].split(',').map(h => h.trim());
+          const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
           
           for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
             
-            const values = lines[i].split(',').map(v => v.trim());
+            // Simple CSV parsing (handles quoted values)
+            const values = [];
+            let inQuotes = false;
+            let currentValue = '';
+            
+            for (let char of lines[i]) {
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                values.push(currentValue.trim().replace(/^"|"$/g, ''));
+                currentValue = '';
+              } else {
+                currentValue += char;
+              }
+            }
+            values.push(currentValue.trim().replace(/^"|"$/g, ''));
+            
             const row: any = {};
             headers.forEach((header, index) => {
-              row[header] = values[index];
+              row[header] = values[index] || '';
             });
             parsedRows.push(row);
           }
@@ -562,7 +581,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
         </>
       )}
 
-      {/* Manual Entry Mode */}
+      {/* Manual Entry Mode - Only show Add Category button if no categories exist */}
       {mode === 'manual' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between mb-4">
@@ -577,7 +596,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
             <div className="w-20"></div>
           </div>
 
-          {/* Add Category Button */}
+          {/* Add Category Button - Always visible */}
           {!showAddCategory ? (
             <button
               onClick={() => setShowAddCategory(true)}
@@ -614,97 +633,112 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
             </Card>
           )}
 
-          {/* Categories */}
-          {categories.map((category) => (
-            <Card key={category.id} padding="lg" className="relative">
-              {/* Category Header */}
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                    {categoryIcons[category.name] ? (
-                      (() => {
-                        const Icon = categoryIcons[category.name];
-                        return <Icon className="w-4 h-4" />;
-                      })()
-                    ) : (
-                      <Coffee className="w-4 h-4" />
-                    )}
-                  </div>
-                  <h3 className="font-medium">{category.name}</h3>
-                  <span className="text-xs text-gray-400">{category.items.length} items</span>
-                </div>
-                {categories.length > 1 && (
-                  <button
-                    onClick={() => deleteCategory(category.id)}
-                    className="p-1 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                  </button>
-                )}
-              </div>
-
-              {/* Items List */}
-              <div className="space-y-3 mb-4">
-                {category.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-4 p-3 bg-gray-50 rounded-xl group hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{item.name}</span>
-                            {item.popular && (
-                              <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
-                                Popular
-                              </span>
-                            )}
-                            {!item.available && (
-                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-                                Sold out
-                              </span>
-                            )}
-                          </div>
-                          {item.description && (
-                            <p className="text-sm text-gray-500">{item.description}</p>
-                          )}
-                        </div>
-                        <span className="font-medium">${item.price.toFixed(2)}</span>
+          {/* Only show categories if there are any */}
+          {categories.length > 0 ? (
+            <>
+              {categories.map((category) => (
+                <Card key={category.id} padding="lg" className="relative">
+                  {/* Category Header */}
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                        {categoryIcons[category.name] ? (
+                          (() => {
+                            const Icon = categoryIcons[category.name];
+                            return <Icon className="w-4 h-4" />;
+                          })()
+                        ) : (
+                          <Coffee className="w-4 h-4" />
+                        )}
                       </div>
+                      <h3 className="font-medium">{category.name}</h3>
+                      <span className="text-xs text-gray-400">{category.items.length} items</span>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {categories.length > 1 && (
                       <button
-                        onClick={() => startEdit(item)}
-                        className="p-2 hover:bg-white rounded-lg transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4 text-gray-400" />
-                      </button>
-                      <button
-                        onClick={() => deleteItem(category.id, item.id)}
-                        className="p-2 hover:bg-white rounded-lg transition-colors"
+                        onClick={() => deleteCategory(category.id)}
+                        className="p-1 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4 text-red-400" />
                       </button>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
 
-              {/* Add Item Button */}
-              <button
-                onClick={() => {
-                  setEditingCategory(category.id);
-                  setNewItem({ ...newItem, category: category.id });
-                  setShowAddForm(true);
-                }}
-                className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-gray-400 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Add item to {category.name}
-              </button>
+                  {/* Items List - Only show if there are items */}
+                  {category.items.length > 0 && (
+                    <div className="space-y-3 mb-4">
+                      {category.items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-start gap-4 p-3 bg-gray-50 rounded-xl group hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{item.name}</span>
+                                  {item.popular && (
+                                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                                      Popular
+                                    </span>
+                                  )}
+                                  {!item.available && (
+                                    <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                                      Sold out
+                                    </span>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <p className="text-sm text-gray-500">{item.description}</p>
+                                )}
+                              </div>
+                              <span className="font-medium">${item.price.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => startEdit(item)}
+                              className="p-2 hover:bg-white rounded-lg transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4 text-gray-400" />
+                            </button>
+                            <button
+                              onClick={() => deleteItem(category.id, item.id)}
+                              className="p-2 hover:bg-white rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-400" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add Item Button */}
+                  <button
+                    onClick={() => {
+                      setEditingCategory(category.id);
+                      setNewItem({ ...newItem, category: category.id });
+                      setShowAddForm(true);
+                    }}
+                    className="w-full py-2 border border-dashed border-gray-200 rounded-lg text-gray-400 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add item to {category.name}
+                  </button>
+                </Card>
+              ))}
+            </>
+          ) : (
+            // Empty state - show when no categories
+            <Card padding="lg" className="text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Coffee className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-light mb-2">No categories yet</h3>
+              <p className="text-gray-400 mb-4">Create your first category to start adding menu items</p>
             </Card>
-          ))}
+          )}
 
           {/* Add Item Form Modal */}
           <AnimatePresence>
@@ -776,6 +810,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
                           onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
                           className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
                         >
+                          <option value="">Select a category</option>
                           {categories.map(cat => (
                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                           ))}
@@ -808,7 +843,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
                     <div className="flex gap-3 pt-4">
                       <button
                         onClick={editingItem ? updateItem : addItem}
-                        disabled={!newItem.name || !newItem.price}
+                        disabled={!newItem.name || !newItem.price || !newItem.category}
                         className="flex-1 bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
                       >
                         {editingItem ? 'Update Item' : 'Add Item'}
@@ -826,32 +861,34 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
             )}
           </AnimatePresence>
 
-          {/* Summary and Navigation */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm text-gray-400">Total items</p>
-                <p className="text-2xl font-light">
-                  {categories.reduce((acc, cat) => acc + cat.items.length, 0)}
-                </p>
+          {/* Summary and Navigation - Only show if there are items */}
+          {categories.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm text-gray-400">Total items</p>
+                  <p className="text-2xl font-light">
+                    {categories.reduce((acc, cat) => acc + cat.items.length, 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Categories</p>
+                  <p className="text-2xl font-light">{categories.length}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-400">Categories</p>
-                <p className="text-2xl font-light">{categories.length}</p>
-              </div>
-            </div>
 
-            <div className="flex gap-3">
-              <Button variant="secondary" onClick={onPrev} className="flex-1">
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-              <Button onClick={handleManualContinue} className="flex-1">
-                Continue
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={onPrev} className="flex-1">
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+                <Button onClick={handleManualContinue} className="flex-1">
+                  Continue
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -901,6 +938,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
                       <li>• Columns: Category, Item Name, Description, Price, Popular</li>
                       <li>• Price should be a number (e.g., 12.99)</li>
                       <li>• Popular should be "yes" or "no"</li>
+                      <li>• Use quotes around descriptions that contain commas</li>
                     </ul>
                     <button
                       onClick={generateCSVTemplate}
