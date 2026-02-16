@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as XLSX from 'xlsx';
 import { 
   Camera, 
   Upload, 
@@ -17,7 +18,9 @@ import {
   Wine,
   IceCream,
   X,
-  Check
+  Check,
+  Download,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -48,9 +51,15 @@ interface MenuCategory {
 
 export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
   const [mode, setMode] = useState<'select' | 'manual' | 'import'>('select');
-  const [importMethod, setImportMethod] = useState<'photo' | 'pdf' | 'url' | 'template' | null>(null);
+  const [importMethod, setImportMethod] = useState<'photo' | 'pdf' | 'csv' | 'template' | null>(null);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [csvTemplate, setCsvTemplate] = useState<string>('');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Manual menu state
   const [categories, setCategories] = useState<MenuCategory[]>(
@@ -84,20 +93,24 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
       title: 'Take a photo',
       description: 'Snap a picture of your menu',
       color: 'bg-blue-50 text-blue-600',
+      comingSoon: true
+    },
+    {
+      id: 'csv',
+      icon: FileText,
+      title: 'Upload CSV/Excel',
+      description: 'Import from spreadsheet',
+      color: 'bg-purple-50 text-purple-600',
+      comingSoon: false
     },
     {
       id: 'pdf',
       icon: FileText,
       title: 'Upload PDF',
-      description: 'Drag & drop your digital menu',
-      color: 'bg-purple-50 text-purple-600',
-    },
-    {
-      id: 'url',
-      icon: Link,
-      title: 'Website URL',
-      description: 'Enter your restaurant website',
-      color: 'bg-green-50 text-green-600',
+      description: 'Coming soon',
+      color: 'bg-gray-100 text-gray-400',
+      comingSoon: true,
+      disabled: true
     },
     {
       id: 'template',
@@ -105,6 +118,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
       title: 'Use template',
       description: 'Start with a cuisine template',
       color: 'bg-orange-50 text-orange-600',
+      comingSoon: false
     },
   ];
 
@@ -162,6 +176,160 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
       ]
     },
   ];
+
+  // Generate CSV template
+  const generateCSVTemplate = () => {
+    const headers = ['Category', 'Item Name', 'Description', 'Price', 'Popular (yes/no)'];
+    const sampleData = [
+      ['Appetizers', 'Bruschetta', 'Toasted bread with tomatoes', '9.99', 'yes'],
+      ['Appetizers', 'Calamari', 'Fried squid with marinara', '12.99', 'no'],
+      ['Pizza', 'Margherita', 'Tomato, mozzarella, basil', '16.99', 'yes'],
+      ['Pizza', 'Pepperoni', 'Classic pepperoni', '18.99', 'no'],
+      ['Drinks', 'House Wine', 'Glass of red or white', '8.99', 'no'],
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      ...sampleData.map(row => row.join(','))
+    ].join('\n');
+    
+    setCsvTemplate(csvContent);
+    
+    // Download template
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'menu-template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+    setImporting(true);
+    setProgress(0);
+
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        let parsedRows: any[] = [];
+
+        // Parse based on file type
+        if (file.name.endsWith('.csv')) {
+          // Parse CSV
+          const text = data as string;
+          const lines = text.split('\n');
+          const headers = lines[0].split(',').map(h => h.trim());
+          
+          for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            
+            const values = lines[i].split(',').map(v => v.trim());
+            const row: any = {};
+            headers.forEach((header, index) => {
+              row[header] = values[index];
+            });
+            parsedRows.push(row);
+          }
+        } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          // Parse Excel
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          parsedRows = XLSX.utils.sheet_to_json(worksheet);
+        }
+
+        setParsedData(parsedRows);
+        processImportedData(parsedRows);
+        
+      } catch (error) {
+        console.error('Error parsing file:', error);
+        setUploadError('Failed to parse file. Please check the format.');
+        setImporting(false);
+      }
+    };
+
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = (event.loaded / event.total) * 100;
+        setProgress(percent);
+      }
+    };
+
+    if (file.name.endsWith('.csv')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
+  };
+
+  // Process imported data into menu categories
+  const processImportedData = (rows: any[]) => {
+    try {
+      const categoryMap = new Map<string, MenuCategory>();
+      
+      rows.forEach((row, index) => {
+        // Try to detect column names (case insensitive)
+        const category = row.Category || row.category || row.CATEGORY || '';
+        const itemName = row['Item Name'] || row.itemName || row['Item name'] || row.name || row.Name || '';
+        const description = row.Description || row.description || '';
+        const price = parseFloat(row.Price || row.price || '0');
+        const popular = (row.Popular || row.popular || '').toLowerCase() === 'yes';
+        
+        if (!category || !itemName || isNaN(price)) {
+          console.warn(`Skipping row ${index + 1}: missing required fields`);
+          return;
+        }
+
+        if (!categoryMap.has(category)) {
+          categoryMap.set(category, {
+            id: Date.now().toString() + index,
+            name: category,
+            items: []
+          });
+        }
+
+        const categoryObj = categoryMap.get(category)!;
+        categoryObj.items.push({
+          id: Date.now().toString() + index + itemName,
+          name: itemName,
+          description: description || '',
+          price: price,
+          category: category,
+          popular: popular,
+          available: true
+        });
+      });
+
+      const newCategories = Array.from(categoryMap.values());
+      
+      if (newCategories.length > 0) {
+        setCategories(newCategories);
+        setUploadSuccess(true);
+        setProgress(100);
+        
+        // Switch to manual mode to review
+        setTimeout(() => {
+          setMode('manual');
+          setImporting(false);
+        }, 1000);
+      } else {
+        setUploadError('No valid menu items found in file');
+        setImporting(false);
+      }
+    } catch (error) {
+      console.error('Error processing data:', error);
+      setUploadError('Failed to process menu data');
+      setImporting(false);
+    }
+  };
 
   const addItem = () => {
     if (!newItem.name || !newItem.price || !newItem.category) return;
@@ -281,7 +449,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
         name: itemName,
         description: '',
         price: 0,
-        category: 'temp',
+        category: cat.name,
         popular: false,
         available: true
       }))
@@ -301,40 +469,6 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
       }
     });
     onNext();
-  };
-
-  const handleImportSimulation = async () => {
-    setImporting(true);
-    for (let i = 0; i <= 100; i += 10) {
-      setProgress(i);
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-    
-    // Mock imported data
-    const mockMenu = {
-      categories: [
-        {
-          id: '1',
-          name: 'Antipasti',
-          items: [
-            { id: '1', name: 'Arancini', description: 'Crispy rice balls with mozzarella', price: 12, popular: true },
-            { id: '2', name: 'Calamari', description: 'Fried squid with marinara', price: 14 },
-          ]
-        },
-        {
-          id: '2',
-          name: 'Pizza',
-          items: [
-            { id: '3', name: 'Margherita', description: 'Tomato, mozzarella, basil', price: 18, popular: true },
-            { id: '4', name: 'Diavola', description: 'Spicy salami', price: 20 },
-          ]
-        }
-      ]
-    };
-    
-    setCategories(mockMenu.categories as MenuCategory[]);
-    setMode('manual');
-    setImporting(false);
   };
 
   return (
@@ -376,12 +510,22 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
                 <button
                   key={method.id}
                   onClick={() => {
-                    setImportMethod(method.id as any);
-                    setMode('import');
+                    if (!method.comingSoon) {
+                      setImportMethod(method.id as any);
+                      setMode('import');
+                    }
                   }}
+                  disabled={method.disabled}
                   className="group relative"
                 >
-                  <Card padding="lg" className="h-full hover:border-black transition-all text-left">
+                  <Card padding="lg" className={`h-full transition-all text-left ${
+                    method.comingSoon ? 'opacity-60' : 'hover:border-black'
+                  }`}>
+                    {method.comingSoon && (
+                      <span className="absolute top-3 right-3 text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
+                        Soon
+                      </span>
+                    )}
                     <div className={`w-12 h-12 ${method.color} rounded-xl flex items-center justify-center mb-4`}>
                       <Icon className="w-6 h-6" />
                     </div>
@@ -718,6 +862,8 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
             onClick={() => {
               setMode('select');
               setImportMethod(null);
+              setUploadError(null);
+              setUploadSuccess(false);
             }}
             className="flex items-center gap-2 text-gray-400 hover:text-black mb-6"
           >
@@ -728,59 +874,118 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
           <div className="mb-8">
             <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               {importMethod === 'photo' && <Camera className="w-8 h-8 text-blue-600" />}
-              {importMethod === 'pdf' && <FileText className="w-8 h-8 text-purple-600" />}
-              {importMethod === 'url' && <Link className="w-8 h-8 text-green-600" />}
+              {importMethod === 'csv' && <FileText className="w-8 h-8 text-purple-600" />}
               {importMethod === 'template' && <Sparkles className="w-8 h-8 text-orange-600" />}
             </div>
             <h3 className="text-xl font-light mb-2">
               {importMethod === 'photo' && 'Take a photo'}
-              {importMethod === 'pdf' && 'Upload PDF'}
-              {importMethod === 'url' && 'Enter website URL'}
+              {importMethod === 'csv' && 'Upload CSV or Excel'}
               {importMethod === 'template' && 'Choose a template'}
             </h3>
             <p className="text-gray-400">
-              {importMethod === 'photo' && 'Position your menu in the frame and take a photo'}
-              {importMethod === 'pdf' && 'Drag and drop your PDF menu file'}
-              {importMethod === 'url' && 'Enter your restaurant website URL'}
+              {importMethod === 'photo' && 'Coming soon!'}
+              {importMethod === 'csv' && 'Upload a spreadsheet with your menu items'}
               {importMethod === 'template' && 'Select a template to customize'}
             </p>
           </div>
 
-          {importing ? (
+          {importMethod === 'csv' && (
             <>
-              <div className="w-full bg-gray-100 rounded-full h-2 mb-8">
-                <motion.div
-                  className="bg-black h-2 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
+              {/* Template Download */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-xl text-left">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-800 font-medium mb-2">Required format:</p>
+                    <ul className="text-xs text-blue-700 space-y-1 mb-3">
+                      <li>• Columns: Category, Item Name, Description, Price, Popular</li>
+                      <li>• Price should be a number (e.g., 12.99)</li>
+                      <li>• Popular should be "yes" or "no"</li>
+                    </ul>
+                    <button
+                      onClick={generateCSVTemplate}
+                      className="inline-flex items-center gap-2 text-sm bg-white px-4 py-2 rounded-lg border border-blue-200 hover:border-blue-400 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Template
+                    </button>
+                  </div>
+                </div>
               </div>
-              {progress === 100 && (
+
+              {/* File Upload */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+              />
+              
+              {!importing && !uploadSuccess && (
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  size="lg"
+                  fullWidth
+                  className="mb-4"
+                >
+                  Select File
+                </Button>
+              )}
+
+              {importing && (
+                <>
+                  <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
+                    <motion.div
+                      className="bg-black h-2 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-400 mb-4">
+                    {progress < 100 ? 'Uploading...' : 'Processing...'}
+                  </p>
+                </>
+              )}
+
+              {uploadError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                  {uploadError}
+                </div>
+              )}
+
+              {uploadSuccess && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="bg-green-50 border border-green-100 rounded-xl p-4 mb-8"
+                  className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4"
                 >
-                  <p className="text-green-700">✨ Menu imported successfully!</p>
+                  <p className="text-green-700">✅ Menu imported successfully! Review your items.</p>
                 </motion.div>
               )}
             </>
-          ) : (
-            <Button
-              onClick={handleImportSimulation}
-              size="lg"
-              fullWidth
-              className="mb-4"
-            >
-              Start Import
-            </Button>
           )}
 
-          {progress === 100 && (
-            <Button onClick={() => setMode('manual')} size="lg" fullWidth>
-              Review Menu
-            </Button>
+          {importMethod === 'template' && (
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => loadTemplate(template.id)}
+                  className="group"
+                >
+                  <Card padding="md" className="hover:border-black transition-all">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-black group-hover:text-white transition-colors">
+                        <template.icon className="w-6 h-6" />
+                      </div>
+                      <h3 className="font-medium">{template.name}</h3>
+                    </div>
+                  </Card>
+                </button>
+              ))}
+            </div>
           )}
         </Card>
       )}
