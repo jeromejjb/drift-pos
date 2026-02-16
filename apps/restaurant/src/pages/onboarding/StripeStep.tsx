@@ -23,8 +23,11 @@ import {
 } from 'lucide-react';
 import { Button } from './../../components/ui/Button';
 import { Card } from './../../components/ui/Card';
-import { loadConnectAndInitialize } from '@stripe/connect-js';
-import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
+
+// TEMPORARILY COMMENT OUT STRIPE IMPORTS
+// import { loadConnectAndInitialize } from '@stripe/connect-js';
+// import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
+
 
 // Animation variants
 const fadeInUp = {
@@ -100,17 +103,18 @@ export function StripeStep({ data, onComplete, updateData }) {
   const [selectedTier, setSelectedTier] = useState(data?.tier || 'free');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [annualBilling, setAnnualBilling] = useState(false);
-  const [connectInstance, setConnectInstance] = useState(null);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  // TEMPORARILY COMMENT OUT
+  // const [connectInstance, setConnectInstance] = useState(null);
+  // const [onboardingComplete, setOnboardingComplete] = useState(false);
   
   // Load saved data with proper type conversion
   const [savedData, setSavedData] = useState({
     restaurantName: data?.name || '',
     email: data?.email || '',
     tier: data?.tier || 'free',
-    tables: Number(data?.tables) || 5,  // 🔥 FIXED: Convert to number
-    menuItems: Number(data?.menuItems) || 0,  // 🔥 FIXED: Convert to number
-    monthlyOrders: Number(data?.monthlyOrders) || 0  // 🔥 FIXED: Convert to number
+    tables: Number(data?.tables) || 5,
+    menuItems: Number(data?.menuItems) || 0,
+    monthlyOrders: Number(data?.monthlyOrders) || 0
   });
 
   // Load from localStorage on mount
@@ -121,7 +125,7 @@ export function StripeStep({ data, onComplete, updateData }) {
       setSavedData(prev => ({ 
         ...prev, 
         ...parsed,
-        tables: Number(parsed.tables) || prev.tables,  // 🔥 FIXED: Ensure number
+        tables: Number(parsed.tables) || prev.tables,
         menuItems: Number(parsed.menuItems) || prev.menuItems,
         monthlyOrders: Number(parsed.monthlyOrders) || prev.monthlyOrders
       }));
@@ -131,7 +135,6 @@ export function StripeStep({ data, onComplete, updateData }) {
 
   // Smart tier recommendation based on usage
   const getRecommendedTier = () => {
-    // 🔥 FIXED: Now savedData.tables is guaranteed to be a number
     if (savedData.tables > 5 || savedData.menuItems > 50 || savedData.monthlyOrders > 100) {
       return 'pro';
     }
@@ -143,7 +146,7 @@ export function StripeStep({ data, onComplete, updateData }) {
   // Calculate annual savings
   const calculateSavings = () => {
     if (annualBilling) {
-      return (49 * 12 * 0.2).toFixed(0); // 20% discount
+      return (49 * 12 * 0.2).toFixed(0);
     }
     return 0;
   };
@@ -194,14 +197,16 @@ export function StripeStep({ data, onComplete, updateData }) {
       const { clientSecret, accountId } = response;
       setClientSecret(clientSecret);
       
-      // Initialize Stripe Connect instance
-      const stripeConnectInstance = loadConnectAndInitialize({
-        publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
-        fetchClientSecret: async () => clientSecret,
-      });
+      // TEMPORARILY COMMENT OUT STRIPE INITIALIZATION
+      // const stripeConnectInstance = loadConnectAndInitialize({
+      //   publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+      //   fetchClientSecret: async () => clientSecret,
+      // });
+      // 
+      // setConnectInstance(stripeConnectInstance);
       
-      setConnectInstance(stripeConnectInstance);
-      setShowOnboarding(true);
+      // Instead of showing onboarding, just complete the step
+      // setShowOnboarding(true);
       
       // Save progress
       localStorage.setItem('drift_onboarding', JSON.stringify({
@@ -211,6 +216,10 @@ export function StripeStep({ data, onComplete, updateData }) {
         stripeConnected: true
       }));
       
+      // TEMPORARY: Just complete the step
+      alert('Stripe account created! (Demo mode)');
+      onComplete();
+      
     } catch (error) {
       console.error('❌ Connection error:', error);
       alert(`Failed to connect: ${error.message}`);
@@ -219,13 +228,13 @@ export function StripeStep({ data, onComplete, updateData }) {
     }
   };
 
-  const handleOnboardingExit = () => {
-    setShowOnboarding(false);
-    // If onboarding was completed successfully, call onComplete
-    if (onboardingComplete) {
-      onComplete();
-    }
-  };
+  // TEMPORARILY COMMENT OUT
+  // const handleOnboardingExit = () => {
+  //   setShowOnboarding(false);
+  //   if (onboardingComplete) {
+  //     onComplete();
+  //   }
+  // };
 
   // Summary Card
   const SummaryCard = () => (
@@ -404,7 +413,7 @@ export function StripeStep({ data, onComplete, updateData }) {
             
             <div className="flex gap-3">
               <Button
-                variant="secondary"  // 🔥 FIXED: Changed from "outline" to "secondary"
+                variant="secondary"
                 onClick={() => setShowUpgradeModal(false)}
                 className="flex-1"
               >
@@ -427,127 +436,96 @@ export function StripeStep({ data, onComplete, updateData }) {
   );
 
   // Main render
-  if (!showOnboarding) {
-    return (
-      <>
-        <motion.div 
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          variants={stagger}
-          className="max-w-6xl mx-auto p-6"
-        >
-          {/* Header */}
-          <motion.div variants={fadeInUp} className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Landmark className="w-10 h-10 text-white" />
-            </div>
-            <h2 className="text-4xl font-light mb-2 bg-gradient-to-r from-black to-gray-600 bg-clip-text text-transparent">
-              Choose Your Plan
-            </h2>
-            <p className="text-gray-500 text-lg">
-              Step {data?.currentStep || 6} of 7 • Select how you want to grow
-            </p>
-            
-            {/* Progress bar */}
-            <div className="w-full h-2 bg-gray-100 rounded-full mt-4 max-w-md mx-auto">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: '75%' }}
-                className="h-full bg-gradient-to-r from-black to-gray-600 rounded-full"
-              />
-            </div>
-          </motion.div>
-
-          {/* Summary from previous steps */}
-          <SummaryCard />
-
-          {/* Tier Selection Grid */}
-          <motion.div 
-            variants={fadeInUp}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
-          >
-            <TierCard tierId="free" tier={TIERS.free} />
-            <TierCard tierId="pro" tier={TIERS.pro} />
-          </motion.div>
-
-          {/* Fee Comparison */}
-          <motion.div variants={fadeInUp} className="mb-8">
-            <Card className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-0">
-              <div className="flex items-center gap-3">
-                <BarChart3 className="w-5 h-5 text-purple-600" />
-                <div>
-                  <p className="text-sm">
-                    <span className="font-medium">Smart pricing:</span> The more you grow, the less you pay. 
-                    {selectedTier === 'free' && ' Upgrade to Pro to save 1% on every transaction!'}
-                    {selectedTier === 'pro' && ' You\'re saving 1% compared to Starter!'}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-
-          {/* Action Button */}
-          <motion.div variants={fadeInUp} className="text-center">
-            <Button
-              size="lg"
-              onClick={handleConnect}
-              disabled={loading}
-              className="px-12 relative overflow-hidden group"
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Setting up...
-                  </>
-                ) : (
-                  <>
-                    Continue with {TIERS[selectedTier].name}
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </span>
-            </Button>
-            
-            <p className="text-xs text-gray-400 mt-3">
-              No credit card required for Starter. Cancel anytime.
-            </p>
-          </motion.div>
+  return (
+    <>
+      <motion.div 
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={stagger}
+        className="max-w-6xl mx-auto p-6"
+      >
+        {/* Header */}
+        <motion.div variants={fadeInUp} className="text-center mb-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <Landmark className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-4xl font-light mb-2 bg-gradient-to-r from-black to-gray-600 bg-clip-text text-transparent">
+            Choose Your Plan
+          </h2>
+          <p className="text-gray-500 text-lg">
+            Step {data?.currentStep || 6} of 7 • Select how you want to grow
+          </p>
+          
+          {/* Progress bar */}
+          <div className="w-full h-2 bg-gray-100 rounded-full mt-4 max-w-md mx-auto">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: '75%' }}
+              className="h-full bg-gradient-to-r from-black to-gray-600 rounded-full"
+            />
+          </div>
         </motion.div>
 
-        {/* Upgrade Modal */}
-        <UpgradeModal />
-      </>
-    );
-  }
+        {/* Summary from previous steps */}
+        <SummaryCard />
 
-  // Embedded onboarding
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="max-w-2xl mx-auto p-6"
-    >
-      <div className="text-center mb-6">
-        <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-          <CheckCircle2 className="w-8 h-8 text-white" />
-        </div>
-        <h2 className="text-3xl font-light mb-2">Complete Your Setup</h2>
-        <p className="text-gray-500">
-          Just a few more details to start accepting payments with your {TIERS[selectedTier].name} plan
-        </p>
-      </div>
+        {/* Tier Selection Grid */}
+        <motion.div 
+          variants={fadeInUp}
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
+        >
+          <TierCard tierId="free" tier={TIERS.free} />
+          <TierCard tierId="pro" tier={TIERS.pro} />
+        </motion.div>
 
-      <Card className="p-6">
-        {connectInstance && clientSecret && (
-          <ConnectComponentsProvider connectInstance={connectInstance}>
-            <ConnectAccountOnboarding
-              onExit={handleOnboardingExit}  // 🔥 FIXED: Removed onSuccess, using onExit only
-            />
-          </ConnectComponentsProvider>
-        )}
-      </Card>
-    </motion.div>
+        {/* Fee Comparison */}
+        <motion.div variants={fadeInUp} className="mb-8">
+          <Card className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-0">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-5 h-5 text-purple-600" />
+              <div>
+                <p className="text-sm">
+                  <span className="font-medium">Smart pricing:</span> The more you grow, the less you pay. 
+                  {selectedTier === 'free' && ' Upgrade to Pro to save 1% on every transaction!'}
+                  {selectedTier === 'pro' && ' You\'re saving 1% compared to Starter!'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Action Button */}
+        <motion.div variants={fadeInUp} className="text-center">
+          <Button
+            size="lg"
+            onClick={handleConnect}
+            disabled={loading}
+            className="px-12 relative overflow-hidden group"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Setting up...
+                </>
+              ) : (
+                <>
+                  Continue with {TIERS[selectedTier].name}
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </span>
+          </Button>
+          
+          <p className="text-xs text-gray-400 mt-3">
+            No credit card required for Starter. Cancel anytime.
+          </p>
+        </motion.div>
+      </motion.div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal />
+    </>
   );
 }
