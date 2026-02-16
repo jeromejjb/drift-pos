@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Briefcase, Heart, Zap, Users } from 'lucide-react';
+import { Briefcase, Heart, Zap, Users } from 'lucide-react';
 // Removed unused navigate
 
 export function Careers() {
