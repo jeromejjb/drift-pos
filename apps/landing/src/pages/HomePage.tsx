@@ -22,7 +22,6 @@ export function HomePage() {
       <Features />
       <RestaurantShowcase />
       <DinerShowcase />
-      <Testimonials />
       <Pricing />
       <FAQ />
       <CTA />

@@ -6,8 +6,6 @@ import {
   TrendingUp, 
   Globe, 
   Shield,
-  Clock,
-  BarChart3
 } from 'lucide-react';
 
 const features = [
