@@ -49,13 +49,29 @@ export function OnboardingPage() {
     const id = searchParams.get('restaurantId');
     const businessName = searchParams.get('businessName');
     const email = searchParams.get('email');
+    const token = searchParams.get('token');
     
-    console.log('📦 Onboarding page loaded with:', { 
-      restaurantId: id, 
-      businessName, 
-      email,
-      fullUrl: window.location.href 
-    });
+    console.log('📦 ===== ONSOARDING PAGE LOADED =====');
+    console.log('Full URL:', window.location.href);
+    console.log('Restaurant ID from URL:', id);
+    console.log('Business Name from URL:', businessName);
+    console.log('Email from URL:', email);
+    console.log('Token in URL:', token ? '✅ YES' : '❌ NO');
+    
+    // CRITICAL: Save token to localStorage if present in URL
+    if (token) {
+      console.log('🔑 Saving token to localStorage from URL');
+      localStorage.setItem('drift-token', decodeURIComponent(token));
+      
+      // Verify it was saved
+      const savedToken = localStorage.getItem('drift-token');
+      console.log('✅ Token saved to localStorage:', savedToken ? 'Success' : 'Failed');
+      console.log('🔑 Token preview:', savedToken?.substring(0, 30) + '...');
+    } else {
+      console.log('❌ No token in URL - checking localStorage');
+      const existingToken = localStorage.getItem('drift-token');
+      console.log('🔑 Token in localStorage:', existingToken ? '✅ Present' : '❌ Missing');
+    }
     
     if (!id) {
       console.log('❌ No restaurantId found - showing error');
@@ -66,7 +82,7 @@ export function OnboardingPage() {
 
     // Pre-fill restaurant info with data from signup
     if (businessName || email) {
-      console.log('📝 Pre-filling restaurant info from signup:', { businessName, email });
+      console.log('📝 Pre-filling restaurant info from URL');
       setOnboardingData(prev => ({
         ...prev,
         restaurantInfo: {
@@ -92,6 +108,8 @@ export function OnboardingPage() {
         console.error('Error loading saved progress:', e);
       }
     }
+    
+    console.log('=====================================\n');
   }, [searchParams]);
 
   useEffect(() => {
