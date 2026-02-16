@@ -10,7 +10,7 @@ export function LoginPage() {
 
   // Use environment variable for API URL
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-  const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'http://localhost:5174';
+const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -21,8 +21,7 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
 
   // Use environment variables
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-  const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5174';
-
+const APP_URL = import.meta.env.VITE_APP_URL || 'https://drift-restaurant.onrender.com';
   // Get JWT token from localStorage (saved during signup/login)
   const getToken = () => {
     const token = localStorage.getItem('drift-token');
