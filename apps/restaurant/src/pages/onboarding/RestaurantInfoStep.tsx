@@ -16,43 +16,61 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
     name: '',
     address: '',
     phone: '',
-    cuisine: ''
+    cuisine: '',
+    email: ''
   });
 
   // Use environment variables
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
 
+  // ========== ELITE DEBUG LOGGING ==========
+  console.log('🎯 ===== RESTAURANT INFO STEP MOUNTED =====');
+  console.log('📌 restaurantId prop:', restaurantId);
+  console.log('🔧 API_URL being used:', API_URL);
+  console.log('📦 Initial info state (from signup):', info);
+  console.log('=======================================');
+
   useEffect(() => {
+    console.log('🔄 useEffect triggered for restaurantId:', restaurantId);
     fetchRestaurant();
   }, [restaurantId]);
 
   const fetchRestaurant = async () => {
+    console.log('🔍 fetchRestaurant called with ID:', restaurantId);
+    console.log('🌐 Fetching from:', `${API_URL}/api/restaurants/${restaurantId}`);
+    
     try {
-      // NO TOKEN REQUIRED for fetching during onboarding
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
+      
+      console.log('📡 Response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Restaurant data loaded:', data);
-        setInfo({
-          name: data.name || '',
+        console.log('✅ Restaurant data received:', data);
+        setInfo(prev => ({
+          name: data.name || prev.name || '',
           address: data.address || '',
           phone: data.phone || '',
-          cuisine: data.cuisine || ''
-        });
+          cuisine: data.cuisine || '',
+          email: data.email || prev.email || ''
+        }));
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Failed to fetch restaurant. Status:', response.status);
+        setError(`Failed to load restaurant data (${response.status})`);
       }
     } catch (error) {
-      console.error('Error fetching restaurant:', error);
-      setError('Failed to load restaurant data');
+      console.error('💥 Network/Fetch error:', error);
+      setError('Failed to load restaurant data. Network error.');
     }
   };
 
   const handleSubmit = async () => {
+    console.log('📤 handleSubmit with data:', info);
     setLoading(true);
     setError('');
     
     try {
-      // NO TOKEN REQUIRED for saving during onboarding
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
         method: 'PATCH',
         headers: { 
@@ -61,17 +79,20 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
         body: JSON.stringify(info)
       });
 
+      console.log('📡 PATCH response status:', response.status);
+
       if (response.ok) {
-        console.log('Restaurant saved successfully');
+        const responseData = await response.json();
+        console.log('✅ Restaurant saved successfully:', responseData);
         updateData({ restaurantInfo: info });
         onNext();
       } else {
         const errorText = await response.text();
-        console.error('Failed to save restaurant:', errorText);
+        console.error('❌ Failed to save restaurant:', errorText);
         setError('Failed to save restaurant information');
       }
     } catch (error) {
-      console.error('Error saving restaurant:', error);
+      console.error('💥 Error saving:', error);
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
@@ -100,6 +121,17 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext }: R
             onChange={(e) => setInfo({ ...info, name: e.target.value })}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
             placeholder="Trattoria Bellini"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+          <input
+            type="email"
+            value={info.email}
+            onChange={(e) => setInfo({ ...info, email: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
+            placeholder="owner@restaurant.com"
           />
         </div>
 

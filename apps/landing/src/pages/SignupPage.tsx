@@ -50,7 +50,9 @@ export function SignupPage() {
       localStorage.setItem('drift-user-email', formData.email);
 
       // DIRECT to onboarding - NO LOGIN PAGE
-      const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}`;
+      // In handleSignup function, after successful signup:
+      const redirectUrl = `${RESTAURANT_URL}/onboarding?restaurantId=${data.restaurantId}&businessName=${encodeURIComponent(formData.businessName)}&email=${encodeURIComponent(formData.email)}`;
+      window.location.href = redirectUrl;
       console.log('🚀 Redirecting to onboarding:', redirectUrl);
       
       // Use window.location for full page redirect

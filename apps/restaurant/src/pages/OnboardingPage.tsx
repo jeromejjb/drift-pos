@@ -45,18 +45,37 @@ export function OnboardingPage() {
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
   useEffect(() => {
-    // Get restaurantId from URL
+    // Get all params from URL
     const id = searchParams.get('restaurantId');
-    console.log('📦 Onboarding page loaded with restaurantId:', id);
-    console.log('Full URL:', window.location.href);
+    const businessName = searchParams.get('businessName');
+    const email = searchParams.get('email');
+    
+    console.log('📦 Onboarding page loaded with:', { 
+      restaurantId: id, 
+      businessName, 
+      email,
+      fullUrl: window.location.href 
+    });
     
     if (!id) {
       console.log('❌ No restaurantId found - showing error');
-      // Show error instead of redirecting
       return;
     }
     
     setRestaurantId(id);
+
+    // Pre-fill restaurant info with data from signup
+    if (businessName || email) {
+      console.log('📝 Pre-filling restaurant info from signup:', { businessName, email });
+      setOnboardingData(prev => ({
+        ...prev,
+        restaurantInfo: {
+          ...prev.restaurantInfo,
+          name: businessName ? decodeURIComponent(businessName) : '',
+          email: email ? decodeURIComponent(email) : ''
+        }
+      }));
+    }
 
     // Load saved progress from localStorage
     const saved = localStorage.getItem(`onboarding-${id}`);
@@ -64,7 +83,10 @@ export function OnboardingPage() {
       try {
         const { step, data } = JSON.parse(saved);
         setCurrentStep(step);
-        setOnboardingData(data || {});
+        setOnboardingData(prev => ({
+          ...prev,
+          ...data
+        }));
         console.log('📂 Loaded saved progress:', { step, data });
       } catch (e) {
         console.error('Error loading saved progress:', e);
@@ -228,5 +250,4 @@ export function OnboardingPage() {
       </div>
     </div>
   );
-}// FORCE DEPLOY - NO MORE LOCALHOST Sun Feb 15 18:12:00 CST 2026
-// FORCE DEPLOY - NO MORE LOCALHOST Sun Feb 15 18:12:28 CST 2026
+}
