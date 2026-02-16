@@ -23,9 +23,22 @@ export default defineConfig(({ mode }) => {
         }
       }
     ],
+    optimizeDeps: {
+      include: [
+        '@stripe/connect-js',
+        '@stripe/react-connect-js',
+        'framer-motion',
+        'lucide-react',
+        'react',
+        'react-dom',
+        'react-router-dom'
+      ],
+      force: true
+    },
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com'),
-      'import.meta.env.VITE_APP_URL': JSON.stringify(env.VITE_APP_URL || 'https://drift-restaurant.onrender.com')
+      'import.meta.env.VITE_APP_URL': JSON.stringify(env.VITE_APP_URL || 'https://drift-restaurant.onrender.com'),
+      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || '')
     },
     server: {
       port: 5174,
@@ -34,6 +47,19 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: false,
+      commonjsOptions: {
+        include: [/node_modules/],
+        transformMixedEsModules: true
+      },
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            stripe: ['@stripe/connect-js', '@stripe/react-connect-js'],
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            ui: ['framer-motion', 'lucide-react']
+          }
+        }
+      }
     },
   }
 })
