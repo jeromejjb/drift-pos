@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Mail, Phone, MapPin, ChevronRight, ChevronLeft, User, Briefcase, Users } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, ChevronRight, ChevronLeft, User, Briefcase, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
@@ -22,6 +22,52 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     role: '',
     teamSize: ''
   });
+
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Phone number formatting function
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-numeric characters
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits for US/Canada numbers
+    const limited = numbers.slice(0, 10);
+    
+    // Format based on length
+    if (limited.length <= 3) {
+      return limited;
+    } else if (limited.length <= 6) {
+      return `(${limited.slice(0, 3)}) ${limited.slice(3)}`;
+    } else {
+      return `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6, 10)}`;
+    }
+  };
+
+  // Phone validation
+  const validatePhone = (phone: string) => {
+    const numbers = phone.replace(/\D/g, '');
+    if (numbers.length === 0) return true; // Optional field
+    if (numbers.length !== 10) {
+      setPhoneError('Phone number must have 10 digits');
+      return false;
+    }
+    setPhoneError(null);
+    return true;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setFormData({ ...formData, phone: formatted });
+    validatePhone(formatted);
+  };
+
+  const handlePhoneBlur = () => {
+    if (formData.phone) {
+      validatePhone(formData.phone);
+    } else {
+      setPhoneError(null);
+    }
+  };
 
   // Load from ALL sources on mount
   useEffect(() => {
@@ -60,11 +106,21 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     
     console.log('✅ Final merged data:', mergedData);
     
+    // Format phone number if it exists (remove any existing formatting and reapply)
+    let phoneNumber = mergedData.phone || '';
+    if (phoneNumber) {
+      // Remove any existing formatting and reapply our standard format
+      const numbers = phoneNumber.replace(/\D/g, '');
+      if (numbers.length > 0) {
+        phoneNumber = formatPhoneNumber(numbers);
+      }
+    }
+    
     // Set ALL form fields with merged data
     setFormData({
       restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || '',
       email: mergedData.email || '',
-      phone: mergedData.phone || '',
+      phone: phoneNumber,
       address: mergedData.address || '',
       fullName: mergedData.fullName || '',
       role: mergedData.role || '',
@@ -75,11 +131,16 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate phone before submit
+    if (formData.phone && !validatePhone(formData.phone)) {
+      return;
+    }
+    
     // Save to parent and localStorage
     const dataToSave = {
       name: formData.restaurantName,
       email: formData.email,
-      phone: formData.phone,
+      phone: formData.phone, // Store formatted version
       address: formData.address,
       fullName: formData.fullName,
       role: formData.role,
@@ -162,7 +223,6 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
               placeholder="e.g., Joe's Pizza"
             />
-            {/* Show source of data for debugging - remove in production */}
             {formData.restaurantName && (
               <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
             )}
@@ -186,17 +246,42 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="(555) 123-4567"
-            />
-            {formData.phone && (
-              <p className="text-xs text-green-600 mt-1">✓ Pre-filled from signup</p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number <span className="text-gray-400">(optional)</span>
+            </label>
+            <div className="relative">
+              <Phone className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                phoneError ? 'text-red-400' : 'text-gray-400'
+              }`} />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
+                maxLength={14} // (123) 456-7890 is 14 characters
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black ${
+                  phoneError 
+                    ? 'border-red-300 bg-red-50' 
+                    : 'border-gray-200'
+                }`}
+                placeholder="(555) 123-4567"
+              />
+              {formData.phone && !phoneError && (
+                <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+              )}
+            </div>
+            {phoneError && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {phoneError}
+              </p>
             )}
+            {formData.phone && !phoneError && (
+              <p className="text-xs text-green-600 mt-1">✓ Format looks good</p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Enter 10-digit US/Canada number
+            </p>
           </div>
 
           <div>
@@ -220,7 +305,11 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
               <ChevronLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <Button type="submit" className="flex-1">
+            <Button 
+              type="submit" 
+              className="flex-1"
+              disabled={!!phoneError}
+            >
               Continue
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
