@@ -201,47 +201,57 @@ morgan.token('body', (req: any) => {
 
 app.use(morgan(':method :url :status :body - :response-time ms'));
 
-// ==================== FUN ROOT ENDPOINT ====================
+// ==================== DRIFT POS ROOT ====================
 app.get('/', (req, res) => {
   const ascii = `
 \x1b[36m    ╔══════════════════════════════════════╗
-    ║     ╔═╗╦═╗╔═╗╔╦╗╔═╗╔╦╗  ╔═╗╔═╗╔╦╗    ║
-    ║     ║ ╦╠╦╝╠═╣║║║╠═╣ ║   ║  ║ ║ ║║    ║
-    ║     ╚═╝╩╚═╩ ╩╩ ╩╩ ╩ ╩   ╚═╝╚═╝═╩╝    ║
-    ╚══════════════════════════════════════╝\x1b[0m
+    ║                                           ║
+    ║            \x1b[1;37mDRIFT POS\x1b[0m\x1b[36m                    ║
+    ║                                           ║
+    ║     \x1b[90m───────  ✦  ───────\x1b[0m\x1b[36m                  ║
+    ║                                           ║
+    ║     \x1b[37mflow · pay · grow\x1b[0m\x1b[36m                       ║
+    ║                                           ║
+    ╚═══════════════════════════════════════╝\x1b[0m
 
-\x1b[32m  ⚡ Global payment infrastructure ⚡\x1b[0m
-\x1b[90m  (Built with ♥ on the Great Lakes · Secured for the world)\x1b[0m
+\x1b[32m  ──────────────────────────────────────────────\x1b[0m
+\x1b[37m  The operating system for business money\x1b[0m
+\x1b[90m  Built on the Great Lakes · Securing the world\x1b[0m
+\x1b[32m  ──────────────────────────────────────────────\x1b[0m
 
 \x1b[33m  ┌─────────────────────────────────────────────┐
-  │  Version: 1.0.0                              │
-  │  Status: \x1b[32m● OPERATIONAL\x1b[33m                           │
-  │  Security: \x1b[36mBANK GRADE · PCI DSS\x1b[33m                   │
-  │  Origin: \x1b[36mGreat Lakes, USA\x1b[33m                       │
-  │  Destination: \x1b[32mEverywhere 🌎\x1b[33m                      │
+  │  \x1b[1;37mstatus\x1b[0m\x1b[33m      \x1b[32m● operational\x1b[33m                     │
+  │  \x1b[1;37msecurity\x1b[0m\x1b[33m    \x1b[36mbank grade · pci dss\x1b[33m            │
+  │  \x1b[1;37morigin\x1b[0m\x1b[33m      \x1b[36mgreat lakes, usa\x1b[33m                │
+  │  \x1b[1;37mmission\x1b[0m\x1b[33m     \x1b[32mmaking money move better\x1b[33m        │
   └─────────────────────────────────────────────┘\x1b[0m
 
-\x1b[34m  🚀 Endpoints:
-     ├─ /api/auth/register
-     ├─ /api/auth/login  
-     ├─ /api/auth/verify
-     ├─ /api/restaurants/:id
-     ├─ /api/tables/:id/qrcode
-     ├─ /api/orders
-     ├─ /api/demo/schedule
-     ├─ /api/users/:id
-     └─ /health\x1b[0m
+\x1b[34m  ──────────────────────────────────────────────\x1b[0m
+\x1b[37m  what you can do here\x1b[0m
+\x1b[34m  ──────────────────────────────────────────────\x1b[0m
 
-\x1b[35m  💡 Started in Milwaukee · Now securing payments worldwide\x1b[0m
-\x1b[90m     (Your data is safer than a vault in a bank vault)\x1b[0m
+\x1b[37m     accept payments · split bills · pay suppliers
+     generate qr codes · run your restaurant
+     schedule a demo · join the movement\x1b[0m
 
-\x1b[37m  🔗 https://driftpos.com\x1b[0m
+\x1b[34m  ──────────────────────────────────────────────\x1b[0m
+
+\x1b[35m                           \x1b[37m.
+                          \x1b[37m...
+                         \x1b[37m.....
+                        \x1b[37m.......
+                       \x1b[36m.........\x1b[0m
+
+\x1b[36m                \x1b[37mdriftpos.com\x1b[0m\x1b[36m\x1b[0m
+
+\x1b[90m  your money should move this good.\x1b[0m
   `;
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('X-Powered-By', 'Drift POS');
   res.send(ascii);
 });
 
