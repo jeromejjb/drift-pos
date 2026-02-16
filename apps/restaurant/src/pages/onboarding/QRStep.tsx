@@ -18,10 +18,10 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(0);
   const [cardsPerSheet, setCardsPerSheet] = useState<'6' | '9' | '12'>('9');
-  const [downloading, setDownloading] = useState(false); // New state for download loading
+  const [downloading, setDownloading] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
-  const restaurantName = data?.restaurantInfo?.name || localStorage.getItem('drift-restaurant-name') || 'Your Business';
+  const restaurantName = data?.restaurantInfo?.name || data?.name || localStorage.getItem('drift-restaurant-name') || 'Your Business';
 
   const generateQRCodes = async () => {
     setGenerating(true);
@@ -33,6 +33,8 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
     }, 100);
     
     try {
+      console.log('🎯 Generating QR codes for tables:', data.tables?.length || 0);
+      
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/tables/generate-qrs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -40,16 +42,18 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
       if (!response.ok) throw new Error('Failed to generate QR codes');
 
-      const data = await response.json();
+      const result = await response.json();
+      console.log('✅ QR codes generated:', result.tables?.length || 0);
       
       setProgress(100);
       setTimeout(() => {
-        setQrCodes(data.tables);
-        updateData({ qrCodes: data.tables });
+        setQrCodes(result.tables);
+        updateData({ qrCodes: result.tables });
         setGenerating(false);
       }, 300);
       
     } catch (error) {
+      console.error('❌ QR generation failed:', error);
       setError('Failed to generate QR codes. Please try again.');
       setGenerating(false);
     } finally {
@@ -58,18 +62,15 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   };
 
   const downloadPDF = async () => {
-    // Prevent double clicks
     if (downloading) return;
-    
     setDownloading(true);
     
     try {
-      // Create a hidden container for PDF generation
       const container = document.createElement('div');
       container.style.position = 'absolute';
       container.style.left = '-9999px';
       container.style.top = '-9999px';
-      container.style.width = '210mm'; // A4 width
+      container.style.width = '210mm';
       container.style.backgroundColor = 'white';
       container.style.fontFamily = 'Helvetica, Arial, sans-serif';
       document.body.appendChild(container);
@@ -102,7 +103,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
           <div style="position: absolute; bottom: 25mm; left: 0; right: 0; text-align: center;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #999;">
-              <span style="font-size: 12px;">Made with</span>
+              <span style="font-size: 12px;">Built with</span>
               <span style="font-size: 16px; color: #999;">♡</span>
               <span style="font-size: 12px;">on the</span>
               <img src="/greatlakes.png" style="height: 16px; width: auto; opacity: 0.8;" />
@@ -126,7 +127,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         page.style.position = 'relative';
         page.style.boxSizing = 'border-box';
 
-        // Page header
         const header = document.createElement('div');
         header.style.textAlign = 'center';
         header.style.marginBottom = '10mm';
@@ -136,7 +136,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         header.innerText = `TABLE QR CODES · PAGE ${pageNum + 1} OF ${totalPages}`;
         page.appendChild(header);
 
-        // Grid container
         const grid = document.createElement('div');
         grid.style.display = 'grid';
         grid.style.gap = '5mm';
@@ -166,7 +165,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           card.style.boxSizing = 'border-box';
           card.style.position = 'relative';
 
-          // QR Code image
           const img = document.createElement('img');
           img.src = qr.qrCode;
           img.style.width = perPage === 6 ? '45mm' : perPage === 9 ? '38mm' : '32mm';
@@ -177,7 +175,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           img.style.transform = 'translate(-50%, -50%)';
           card.appendChild(img);
 
-          // Table number
           const tableNum = document.createElement('div');
           tableNum.style.position = 'absolute';
           tableNum.style.top = '8px';
@@ -197,7 +194,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           tableLabel.innerText = 'table';
           card.appendChild(tableLabel);
 
-          // DRIFT logo
           const drift = document.createElement('div');
           drift.style.position = 'absolute';
           drift.style.bottom = '8px';
@@ -209,7 +205,6 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           drift.innerText = 'DRIFT';
           card.appendChild(drift);
 
-          // Great Lakes branding
           const lakes = document.createElement('div');
           lakes.style.position = 'absolute';
           lakes.style.bottom = '8px';
@@ -220,7 +215,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
           lakes.style.fontSize = '6px';
           lakes.style.color = '#bbb';
           lakes.innerHTML = `
-            <span>made with</span>
+            <span>Built with</span>
             <span style="font-size: 8px;">♡</span>
             <span>on the</span>
             <img src="/greatlakes.png" style="height: 8px; width: auto; opacity: 0.8; margin-left: 2px;" />
@@ -280,7 +275,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
           <div style="position: absolute; bottom: 25mm; left: 0; right: 0; text-align: center;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 6px; color: #999;">
-              <span style="font-size: 12px;">Made with</span>
+              <span style="font-size: 12px;">Built with</span>
               <span style="font-size: 16px; color: #999;">♡</span>
               <span style="font-size: 12px;">on the</span>
               <img src="/greatlakes.png" style="height: 16px; width: auto; opacity: 0.8;" />
@@ -314,24 +309,31 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
       }
 
-      // Clean up
       document.body.removeChild(container);
-
-      // Save PDF
-      pdf.save(`${restaurantName}-qr-codes.pdf`);
+      pdf.save(`${restaurantName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-qr-codes.pdf`);
     } catch (error) {
-      console.error('PDF generation failed:', error);
+      console.error('❌ PDF generation failed:', error);
       setError('Failed to generate PDF. Please try again.');
     } finally {
       setDownloading(false);
     }
   };
 
+  // Auto-generate QR codes when tables are available
   useEffect(() => {
-    if (qrCodes.length === 0 && data.tables) {
+    console.log('📊 QRStep data:', {
+      hasTables: !!data.tables,
+      tableCount: data.tables?.length || 0,
+      hasQrCodes: qrCodes.length > 0,
+      restaurantId
+    });
+
+    // Only generate if we have tables AND no QR codes yet
+    if (data.tables && Array.isArray(data.tables) && data.tables.length > 0 && qrCodes.length === 0 && !generating) {
+      console.log(`🎯 Auto-generating QR codes for ${data.tables.length} tables`);
       generateQRCodes();
     }
-  }, []);
+  }, [data.tables, restaurantId]); // Add dependencies
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
@@ -351,6 +353,11 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         <p className="text-base text-gray-500 max-w-md mx-auto">
           Each table gets its own unique QR code. Print, cut, and place them around your venue.
         </p>
+        {data.tables && (
+          <p className="text-sm text-blue-600 mt-2">
+            Generating codes for {data.tables.length} {data.tables.length === 1 ? 'table' : 'tables'}
+          </p>
+        )}
       </div>
 
       {error && (
@@ -453,9 +460,9 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
             )}
           </button>
 
-          {/* Great Lakes branding - matching footer exactly */}
+          {/* Great Lakes branding */}
           <div className="flex items-center justify-center gap-2 mb-6">
-            <span className="text-sm text-gray-400">Made with</span>
+            <span className="text-sm text-gray-400">Built with</span>
             <span className="text-gray-400 text-lg">♡</span>
             <span className="text-sm text-gray-400">on the</span>
             <img 
@@ -484,11 +491,27 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
       ) : (
         <button
           onClick={generateQRCodes}
-          className="w-full py-16 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 hover:border-black transition-all text-center"
+          disabled={!data.tables || data.tables.length === 0}
+          className={`w-full py-16 rounded-xl border-2 border-dashed transition-all text-center ${
+            !data.tables || data.tables.length === 0
+              ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
+              : 'bg-gray-50 border-gray-300 hover:border-black'
+          }`}
         >
-          <QrCode className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-lg text-gray-700 mb-1">Generate QR codes</p>
-          <p className="text-sm text-gray-500">Create unique codes for each table</p>
+          <QrCode className={`w-12 h-12 mx-auto mb-3 ${
+            !data.tables || data.tables.length === 0 ? 'text-gray-300' : 'text-gray-400'
+          }`} />
+          <p className={`text-lg mb-1 ${
+            !data.tables || data.tables.length === 0 ? 'text-gray-400' : 'text-gray-700'
+          }`}>
+            Generate QR codes
+          </p>
+          <p className="text-sm text-gray-500">
+            {!data.tables || data.tables.length === 0
+              ? 'No tables configured yet'
+              : `Create unique codes for ${data.tables.length} tables`
+            }
+          </p>
         </button>
       )}
     </div>

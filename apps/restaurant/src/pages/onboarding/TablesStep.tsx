@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle } from 'lucide-react';
 
 interface TablesStepProps {
@@ -10,13 +10,55 @@ interface TablesStepProps {
 }
 
 export function TablesStep({ restaurantId, data, updateData, onNext, onPrev }: TablesStepProps) {
-  const [tables, setTables] = useState(data.tables || [
-    { id: '1', number: 1 },
-    { id: '2', number: 2 },
-    { id: '3', number: 3 },
-    { id: '4', number: 4 },
-    { id: '5', number: 5 },
-  ]);
+  // Initialize tables from props or create default 5 ONLY if no data exists
+  const [tables, setTables] = useState(() => {
+    // If data.tables exists and has items, use it
+    if (data.tables && Array.isArray(data.tables) && data.tables.length > 0) {
+      return data.tables;
+    }
+    
+    // If there's a tableCount in data (from previous selection), use that
+    if (data.tableCount && typeof data.tableCount === 'number') {
+      return Array.from({ length: data.tableCount }, (_, i) => ({
+        id: `table-${i + 1}-${Date.now()}`,
+        number: i + 1
+      }));
+    }
+    
+    // If there's a tables array in localStorage (from previous steps), check that
+    const stored = localStorage.getItem('drift_onboarding');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.tables && Array.isArray(parsed.tables) && parsed.tables.length > 0) {
+        return parsed.tables;
+      }
+      if (parsed.tableCount && typeof parsed.tableCount === 'number') {
+        return Array.from({ length: parsed.tableCount }, (_, i) => ({
+          id: `table-${i + 1}-${Date.now()}`,
+          number: i + 1
+        }));
+      }
+    }
+    
+    // Default to 5 tables ONLY if absolutely nothing exists
+    return [
+      { id: '1', number: 1 },
+      { id: '2', number: 2 },
+      { id: '3', number: 3 },
+      { id: '4', number: 4 },
+      { id: '5', number: 5 },
+    ];
+  });
+
+  // Save to localStorage whenever tables change
+  useEffect(() => {
+    const stored = localStorage.getItem('drift_onboarding');
+    const parsed = stored ? JSON.parse(stored) : {};
+    localStorage.setItem('drift_onboarding', JSON.stringify({
+      ...parsed,
+      tables: tables
+    }));
+  }, [tables]);
 
   const addTable = () => {
     const newNumber = tables.length + 1;
@@ -36,7 +78,18 @@ export function TablesStep({ restaurantId, data, updateData, onNext, onPrev }: T
   };
 
   const handleContinue = () => {
+    // Save to parent and localStorage
     updateData({ tables });
+    
+    // Also save to localStorage with full context
+    const stored = localStorage.getItem('drift_onboarding');
+    const parsed = stored ? JSON.parse(stored) : {};
+    localStorage.setItem('drift_onboarding', JSON.stringify({
+      ...parsed,
+      tables: tables,
+      tableCount: tables.length
+    }));
+    
     onNext();
   };
 
@@ -45,6 +98,11 @@ export function TablesStep({ restaurantId, data, updateData, onNext, onPrev }: T
       <div>
         <h2 className="text-2xl font-light text-gray-900 mb-2">Set up your tables</h2>
         <p className="text-gray-400">Add all the tables in your restaurant</p>
+        {data.tableCount && (
+          <p className="text-sm text-blue-600 mt-2">
+            You previously set up {data.tableCount} tables
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl p-6 border border-gray-200">
@@ -88,7 +146,7 @@ export function TablesStep({ restaurantId, data, updateData, onNext, onPrev }: T
           onClick={handleContinue}
           className="px-8 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center gap-2"
         >
-          Continue
+          Continue with {tables.length} {tables.length === 1 ? 'table' : 'tables'}
           <CheckCircle className="w-4 h-4" />
         </button>
       </div>

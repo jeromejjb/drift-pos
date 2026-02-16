@@ -42,9 +42,8 @@ export function Footer() {
               © 2026 Drift Technologies. All rights reserved.
             </p>
             
-            {/* Made with love on the Great Lakes - elegant version */}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Made with</span>
+              <span className="text-sm text-gray-400">Built with</span>
               <span className="text-gray-400">♡</span>
               <span className="text-sm text-gray-400">on the</span>
               <img 

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
 interface Props {
+   restaurantId: string; 
   data: any;
   updateData: (data: any) => void;
   onNext: () => void;

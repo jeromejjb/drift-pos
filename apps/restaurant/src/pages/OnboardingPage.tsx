@@ -11,7 +11,10 @@ import {
   ArrowLeft,
   ChefHat,
   Sparkles,
-  ScrollText
+  ScrollText,
+  User,
+  Briefcase,
+  Users
 } from 'lucide-react';
 import { RestaurantInfoStep } from './onboarding/RestaurantInfoStep';
 import { TablesStep } from './onboarding/TablesStep';
@@ -79,6 +82,11 @@ interface OnboardingData {
   menu?: any;
   qrCodes?: any;
   stripeConnected?: boolean;
+  fullName?: string;
+  email?: string;
+  businessType?: string;
+  role?: string;
+  teamSize?: string;
   [key: string]: any;
 }
 
@@ -89,19 +97,29 @@ export function OnboardingPage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
+  // Load ALL data from URL params and localStorage on mount
   useEffect(() => {
     const id = searchParams.get('restaurantId');
     const businessName = searchParams.get('businessName');
+    const businessType = searchParams.get('businessType');
     const email = searchParams.get('email');
+    const fullName = searchParams.get('fullName');
+    const role = searchParams.get('role');
+    const teamSize = searchParams.get('teamSize');
     const token = searchParams.get('token');
     
-    console.log('📦 Onboarding page loaded with:', { 
+    console.log('📦 Onboarding page loaded with URL params:', { 
       restaurantId: id, 
       businessName, 
+      businessType,
       email,
+      fullName,
+      role,
+      teamSize,
       token: token ? '✅ Present' : '❌ Missing'
     });
     
+    // Save token if present
     if (token) {
       console.log('🔑 Saving token to localStorage');
       localStorage.setItem('drift-token', decodeURIComponent(token));
@@ -114,17 +132,22 @@ export function OnboardingPage() {
     
     setRestaurantId(id);
 
-    if (businessName || email) {
-      setOnboardingData(prev => ({
-        ...prev,
-        restaurantInfo: {
-          ...prev.restaurantInfo,
-          name: businessName ? decodeURIComponent(businessName) : '',
-          email: email ? decodeURIComponent(email) : ''
-        }
-      }));
-    }
+    // Build comprehensive user profile from URL params
+    const urlProfile = {
+      restaurantName: businessName ? decodeURIComponent(businessName) : '',
+      businessType: businessType ? decodeURIComponent(businessType) : 'restaurant',
+      email: email ? decodeURIComponent(email) : '',
+      fullName: fullName ? decodeURIComponent(fullName) : '',
+      role: role ? decodeURIComponent(role) : '',
+      teamSize: teamSize ? decodeURIComponent(teamSize) : '',
+    };
 
+    console.log('👤 Profile from URL:', urlProfile);
+
+    // Save profile to localStorage for other steps to use
+    localStorage.setItem('drift-user-profile', JSON.stringify(urlProfile));
+
+    // Load any saved onboarding progress
     const saved = localStorage.getItem(`onboarding-${id}`);
     if (saved) {
       try {
@@ -132,21 +155,63 @@ export function OnboardingPage() {
         setCurrentStep(step);
         setOnboardingData(prev => ({
           ...prev,
-          ...data
+          ...data,
+          // URL data takes precedence over saved data
+          ...urlProfile
         }));
         console.log('📂 Loaded saved progress:', { step, data });
       } catch (e) {
         console.error('Error loading saved progress:', e);
+        // If no saved progress, just use URL data
+        setOnboardingData(prev => ({
+          ...prev,
+          ...urlProfile
+        }));
+      }
+    } else {
+      // No saved progress, just use URL data
+      setOnboardingData(prev => ({
+        ...prev,
+        ...urlProfile
+      }));
+    }
+
+    // Also check for drift-user-profile in localStorage (from previous sessions)
+    const storedProfile = localStorage.getItem('drift-user-profile');
+    if (storedProfile && !saved) {
+      try {
+        const profile = JSON.parse(storedProfile);
+        setOnboardingData(prev => ({
+          ...prev,
+          ...profile,
+          restaurantName: profile.businessName || profile.restaurantName || prev.restaurantName,
+        }));
+        console.log('📁 Loaded profile from localStorage:', profile);
+      } catch (e) {
+        console.error('Error loading profile:', e);
       }
     }
   }, [searchParams]);
 
+  // Save progress whenever it changes
   useEffect(() => {
     if (restaurantId) {
       localStorage.setItem(`onboarding-${restaurantId}`, JSON.stringify({
         step: currentStep,
         data: onboardingData
       }));
+      
+      // Also update the user profile in localStorage
+      const profileToSave = {
+        restaurantName: onboardingData.restaurantName || onboardingData.name,
+        businessType: onboardingData.businessType,
+        email: onboardingData.email,
+        fullName: onboardingData.fullName,
+        role: onboardingData.role,
+        teamSize: onboardingData.teamSize,
+      };
+      
+      localStorage.setItem('drift-user-profile', JSON.stringify(profileToSave));
     }
   }, [currentStep, onboardingData, restaurantId]);
 
@@ -165,6 +230,7 @@ export function OnboardingPage() {
   };
 
   const updateOnboardingData = (data: Partial<OnboardingData>) => {
+    console.log('💾 Updating onboarding data:', data);
     setOnboardingData(prev => ({ ...prev, ...data }));
   };
 
@@ -222,6 +288,22 @@ export function OnboardingPage() {
             </div>
           </div>
           
+          {/* User Profile Summary - Show if we have data */}
+          {(onboardingData.fullName || onboardingData.businessType) && (
+            <div className="flex items-center gap-3 text-sm">
+              {onboardingData.fullName && (
+                <span className="text-gray-600 hidden md:inline">
+                  {onboardingData.fullName}
+                </span>
+              )}
+              {onboardingData.businessType && (
+                <span className="px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+                  {onboardingData.businessType}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Step counter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400">
@@ -230,6 +312,36 @@ export function OnboardingPage() {
           </div>
         </div>
       </header>
+
+      {/* User Profile Bar - Visible when we have profile data */}
+      {(onboardingData.fullName || onboardingData.email || onboardingData.role || onboardingData.teamSize) && (
+        <div className="bg-blue-50 border-b border-blue-100">
+          <div className="max-w-6xl mx-auto px-6 py-2">
+            <div className="flex items-center gap-4 text-xs text-blue-700 flex-wrap">
+              {onboardingData.fullName && (
+                <span className="flex items-center gap-1">
+                  <User className="w-3 h-3" /> {onboardingData.fullName}
+                </span>
+              )}
+              {onboardingData.email && (
+                <span className="flex items-center gap-1">
+                  <Store className="w-3 h-3" /> {onboardingData.email}
+                </span>
+              )}
+              {onboardingData.role && (
+                <span className="flex items-center gap-1">
+                  <Briefcase className="w-3 h-3" /> {onboardingData.role}
+                </span>
+              )}
+              {onboardingData.teamSize && (
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3" /> {onboardingData.teamSize}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Beautiful Step Navigation */}
       <div className="border-b border-gray-100 bg-white">
@@ -317,12 +429,13 @@ export function OnboardingPage() {
             transition={{ duration: 0.2 }}
           >
             <CurrentStepComponent
-              restaurantId={restaurantId}
-              data={onboardingData}
-              updateData={updateOnboardingData}
-              onNext={nextStep}
-              onPrev={prevStep}
-            />
+            restaurantId={restaurantId}
+            data={onboardingData}
+            updateData={updateOnboardingData}
+            onNext={nextStep}
+            onPrev={prevStep}
+            onComplete={nextStep}  // Add this line
+          />
           </motion.div>
         </AnimatePresence>
       </main>

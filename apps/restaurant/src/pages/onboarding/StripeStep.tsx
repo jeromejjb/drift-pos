@@ -91,7 +91,7 @@ const TIERS = {
   }
 };
 
-export function StripeStep({ data, onComplete, updateData }) {
+export function StripeStep({ restaurantId, data, onComplete, updateData }) {
   const [loading, setLoading] = useState(false);
   const [selectedTier, setSelectedTier] = useState('free');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -306,7 +306,7 @@ export function StripeStep({ data, onComplete, updateData }) {
       </div>
       
       {/* Debug info - remove in production */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <div className="mt-4 p-2 bg-gray-100 rounded text-xs font-mono">
           <p>Email: {savedData.email || '❌ MISSING'}</p>
           <p>Name: {savedData.restaurantName || '❌ MISSING'}</p>
