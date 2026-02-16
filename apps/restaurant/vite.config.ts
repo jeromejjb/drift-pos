@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
         }
       }
     ],
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, './src'),
+      },
+      dedupe: ['react', 'react-dom', '@stripe/connect-js', '@stripe/react-connect-js']
+    },
     optimizeDeps: {
       include: [
         '@stripe/connect-js',
@@ -33,7 +39,10 @@ export default defineConfig(({ mode }) => {
         'react-dom',
         'react-router-dom'
       ],
-      force: true
+      force: true,
+      esbuildOptions: {
+        target: 'es2020'
+      }
     },
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com'),
@@ -60,6 +69,6 @@ export default defineConfig(({ mode }) => {
           }
         }
       }
-    },
+    }
   }
 })
