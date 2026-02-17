@@ -184,7 +184,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
 // Auth endpoints
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, name, restaurantName } = req.body;
+    const { email, password, name, restaurantName, tableCount = 1 } = req.body; // Add tableCount parameter
 
     if (!email || !password || !name || !restaurantName) {
       return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
@@ -205,15 +205,22 @@ app.post('/api/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({ data: { email, name, passwordHash: hashedPassword } });
+      
+      // Create restaurant with dynamic number of tables based on tableCount
       const restaurant = await tx.restaurant.create({
         data: {
           name: restaurantName,
           email,
           supabaseUserId: user.id,
-          tables: { create: [{ number: 1 }] }
+          tables: {
+            create: Array.from({ length: tableCount }, (_, i) => ({ 
+              number: i + 1 
+            }))
+          }
         },
         include: { tables: true }
       });
+      
       return { user, restaurant };
     });
 
@@ -227,6 +234,7 @@ app.post('/api/auth/register', async (req, res) => {
       success: true,
       token,
       restaurantId: result.restaurant.id,
+      tableCount: result.restaurant.tables.length,
       user: { id: result.user.id, email: result.user.email, name: result.user.name }
     });
   } catch (error) {
