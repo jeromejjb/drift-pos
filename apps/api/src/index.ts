@@ -422,21 +422,60 @@ app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
 app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) => {
   try {
     const { restaurantId } = req.params;
-    const tables = await prisma.table.findMany({ where: { restaurantId }, orderBy: { number: 'asc' } });
-    if (!tables.length) return res.status(404).json({ error: 'No tables found', code: 'NOT_FOUND' });
-
-    const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
-    const qrCodes = [];
-
-    for (const table of tables) {
-      const url = `${baseUrl}/table/${table.id}`;
-      const qrDataUrl = await QRCode.toDataURL(url, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
-      await prisma.table.update({ where: { id: table.id }, data: { qrCode: url } });
-      qrCodes.push({ tableId: table.id, tableNumber: table.number, qrCode: qrDataUrl, url });
+    const { tables: requestedTables } = req.body;
+    
+    // Validate we have tables to generate
+    if (!requestedTables || !Array.isArray(requestedTables) || requestedTables.length === 0) {
+      return res.status(400).json({ error: 'No tables provided', code: 'NO_TABLES' });
     }
 
+    console.log(`🎯 Generating QR codes for ${requestedTables.length} tables for restaurant ${restaurantId}`);
+
+    const baseUrl = process.env.DINER_URL || 'https://app.driftpos.com';
+    const qrCodes = [];
+
+    for (const table of requestedTables) {
+      // Verify the table exists and belongs to this restaurant
+      const existingTable = await prisma.table.findFirst({
+        where: { 
+          id: table.id,
+          restaurantId 
+        }
+      });
+
+      if (!existingTable) {
+        console.warn(`⚠️ Table ${table.id} not found for restaurant ${restaurantId}, skipping`);
+        continue;
+      }
+
+      const url = `${baseUrl}/table/${table.id}`;
+      const qrDataUrl = await QRCode.toDataURL(url, { 
+        width: 400, 
+        margin: 2, 
+        color: { dark: '#000000', light: '#ffffff' } 
+      });
+      
+      // Update the table with QR code URL
+      await prisma.table.update({ 
+        where: { id: table.id }, 
+        data: { qrCode: url } 
+      });
+      
+      qrCodes.push({ 
+        tableId: table.id, 
+        tableNumber: existingTable.number, 
+        qrCode: qrDataUrl, 
+        url 
+      });
+      
+      console.log(`✅ Generated QR code for table ${existingTable.number}`);
+    }
+
+    console.log(`✅ Successfully generated ${qrCodes.length} QR codes`);
     res.json({ tables: qrCodes });
+    
   } catch (error) {
+    console.error('❌ QR generation error:', error);
     res.status(500).json({ error: 'Failed to generate QR codes', code: 'SERVER_ERROR' });
   }
 });
