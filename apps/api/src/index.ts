@@ -430,25 +430,30 @@ app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) 
     }
 
     console.log(`🎯 Generating QR codes for ${requestedTables.length} tables for restaurant ${restaurantId}`);
+    console.log('Requested tables:', requestedTables.map(t => ({ number: t.number, id: t.id })));
 
     const baseUrl = process.env.DINER_URL || 'https://app.driftpos.com';
     const qrCodes = [];
 
-    for (const table of requestedTables) {
-      // Verify the table exists and belongs to this restaurant
-      const existingTable = await prisma.table.findFirst({
-        where: { 
-          id: table.id,
-          restaurantId 
-        }
-      });
+    // First, get ALL tables for this restaurant from the database
+    const dbTables = await prisma.table.findMany({
+      where: { restaurantId },
+      orderBy: { number: 'asc' }
+    });
 
-      if (!existingTable) {
-        console.warn(`⚠️ Table ${table.id} not found for restaurant ${restaurantId}, skipping`);
+    console.log(`📋 Found ${dbTables.length} tables in database:`, dbTables.map(t => ({ number: t.number, id: t.id })));
+
+    // Match by table NUMBER instead of ID
+    for (const requestedTable of requestedTables) {
+      // Find the table with the matching number in the database
+      const dbTable = dbTables.find(t => t.number === requestedTable.number);
+      
+      if (!dbTable) {
+        console.warn(`⚠️ Table number ${requestedTable.number} not found in database for restaurant ${restaurantId}`);
         continue;
       }
 
-      const url = `${baseUrl}/table/${table.id}`;
+      const url = `${baseUrl}/table/${dbTable.id}`;
       const qrDataUrl = await QRCode.toDataURL(url, { 
         width: 400, 
         margin: 2, 
@@ -457,18 +462,18 @@ app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) 
       
       // Update the table with QR code URL
       await prisma.table.update({ 
-        where: { id: table.id }, 
+        where: { id: dbTable.id }, 
         data: { qrCode: url } 
       });
       
       qrCodes.push({ 
-        tableId: table.id, 
-        tableNumber: existingTable.number, 
+        tableId: dbTable.id, 
+        tableNumber: dbTable.number, 
         qrCode: qrDataUrl, 
         url 
       });
       
-      console.log(`✅ Generated QR code for table ${existingTable.number}`);
+      console.log(`✅ Generated QR code for table ${dbTable.number} (ID: ${dbTable.id})`);
     }
 
     console.log(`✅ Successfully generated ${qrCodes.length} QR codes`);
