@@ -92,28 +92,28 @@ export function LoginPage() {
             </p>
           </motion.div>
           
-          {/* Simple stats - cleaner than before */}
-          <div className="space-y-4 mb-12">
-            {[
-              { label: 'Active businesses', value: '10,000+' },
-              { label: 'Transactions processed', value: '$2.5B+' },
-              { label: 'Platform uptime', value: '99.9%' }
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 + i * 0.1 }}
-                className="flex items-center gap-3"
-              >
-                <div className="w-1 h-8 bg-white/20 rounded-full" />
-                <div>
-                  <div className="text-2xl font-light">{stat.value}</div>
-                  <div className="text-white/40 text-sm">{stat.label}</div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+         {/* Welcome back to... */}
+        <div className="space-y-4 mb-12">
+          {[
+            { feature: 'Your business overview', detail: 'Sales, trends, and insights' },
+            { feature: 'Order management', detail: 'Live orders and history' },
+            { feature: 'Menu control', detail: 'Update anytime, anywhere' }
+          ].map((item, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 + i * 0.1 }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-1 h-8 bg-white/20 rounded-full" />
+              <div>
+                <div className="text-2xl font-light text-white">{item.feature}</div>
+                <div className="text-white/40 text-sm">{item.detail}</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
           
           {/* Great Lakes pride - matching signup page */}
           <motion.div
