@@ -14,8 +14,12 @@ import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { randomBytes } from 'crypto';
 import stripeRouter from './routes/stripe';
+import path from 'path'; 
+import fs from 'fs'; 
 
 dotenv.config();
+
+
 
 const app = express();
 const httpServer = createServer(app);
@@ -184,7 +188,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
 // Auth endpoints
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, name, restaurantName, tableCount = 1 } = req.body; // Add tableCount parameter
+    const { email, password, name, restaurantName, tableCount = 1 } = req.body;
 
     if (!email || !password || !name || !restaurantName) {
       return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
@@ -206,7 +210,6 @@ app.post('/api/auth/register', async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({ data: { email, name, passwordHash: hashedPassword } });
       
-      // Create restaurant with dynamic number of tables based on tableCount
       const restaurant = await tx.restaurant.create({
         data: {
           name: restaurantName,
@@ -856,12 +859,54 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
   }
 });
 
-// Error handlers
+// ============================================
+// STATIC FILE SERVING AND CLIENT-SIDE ROUTING
+// ============================================
+
+const landingBuildPath = path.join(__dirname, '../landing/dist');
+console.log('📁 Serving static files from:', landingBuildPath);
+
+// Check if build exists
+if (fs.existsSync(landingBuildPath)) {
+  console.log('✅ Landing build found, serving static files');
+  
+  // Serve static files (CSS, JS, images, etc.)
+  app.use(express.static(landingBuildPath));
+
+  // Handle client-side routing - THIS IS THE KEY FIX FOR REFRESHES
+  app.get('*', (req, res) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API endpoint not found', code: 'NOT_FOUND' });
+    }
+    
+    // For all other routes, serve the React app
+    // This allows React Router to handle /signup, /login, etc.
+    res.sendFile(path.join(landingBuildPath, 'index.html'));
+  });
+} else {
+  console.log('⚠️ Landing build not found at:', landingBuildPath);
+  console.log('Make sure to run: cd apps/landing && npm run build');
+}
+
+// ============================================
+// 404 HANDLER - ONLY FOR API ROUTES NOW
+// ============================================
+
+// This will only catch API routes that don't exist
 app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found', code: 'NOT_FOUND' });
+  // Only return JSON for API routes
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ error: 'API endpoint not found', code: 'NOT_FOUND' });
+  } else {
+    // If we get here, it means the static file serving didn't work
+    res.status(404).send('Not found');
+  }
 });
 
+// Error handler
 app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error', code: 'INTERNAL_ERROR' });
 });
 
@@ -869,10 +914,12 @@ app.use((err: any, req: any, res: any, next: any) => {
 const PORT = process.env.PORT || 3001;
 httpServer.listen(parseInt(PORT.toString()), '0.0.0.0', () => {
   console.log(`Drift API running on port ${PORT}`);
+  console.log(`📍 Serving landing app from: ${landingBuildPath}`);
 });
 
 // Graceful shutdown
 const shutdown = async () => {
+  console.log('Shutting down gracefully...');
   await prisma.$disconnect();
   httpServer.close(() => process.exit(0));
 };
