@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Mail, Lock, ArrowRight, Building2, ChevronRight, Heart, Shield } from 'lucide-react';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Use environment variable for API URL
   const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
-const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com';
+  const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,55 +50,111 @@ const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-res
   };
 
   return (
-    <div className="min-h-screen bg-white flex">
-      {/* Left panel - Professional branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 to-gray-800 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMzAgMzBoMzB2MzBIMzB6TTAgMGgzMHYzMEgweiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAyKSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-8 h-8" />
-              <span className="text-2xl font-light tracking-tight">drift</span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex">
+      {/* Left panel - DRIFT Branded (matching signup page) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden p-12 text-white flex-col">
+        {/* Great Lakes pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }} />
+        </div>
+        
+        <div className="relative z-10 flex-1 flex flex-col">
+          {/* Logo */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 mb-16"
+          >
+            <div className="w-10 h-10 bg-white/10 backdrop-blur rounded-xl flex items-center justify-center">
+              <Building2 className="w-5 h-5" />
             </div>
-            <h1 className="text-4xl font-light mb-4">Financial intelligence for modern businesses</h1>
-            <p className="text-white/70 text-lg mb-8">Join thousands of businesses using Drift to manage payments, analytics, and growth.</p>
+            <span className="text-xl font-light tracking-tight">drift</span>
+          </motion.div>
+          
+          {/* Headline */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="mb-12"
+          >
+            <h1 className="text-5xl font-light leading-tight mb-4">
+              Welcome back to
+              <br />
+              <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                your dashboard
+              </span>
+            </h1>
+            <p className="text-white/60 text-lg">
+              Access your analytics, manage payments, and grow your business.
+            </p>
+          </motion.div>
+          
+          {/* Simple stats - cleaner than before */}
+          <div className="space-y-4 mb-12">
+            {[
+              { label: 'Active businesses', value: '10,000+' },
+              { label: 'Transactions processed', value: '$2.5B+' },
+              { label: 'Platform uptime', value: '99.9%' }
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + i * 0.1 }}
+                className="flex items-center gap-3"
+              >
+                <div className="w-1 h-8 bg-white/20 rounded-full" />
+                <div>
+                  <div className="text-2xl font-light">{stat.value}</div>
+                  <div className="text-white/40 text-sm">{stat.label}</div>
+                </div>
+              </motion.div>
+            ))}
           </div>
           
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-xl font-light">1M+</div>
-              <div>
-                <div className="font-light">Transactions processed</div>
-                <div className="text-white/60 text-sm">Securely every month</div>
-              </div>
+          {/* Great Lakes pride - matching signup page */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="mt-auto"
+          >
+            <div className="flex items-center justify-center gap-2 text-white/40 text-sm">
+              <span>Built with</span>
+              <Heart className="w-4 h-4 text-white/40" />
+              <span>on the</span>
+              <img 
+                src="/greatlakes.png" 
+                alt="Great Lakes" 
+                className="h-5 w-auto inline-block opacity-40 hover:opacity-60 transition-opacity"
+                style={{ filter: 'brightness(0) invert(1)' }}
+              />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-xl font-light">99.9%</div>
-              <div>
-                <div className="font-light">Platform uptime</div>
-                <div className="text-white/60 text-sm">Enterprise-grade reliability</div>
-              </div>
+            <div className="flex gap-6 text-white/20 text-xs mt-2 justify-center">
+              <span>SOC 2 Type II</span>
+              <span>PCI DSS Level 1</span>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-xl font-light">24/7</div>
-              <div>
-                <div className="font-light">Expert support</div>
-                <div className="text-white/60 text-sm">When you need it most</div>
-              </div>
-            </div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* Right panel - Login form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
           {/* Back link */}
           <button 
             onClick={() => navigate('/')}
-            className="text-sm text-gray-400 hover:text-gray-600 mb-12 flex items-center gap-1 transition-colors"
+            className="text-sm text-gray-400 hover:text-gray-600 mb-12 flex items-center gap-1 transition-colors group"
           >
-            ← Back to home
+            <ChevronRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
+            Back to home
           </button>
 
           {/* Header */}
@@ -105,17 +163,21 @@ const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-res
             <p className="text-gray-400">Sign in to access your dashboard</p>
           </div>
 
-          {/* Login form */}
+          {/* Login form - with signup page styling */}
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className={`relative transition-all ${focusedField === 'email' ? 'scale-[1.02]' : ''}`}>
+                <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${
+                  focusedField === 'email' ? 'text-black' : 'text-gray-400'
+                }`} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none transition-all bg-white"
                   placeholder="name@company.com"
                   required
                 />
@@ -124,13 +186,17 @@ const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-res
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className={`relative transition-all ${focusedField === 'password' ? 'scale-[1.02]' : ''}`}>
+                <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${
+                  focusedField === 'password' ? 'text-black' : 'text-gray-400'
+                }`} />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none transition-all bg-white"
                   placeholder="••••••••"
                   required
                 />
@@ -150,14 +216,14 @@ const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-res
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gray-900 text-white py-3 rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
+              className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 group"
             >
               {loading ? (
                 <span>Signing in...</span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
                   Sign in to dashboard
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </span>
               )}
             </button>
@@ -168,19 +234,28 @@ const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-res
             New to Drift?{' '}
             <button 
               onClick={() => navigate('/signup')}
-              className="text-gray-900 font-medium hover:text-gray-700 transition-colors"
+              className="text-gray-900 font-medium hover:text-gray-700 transition-colors underline decoration-gray-200 hover:decoration-gray-400"
             >
               Create an account
             </button>
           </p>
 
-          {/* Security badge */}
-          <div className="mt-12 pt-8 border-t border-gray-100">
-            <p className="text-xs text-gray-400 text-center">
-              🔒 Bank-level security · SOC 2 Type II certified
-            </p>
-          </div>
-        </div>
+          {/* Security badges - matching signup page style */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-12 pt-8 border-t border-gray-100"
+          >
+            <div className="flex items-center justify-center gap-4 text-xs text-gray-300">
+              <span className="flex items-center gap-1">
+                <Shield className="w-3 h-3" /> 256-bit SSL
+              </span>
+              <span>✓ PCI Compliant</span>
+              <span>🔒 SOC 2</span>
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );

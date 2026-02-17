@@ -17,7 +17,7 @@ function RedirectToLanding() {
 
 function RedirectToLandingLogin() {
   useEffect(() => {
-    window.location.href = 'https://drift-landing.onrender.com/login';
+    window.location.href = 'https://driftpos.com/login';
   }, []);
   return null;
 }
