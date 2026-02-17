@@ -1,772 +1,605 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { loadConnectAndInitialize } from '@stripe/connect-js';
-import { ConnectAccountOnboarding, ConnectComponentsProvider } from '@stripe/react-connect-js';
+import { motion } from 'framer-motion';
 import { 
   Building2, 
   CreditCard, 
-  Landmark, 
-  Shield, 
-  CheckCircle2,
+  Mail, 
+  Phone, 
+  MapPin,
   ArrowRight,
-  ChevronRight,
-  Clock,
-  Percent,
-  Sparkles,
-  Lock,
-  Wallet,
-  Crown,
-  Star,
-  TrendingUp,
-  BarChart3,
-  Users,
-  X,
-  AlertCircle,
-  Mail,
+  CheckCircle2,
   Loader2,
+  Lock,
   Heart,
-  Fingerprint
+  AlertCircle,
+  Briefcase,
+  Globe,
+  User,
+  Landmark,
+  Wallet,
+  FileText,
+  ChevronRight
 } from 'lucide-react';
-import { Button } from './../../components/ui/Button';
-import { Card } from './../../components/ui/Card';
 
-// Animation variants
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-};
+interface StripeStepProps {
+  restaurantId: string;
+  data: any;
+  updateData: (data: any) => void;
+  onNext: () => void;
+  onPrev: () => void;
+}
 
-const stagger = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
-
-// Tier configurations - UPDATED PRICING
-const TIERS = {
-  free: {
-    name: 'Starter',
-    price: '$0',
-    period: '/month',
-    fee: '3.5%',
-    feeValue: 0.035,
-    icon: Star,
-    gradient: 'from-gray-500 to-gray-600',
-    bgLight: 'bg-gray-50',
-    border: 'border-gray-200',
-    features: [
-      'QR code ordering',
-      'Up to 5 tables',
-      'Basic dashboard',
-      'Email support',
-      'Standard payouts (2-3 days)'
-    ],
-    limits: {
-      tables: 5,
-      menuItems: 50,
-      orders: 'unlimited'
-    }
-  },
-  pro: {
-    name: 'Pro',
-    price: '$97', // Updated from $49 to $97
-    period: '/month',
-    fee: '2.5%',
-    feeValue: 0.025,
-    icon: Crown,
-    gradient: 'from-purple-500 to-indigo-600',
-    bgLight: 'bg-purple-50',
-    border: 'border-purple-200',
-    features: [
-      'Everything in Starter',
-      'Advanced analytics',
-      'Customer insights',
-      'Priority phone support',
-      'Marketing tools',
-      'Next-day payouts',
-      'No Drift branding'
-    ],
-    limits: {
-      tables: 'unlimited',
-      menuItems: 'unlimited',
-      orders: 'unlimited'
-    }
-  }
-};
-
-export function StripeStep({ restaurantId, data, onComplete, updateData }) {
+export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: StripeStepProps) {
   const [loading, setLoading] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [selectedTier, setSelectedTier] = useState('free');
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [annualBilling, setAnnualBilling] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [clientSecret, setClientSecret] = useState(null);
-  const [connectInstance, setConnectInstance] = useState(null);
-  const [accountId, setAccountId] = useState(null);
   const [error, setError] = useState('');
-  const [errorType, setErrorType] = useState<'duplicate' | 'generic' | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [activeSection, setActiveSection] = useState<'business' | 'bank'>('business');
   
-  // Load ALL saved data from props and localStorage
-  const [savedData, setSavedData] = useState({
-    restaurantName: '',
+  // Simple form state - organized by section
+  const [formData, setFormData] = useState({
+    // Business info
+    fullName: '',
     email: '',
-    tier: 'free',
-    tables: 5,
-    menuItems: 0,
-    monthlyOrders: 0
+    phone: '',
+    businessName: '',
+    businessAddress: '',
+    taxId: '',
+    website: '',
+    
+    // Bank info
+    accountHolderName: '',
+    routingNumber: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    accountType: 'checking'
   });
 
-  // Comprehensive data loading on mount
+  // Load saved data on mount
   useEffect(() => {
-    console.log('📊 StripeStep received data prop:', data);
-    
-    let mergedData: any = {};
-    
-    // 1. Load from drift-user-profile first (from signup - MOST IMPORTANT)
+    const saved = { ...formData };
+
+    // From user profile
     const userProfile = localStorage.getItem('drift-user-profile');
     if (userProfile) {
       try {
         const profile = JSON.parse(userProfile);
-        console.log('👤 Loaded user profile:', profile);
-        mergedData = { ...mergedData, ...profile };
-      } catch (e) {
-        console.error('Error parsing user profile:', e);
-      }
+        saved.fullName = profile.fullName || '';
+        saved.email = profile.email || '';
+        saved.phone = profile.phone || '';
+        saved.businessName = profile.businessName || '';
+      } catch (e) {}
     }
-    
-    // 2. Load from onboarding progress
-    const onboarding = localStorage.getItem('drift_onboarding');
-    if (onboarding) {
-      try {
-        const parsed = JSON.parse(onboarding);
-        console.log('📂 Loaded onboarding:', parsed);
-        mergedData = { ...mergedData, ...parsed };
-      } catch (e) {
-        console.error('Error parsing onboarding:', e);
-      }
-    }
-    
-    // 3. Props override everything (most recent)
+
+    // From onboarding data
     if (data) {
-      mergedData = { ...mergedData, ...data };
+      saved.businessName = data.businessName || data.restaurantName || saved.businessName;
+      saved.email = data.email || saved.email;
+      saved.phone = data.phone || saved.phone;
+      saved.accountHolderName = data.accountHolderName || saved.fullName;
     }
-    
-    console.log('✅ Final merged data:', mergedData);
-    
-    setSavedData({
-      restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || 'Your Restaurant',
-      email: mergedData.email || '',
-      tier: mergedData.tier || 'free',
-      tables: Number(mergedData.tables) || 5,
-      menuItems: Number(mergedData.menuItems) || 0,
-      monthlyOrders: Number(mergedData.monthlyOrders) || 0
-    });
-    
-    if (mergedData.tier) {
-      setSelectedTier(mergedData.tier);
-    }
-    
+
+    setFormData(saved);
   }, [data]);
 
-  // Smart tier recommendation based on usage
-  const getRecommendedTier = () => {
-    if (savedData.tables > 5 || savedData.menuItems > 50 || savedData.monthlyOrders > 100) {
-      return 'pro';
-    }
-    return 'free';
+  // Validation
+  const isBusinessInfoValid = () => {
+    return (
+      formData.fullName.trim() !== '' &&
+      formData.email.trim() !== '' &&
+      formData.phone.trim() !== '' &&
+      formData.businessName.trim() !== '' &&
+      formData.businessAddress.trim() !== ''
+    );
   };
 
-  const recommendedTier = getRecommendedTier();
-
-  // Calculate annual savings - UPDATED to $97
-  const calculateSavings = () => {
-    if (annualBilling) {
-      return (97 * 12 * 0.2).toFixed(0); // 20% off $97/year
-    }
-    return 0;
+  const isBankInfoValid = () => {
+    return (
+      formData.accountHolderName.trim() !== '' &&
+      formData.routingNumber.trim().length === 9 &&
+      formData.accountNumber.trim().length >= 4 &&
+      formData.accountNumber === formData.confirmAccountNumber
+    );
   };
 
-  // Calculate estimated monthly fees - UPDATED with $97 pro price
-  const calculateEstimatedFees = (avgOrderValue = 45, ordersPerMonth = 100) => {
-    const monthlyVolume = avgOrderValue * ordersPerMonth;
-    const freeFees = monthlyVolume * 0.035;
-    const proFees = (monthlyVolume * 0.025) + 97; // Updated from 49 to 97
-    const savings = freeFees - proFees;
-    
-    return {
-      free: Math.round(freeFees).toString(),
-      pro: Math.round(proFees).toString(),
-      savings: savings > 0 ? Math.round(savings).toString() : '0'
-    };
+  const canContinue = () => {
+    return isBusinessInfoValid() && isBankInfoValid();
   };
 
-  const estimated = calculateEstimatedFees(45, savedData.monthlyOrders || 100);
-
-  // Check account status after onboarding
-  const checkAccountStatus = async (id: string) => {
-    setVerifying(true);
-    try {
-      const API_URL = import.meta.env.VITE_API_URL;
-      const res = await fetch(`${API_URL}/api/stripe/account-status/${id}`);
-      const status = await res.json();
-      
-      if (status.isOnboardingComplete) {
-        // Short delay to show success
-        setTimeout(() => {
-          setVerifying(false);
-          onComplete();
-        }, 1000);
-      } else {
-        setVerifying(false);
-        // If not complete, show onboarding again
-        setShowOnboarding(true);
-      }
-    } catch (error) {
-      console.error('Error checking status:', error);
-      setVerifying(false);
-    }
+  // Format routing number (XXX-XXX-XXX)
+  const formatRoutingNumber = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 9);
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6, 9)}`;
   };
 
-  const handleConnect = async () => {
+  // Format account number (show only last 4)
+  const formatAccountNumber = (value: string) => {
+    return value.replace(/\D/g, '').slice(0, 17);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
-    setErrorType(null);
-    
+
     try {
-      // Validate we have required data
-      if (!savedData.email) {
-        throw new Error('Email address is missing. Please go back to Restaurant Info step.');
-      }
+      const API_URL = import.meta.env.VITE_API_URL;
       
-      if (!savedData.restaurantName) {
-        throw new Error('Restaurant name is missing. Please go back to Restaurant Info step.');
-      }
-      
-      let API_URL = import.meta.env.VITE_API_URL;
-      if (!API_URL) throw new Error('API_URL not configured');
-      API_URL = API_URL.replace('http://', 'https://');
-      
-      // Save the selected tier
-      if (updateData) {
-        await updateData({ tier: selectedTier });
-      }
-      
-      const res = await fetch(`${API_URL}/api/stripe/connect`, {
+      // Create Stripe account with all info
+      const response = await fetch(`${API_URL}/api/stripe/create-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: savedData.email,
-          name: savedData.restaurantName,
           restaurantId,
-          tier: selectedTier
+          // Business info
+          email: formData.email,
+          businessName: formData.businessName,
+          fullName: formData.fullName,
+          phone: formData.phone,
+          address: formData.businessAddress,
+          taxId: formData.taxId || undefined,
+          website: formData.website || `https://driftpos.com/restaurant/${restaurantId}`,
+          
+          // Bank info
+          bankAccount: {
+            accountHolderName: formData.accountHolderName,
+            routingNumber: formData.routingNumber.replace(/\D/g, ''),
+            accountNumber: formData.accountNumber.replace(/\D/g, ''),
+            accountType: formData.accountType
+          }
         })
       });
+
+      const result = await response.json();
       
-      const response = await res.json();
-      
-      // Handle duplicate email error gracefully
-      if (res.status === 400 && response.code === 'duplicate_email') {
-        setErrorType('duplicate');
-        setError(response.error);
-        setLoading(false);
-        return;
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to set up payments');
       }
-      
-      if (!res.ok) throw new Error(response.error || 'Failed to connect');
-      
-      const { clientSecret, accountId } = response;
-      setClientSecret(clientSecret);
-      setAccountId(accountId);
-      
-      // Initialize Stripe Connect instance
-      const stripeConnectInstance = loadConnectAndInitialize({
-        publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
-        fetchClientSecret: async () => clientSecret,
+
+      // Save the account info
+      updateData({ 
+        stripeAccountId: result.accountId,
+        paymentsEnabled: true,
+        ...formData
       });
       
-      setConnectInstance(stripeConnectInstance);
+      setSuccess(true);
       
-      // Save progress
-      const onboardingData = {
-        ...savedData,
-        tier: selectedTier,
-        stripeAccountId: accountId,
-        stripeConnectInProgress: true
-      };
-      
-      localStorage.setItem('drift_onboarding', JSON.stringify(onboardingData));
-      if (updateData) {
-        await updateData(onboardingData);
-      }
-      
-      setShowOnboarding(true);
-      setLoading(false);
-      
-    } catch (error) {
-      console.error('❌ Connection error:', error);
-      setErrorType('generic');
-      setError(error.message);
+      // Move to next step
+      setTimeout(() => {
+        onNext();
+      }, 1500);
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleOnboardingExit = () => {
-    setShowOnboarding(false);
-    // Check status when they exit
-    if (accountId) {
-      checkAccountStatus(accountId);
-    }
-  };
-
-  // Summary Card
-  const SummaryCard = () => (
-    <motion.div 
-      variants={fadeInUp}
-      className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 mb-8 border border-gray-100"
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-purple-500" />
-          <h3 className="font-medium text-gray-700">Your Business Snapshot</h3>
-        </div>
-        {recommendedTier !== selectedTier && (
-          <button
-            onClick={() => setShowUpgradeModal(true)}
-            className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 transition-colors"
-          >
-            ⚡ Recommended: Upgrade to Pro
-          </button>
-        )}
+  return (
+    <div className="max-w-2xl mx-auto px-6 py-8">
+      {/* Step indicator */}
+      <div className="text-center mb-6">
+        <span className="text-sm text-gray-400 bg-gray-100 px-4 py-2 rounded-full">
+          Step 6 of 7 · Payment Setup
+        </span>
       </div>
-      
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <Building2 className="w-4 h-4 text-blue-500 mb-1" />
-          <p className="text-xs text-gray-500">Restaurant</p>
-          <p className="font-medium text-sm truncate">{savedData.restaurantName}</p>
+
+      {/* Header */}
+      <div className="text-center mb-8">
+        <div className="w-20 h-20 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <CreditCard className="w-10 h-10 text-white" />
         </div>
-        
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <Mail className="w-4 h-4 text-green-500 mb-1" />
-          <p className="text-xs text-gray-500">Email</p>
-          <p className="font-medium text-sm truncate">{savedData.email || 'Not set'}</p>
-        </div>
-        
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <Percent className="w-4 h-4 text-purple-500 mb-1" />
-          <p className="text-xs text-gray-500">Plan</p>
-          <p className="font-medium text-sm capitalize">{selectedTier}</p>
-        </div>
-        
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <Users className="w-4 h-4 text-orange-500 mb-1" />
-          <p className="text-xs text-gray-500">Tables</p>
-          <p className="font-medium text-sm">{savedData.tables} tables</p>
-        </div>
+        <h1 className="text-3xl font-light text-gray-900 mb-3">Set up payouts</h1>
+        <p className="text-base text-gray-500 max-w-md mx-auto">
+          Where should we send your earnings?
+        </p>
       </div>
-    </motion.div>
-  );
 
-  // Tier Card - UPDATED to show correct pricing
-  const TierCard = ({ tierId, tier }) => {
-    const TierIcon = tier.icon;
-    const isSelected = selectedTier === tierId;
-    const isRecommended = recommendedTier === tierId && tierId === 'pro';
-    
-    return (
-      <motion.div
-        whileHover={{ y: -4 }}
-        className={`relative rounded-2xl p-6 cursor-pointer transition-all ${
-          isSelected 
-            ? `ring-2 ring-black shadow-xl bg-white` 
-            : `border-2 ${tier.border} hover:border-gray-300 bg-white`
-        }`}
-        onClick={() => setSelectedTier(tierId)}
-      >
-        {isRecommended && (
-          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-            <span className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xs px-3 py-1 rounded-full shadow-lg">
-              Best for you ⚡
-            </span>
-          </div>
-        )}
-        
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tier.gradient} flex items-center justify-center mb-3`}>
-              <TierIcon className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-xl font-medium">{tier.name}</h3>
-            <div className="flex items-baseline gap-1 mt-2">
-              <span className="text-3xl font-light">{tier.price}</span>
-              <span className="text-gray-400 text-sm">{tier.period}</span>
-            </div>
-            <div className="mt-1">
-              <span className="text-lg font-medium">{tier.fee}</span>
-              <span className="text-gray-400 text-xs ml-1">per transaction</span>
-            </div>
-          </div>
-          
-          {isSelected && (
-            <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-white" />
-            </div>
-          )}
-        </div>
-        
-        <div className="space-y-3 mb-6">
-          {tier.features.map((feature, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-gray-600">{feature}</span>
-            </div>
-          ))}
-        </div>
-        
-        {tierId === 'pro' && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={annualBilling}
-                onChange={(e) => setAnnualBilling(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span>Pay annually <span className="text-purple-600 font-medium">(save ${calculateSavings()}/year)</span></span>
-            </label>
-          </div>
-        )}
-      </motion.div>
-    );
-  };
-
-  // Upgrade Modal - UPDATED with correct pricing
-  const UpgradeModal = () => (
-    <AnimatePresence>
-      {showUpgradeModal && (
+      {/* Success message */}
+      {success && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowUpgradeModal(false)}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3"
         >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            className="bg-white rounded-2xl max-w-md w-full p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <button
-                onClick={() => setShowUpgradeModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <h3 className="text-2xl font-light mb-2">Go Pro & Save More</h3>
-            <p className="text-gray-500 mb-6">
-              Based on your business size, you could save money with Pro.
-            </p>
-            
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Starter (3.5%)</span>
-                <span className="font-medium">${estimated.free}/mo</span>
-              </div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-600">Pro (2.5% + $97)</span> {/* Updated from $49 to $97 */}
-                <span className="font-medium text-purple-700">${estimated.pro}/mo</span>
-              </div>
-              {Number(estimated.savings) > 0 && (
-                <div className="bg-green-100 text-green-700 text-sm p-2 rounded-lg text-center">
-                  Save ${estimated.savings}/month with Pro! 🎉
-                </div>
-              )}
-            </div>
-            
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                onClick={() => setShowUpgradeModal(false)}
-                className="flex-1"
-              >
-                Keep Starter
-              </Button>
-              <Button
-                onClick={() => {
-                  setSelectedTier('pro');
-                  setShowUpgradeModal(false);
-                }}
-                className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600"
-              >
-                Upgrade to Pro
-              </Button>
-            </div>
-          </motion.div>
+          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-700">Payment setup complete! Redirecting...</p>
         </motion.div>
       )}
-    </AnimatePresence>
-  );
 
-  // Embedded onboarding view
-  if (showOnboarding && connectInstance && clientSecret) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="max-w-3xl mx-auto p-6"
-      >
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <Shield className="w-10 h-10 text-white" />
-          </div>
-          <h2 className="text-3xl font-light mb-2">Connect Your Bank Account</h2>
-          <p className="text-gray-500">
-            Just a few details to verify your identity and connect your bank account.
-          </p>
+      {/* Error message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-600">{error}</p>
         </div>
+      )}
 
-        {/* What we're collecting - transparency */}
-        <div className="grid grid-cols-3 gap-3 mb-6 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
-          <div className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-500" />
-            <span>Identity verification</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-500" />
-            <span>Bank account</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-500" />
-            <span>Tax information</span>
-          </div>
-        </div>
-
-        <Card className="p-6 border-2 border-gray-100">
-          <ConnectComponentsProvider connectInstance={connectInstance}>
-            <ConnectAccountOnboarding
-              onExit={handleOnboardingExit}
-            />
-          </ConnectComponentsProvider>
-        </Card>
-
-        {/* Trust badges */}
-        <div className="mt-6 flex items-center justify-center gap-6 text-xs text-gray-400">
-          <span className="flex items-center gap-1">
-            <Lock className="w-3 h-3" /> 256-bit Encryption
-          </span>
-          <span className="flex items-center gap-1">
-            <Fingerprint className="w-3 h-3" /> PCI Compliant
-          </span>
-          <span className="flex items-center gap-1">
-            <Heart className="w-3 h-3" /> Built on the Great Lakes
-          </span>
-        </div>
-
-        <p className="text-xs text-gray-400 text-center mt-4">
-          🔒 All information is encrypted and securely transmitted. We never see your full bank details.
-        </p>
-
-        {/* Verification overlay */}
-        <AnimatePresence>
-          {verifying && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50"
-            >
-              <div className="text-center">
-                <div className="relative w-20 h-20 mx-auto mb-4">
-                  <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-                  <motion.div 
-                    className="absolute inset-0 border-4 border-black rounded-full border-t-transparent"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  />
-                </div>
-                <p className="text-lg font-light">Verifying your information...</p>
-                <p className="text-sm text-gray-400">This will just take a moment</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  }
-
-  // Main render (tier selection)
-  return (
-    <>
-      <motion.div 
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={stagger}
-        className="max-w-6xl mx-auto p-6"
-      >
-        {/* Header */}
-        <motion.div variants={fadeInUp} className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <Landmark className="w-10 h-10 text-white" />
-          </div>
-          <h2 className="text-4xl font-light mb-2 bg-gradient-to-r from-black to-gray-600 bg-clip-text text-transparent">
-            Choose Your Plan
-          </h2>
-          <p className="text-gray-500 text-lg">
-            Step 6 of 7 • Select how you want to grow
-          </p>
-          
-          {/* Progress bar */}
-          <div className="w-full h-2 bg-gray-100 rounded-full mt-4 max-w-md mx-auto">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: '75%' }}
-              className="h-full bg-gradient-to-r from-black to-gray-600 rounded-full"
-            />
-          </div>
-        </motion.div>
-
-        {/* Summary from previous steps */}
-        <SummaryCard />
-
-        {/* Custom error handling */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="mb-6"
-            >
-              {errorType === 'duplicate' ? (
-                <Card className="p-6 bg-amber-50 border-amber-200">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <AlertCircle className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-amber-800 mb-1">
-                        Account already exists
-                      </h3>
-                      <p className="text-sm text-amber-700 mb-4">
-                        {error}
-                      </p>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="secondary"
-                          onClick={() => window.location.href = '/login'}
-                          className="bg-white hover:bg-gray-50"
-                        >
-                          Sign in instead
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setError('');
-                            setErrorType(null);
-                          }}
-                          className="bg-amber-600 hover:bg-amber-700"
-                        >
-                          Try another email
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ) : (
-                <Card className="p-4 bg-red-50 border-red-200">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                </Card>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Tier Selection Grid */}
-        <motion.div 
-          variants={fadeInUp}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
+      {/* Section tabs */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setActiveSection('business')}
+          className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
+            activeSection === 'business'
+              ? 'bg-black text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
         >
-          <TierCard tierId="free" tier={TIERS.free} />
-          <TierCard tierId="pro" tier={TIERS.pro} />
-        </motion.div>
+          Business info
+        </button>
+        <button
+          onClick={() => setActiveSection('bank')}
+          className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all ${
+            activeSection === 'bank'
+              ? 'bg-black text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Bank details
+        </button>
+      </div>
 
-        {/* Fee Comparison - UPDATED text */}
-        <motion.div variants={fadeInUp} className="mb-8">
-          <Card className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-0">
-            <div className="flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-purple-600" />
-              <div>
-                <p className="text-sm">
-                  <span className="font-medium">Smart pricing:</span> The more you grow, the less you pay. 
-                  {selectedTier === 'free' && ' Upgrade to Pro ($97/mo) to save 1% on every transaction!'}
-                  {selectedTier === 'pro' && ' You\'re saving 1% compared to Starter!'}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        {/* Email confirmation */}
-        <motion.div variants={fadeInUp} className="mb-6">
-          <Card className="p-4 bg-gray-50 border-gray-200">
-            <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-gray-500" />
-              <div>
-                <p className="text-sm text-gray-500">You'll connect using:</p>
-                <p className="font-medium">{savedData.email || 'Not provided'}</p>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        {/* Action Button */}
-        <motion.div variants={fadeInUp} className="text-center">
-          <Button
-            size="lg"
-            onClick={handleConnect}
-            disabled={loading || !savedData.email}
-            className="px-12 relative overflow-hidden group"
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* BUSINESS INFO SECTION */}
+        {activeSection === 'business' && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-4"
           >
-            <span className="relative z-10 flex items-center gap-2">
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Setting up secure connection...
-                </>
-              ) : (
-                <>
-                  Continue with {TIERS[selectedTier].name}
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </span>
-          </Button>
-          
-          <p className="text-xs text-gray-400 mt-3 flex items-center justify-center gap-1">
-            <Lock className="w-3 h-3" /> 
-            Secured by industry-leading encryption
-          </p>
-        </motion.div>
-      </motion.div>
+            <div className="bg-gray-50 rounded-xl p-4 mb-2">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Building2 className="w-4 h-4" />
+                <span>Your business information</span>
+              </div>
+            </div>
 
-      {/* Upgrade Modal */}
-      <UpgradeModal />
-    </>
+            {/* Full Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Your full name <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="Alex Johnson"
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email address <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="owner@restaurant.com"
+                />
+              </div>
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phone number <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="(555) 555-5555"
+                />
+              </div>
+            </div>
+
+            {/* Business Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Business name <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formData.businessName}
+                  onChange={(e) => setFormData({...formData, businessName: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="Trattoria Bellini"
+                />
+              </div>
+            </div>
+
+            {/* Business Address */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Business address <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formData.businessAddress}
+                  onChange={(e) => setFormData({...formData, businessAddress: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="123 Main St, Chicago, IL 60654"
+                />
+              </div>
+            </div>
+
+            {/* Tax ID (optional) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tax ID / EIN <span className="text-gray-400">(optional)</span>
+              </label>
+              <div className="relative">
+                <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={formData.taxId}
+                  onChange={(e) => setFormData({...formData, taxId: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="XX-XXXXXXX"
+                />
+              </div>
+            </div>
+
+            {/* Website (optional) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Website <span className="text-gray-400">(optional)</span>
+              </label>
+              <div className="relative">
+                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({...formData, website: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="https://yourrestaurant.com"
+                />
+              </div>
+            </div>
+
+            {/* Next section button */}
+            <button
+              type="button"
+              onClick={() => setActiveSection('bank')}
+              className="w-full mt-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+            >
+              Continue to bank details
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+
+        {/* BANK INFO SECTION */}
+        {activeSection === 'bank' && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-4"
+          >
+            <div className="bg-gray-50 rounded-xl p-4 mb-2">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Landmark className="w-4 h-4" />
+                <span>Where should we send your money?</span>
+              </div>
+            </div>
+
+            {/* Account holder name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Account holder name <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formData.accountHolderName}
+                  onChange={(e) => setFormData({...formData, accountHolderName: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none"
+                  placeholder="Name on account"
+                />
+              </div>
+            </div>
+
+            {/* Routing number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Routing number <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formatRoutingNumber(formData.routingNumber)}
+                  onChange={(e) => setFormData({...formData, routingNumber: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none font-mono"
+                  placeholder="123-456-789"
+                  maxLength={11}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">9-digit number from your bank</p>
+            </div>
+
+            {/* Account number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Account number <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formatAccountNumber(formData.accountNumber)}
+                  onChange={(e) => setFormData({...formData, accountNumber: e.target.value})}
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-100 rounded-xl focus:border-black focus:outline-none font-mono"
+                  placeholder="••••••••1234"
+                />
+              </div>
+            </div>
+
+            {/* Confirm account number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm account number <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formatAccountNumber(formData.confirmAccountNumber)}
+                  onChange={(e) => setFormData({...formData, confirmAccountNumber: e.target.value})}
+                  className={`w-full pl-12 pr-4 py-4 border-2 rounded-xl focus:outline-none font-mono ${
+                    formData.confirmAccountNumber && formData.accountNumber !== formData.confirmAccountNumber
+                      ? 'border-red-300 bg-red-50'
+                      : formData.confirmAccountNumber && formData.accountNumber === formData.confirmAccountNumber
+                      ? 'border-green-300 bg-green-50'
+                      : 'border-gray-100'
+                  }`}
+                  placeholder="Re-enter account number"
+                />
+                {formData.confirmAccountNumber && formData.accountNumber === formData.confirmAccountNumber && (
+                  <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                )}
+              </div>
+              {formData.confirmAccountNumber && formData.accountNumber !== formData.confirmAccountNumber && (
+                <p className="text-xs text-red-500 mt-1">Account numbers don't match</p>
+              )}
+            </div>
+
+            {/* Account type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Account type <span className="text-red-400">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, accountType: 'checking'})}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.accountType === 'checking'
+                      ? 'border-black bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="block font-medium">Checking</span>
+                  <span className="text-xs text-gray-400">Everyday account</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, accountType: 'savings'})}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.accountType === 'savings'
+                      ? 'border-black bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="block font-medium">Savings</span>
+                  <span className="text-xs text-gray-400">Interest account</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Back to business button */}
+            <button
+              type="button"
+              onClick={() => setActiveSection('business')}
+              className="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 py-2"
+            >
+              ← Back to business info
+            </button>
+          </motion.div>
+        )}
+
+        {/* Summary of collected info */}
+        {isBusinessInfoValid() && isBankInfoValid() && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 my-4">
+            <div className="flex items-center gap-2 text-green-700 text-sm font-medium mb-2">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>All set! Ready to continue</span>
+            </div>
+            <p className="text-xs text-green-600">
+              We have all the information needed to set up your payments.
+            </p>
+          </div>
+        )}
+
+        {/* Trust message */}
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 my-6">
+          <div className="flex items-start gap-3">
+            <Lock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-blue-800 font-medium">Your information is secure</p>
+              <p className="text-xs text-blue-600 mt-1">
+                All data is encrypted and transmitted securely. We use Stripe, a trusted payment processor used by millions of businesses.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex justify-between pt-6">
+          <button
+            type="button"
+            onClick={onPrev}
+            className="px-6 py-3 text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            ← Back
+          </button>
+          <button
+            type="submit"
+            disabled={loading || success || !canContinue()}
+            className="px-8 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Setting up payments...
+              </>
+            ) : (
+              <>
+                Complete setup
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Great Lakes branding */}
+        <div className="flex items-center justify-center gap-2 mt-8 pt-6 border-t border-gray-100">
+          <span className="text-sm text-gray-400">Built with</span>
+          <Heart className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-400">on the Great Lakes</span>
+        </div>
+      </form>
+    </div>
   );
 }
