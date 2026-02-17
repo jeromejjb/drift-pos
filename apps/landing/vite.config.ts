@@ -5,14 +5,11 @@ import { copyFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode`
   const env = loadEnv(mode, process.cwd(), '')
   
-  // Log what we're building with
   console.log('\n🔧 ===== BUILD CONFIGURATION =====');
   console.log('Mode:', mode);
   console.log('VITE_API_URL from env:', env.VITE_API_URL);
-  console.log('VITE_RESTAURANT_URL from env:', env.VITE_RESTAURANT_URL);
   console.log('================================\n');
   
   return {
@@ -28,6 +25,8 @@ export default defineConfig(({ mode }) => {
           if (existsSync(source)) {
             copyFileSync(source, dest);
             console.log('✅ _redirects copied to dist');
+          } else {
+            console.log('⚠️ No _redirects file found at:', source);
           }
         }
       }
