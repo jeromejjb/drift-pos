@@ -330,10 +330,13 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
 
     // Only generate if we have tables AND no QR codes yet
     if (data.tables && Array.isArray(data.tables) && data.tables.length > 0 && qrCodes.length === 0 && !generating) {
-      console.log(`🎯 Auto-generating QR codes for ${data.tables.length} tables`);
-      generateQRCodes();
-    }
-  }, [data.tables, restaurantId]); // Add dependencies
+    console.log(`🎯 Auto-generating QR codes for ${data.tables.length} tables`);
+    console.log('📋 Tables:', data.tables.map(t => t.number).join(', '));
+    generateQRCodes();
+  } else if (!data.tables || data.tables.length === 0) {
+    console.log('⚠️ No tables found in data');
+  }
+}, [data.tables, restaurantId]); // Add dependencies
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">

@@ -87,7 +87,8 @@ export function TablesStep({ restaurantId, data, updateData, onNext, onPrev }: T
     localStorage.setItem('drift_onboarding', JSON.stringify({
       ...parsed,
       tables: tables,
-      tableCount: tables.length
+      tableCount: tables.length,
+      tablesUpdatedAt: new Date().toISOString()
     }));
     
     onNext();
