@@ -158,7 +158,6 @@ router.post('/stripe/create-account', async (req, res) => {
       await prisma.restaurant.update({
         where: { id: restaurantId },
         data: { 
-          stripeAccountId: account.id,
           stripeAccount: account.id // Using the field from your schema
         }
       });
