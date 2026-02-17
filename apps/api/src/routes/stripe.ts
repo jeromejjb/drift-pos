@@ -5,6 +5,22 @@ import express from 'express';
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+// Helper function to safely parse strings
+const safeString = (value: any): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+// Helper function to extract name parts
+const extractNameParts = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/);
+  const firstName = parts[0] || '';
+  const lastName = parts.slice(1).join(' ') || firstName;
+  return { firstName, lastName };
+};
+
 // Create Stripe account with embedded onboarding
 router.post('/stripe/connect', async (req, res) => {
   try {
@@ -16,30 +32,52 @@ router.post('/stripe/connect', async (req, res) => {
 
     const account = await stripe.accounts.create({
       type: 'express',
-      email,
-      business_profile: { name, url: `https://driftpos.com/restaurant/${restaurantId}` },
-      metadata: { restaurantId, tier: tier || 'free', platform: 'Drift POS' },
-      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+      email: safeString(email),
+      business_profile: { 
+        name: safeString(name), 
+        url: `https://driftpos.com/restaurant/${safeString(restaurantId)}` 
+      },
+      metadata: { 
+        restaurantId: safeString(restaurantId), 
+        tier: tier || 'free', 
+        platform: 'Drift POS' 
+      },
+      capabilities: { 
+        card_payments: { requested: true }, 
+        transfers: { requested: true } 
+      },
     });
 
     const session = await stripe.accountSessions.create({
       account: account.id,
-      components: { account_onboarding: { enabled: true, features: { external_account_collection: true } } },
+      components: { 
+        account_onboarding: { 
+          enabled: true, 
+          features: { external_account_collection: true } 
+        } 
+      },
     });
 
     res.json({ clientSecret: session.client_secret, accountId: account.id });
   } catch (error: any) {
+    console.error('❌ Stripe connect error:', error);
+    
     if (error.code === 'resource_already_exists') {
       return res.status(400).json({ error: 'Email already registered', code: 'duplicate_email' });
     }
     if (error.code === 'rate_limit_exceeded') {
       return res.status(429).json({ error: 'Too many requests', code: 'rate_limit' });
     }
-    res.status(500).json({ error: 'Failed to create account', code: 'server_error' });
+    
+    res.status(500).json({ 
+      error: 'Failed to create account', 
+      code: 'server_error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
-// Add this new endpoint for our simplified form
+// Create Stripe account with simplified form (collects all required data)
 router.post('/stripe/create-account', async (req, res) => {
   try {
     const {
@@ -51,76 +89,111 @@ router.post('/stripe/create-account', async (req, res) => {
       address,
       taxId,
       website,
-      bankAccount
+      bankAccount,
+      dob,
+      ssnLast4,
+      tosAcceptance
     } = req.body;
 
     console.log('📝 Received account creation request:', { 
       restaurantId, 
       email, 
       businessName,
-      hasBankAccount: !!bankAccount 
+      hasBankAccount: !!bankAccount,
+      hasDob: !!dob,
+      hasSsn: !!ssnLast4
     });
 
     // Validate required fields
-    if (!restaurantId || !email || !businessName || !fullName || !bankAccount) {
+    const missingFields = [];
+    if (!restaurantId) missingFields.push('restaurantId');
+    if (!email) missingFields.push('email');
+    if (!businessName) missingFields.push('businessName');
+    if (!fullName) missingFields.push('fullName');
+    if (!bankAccount) missingFields.push('bankAccount');
+    if (!dob) missingFields.push('dob');
+    if (!ssnLast4) missingFields.push('ssnLast4');
+    
+    if (missingFields.length > 0) {
       return res.status(400).json({ 
         error: 'Missing required fields', 
         code: 'MISSING_FIELDS',
-        missing: {
-          restaurantId: !restaurantId,
-          email: !email,
-          businessName: !businessName,
-          fullName: !fullName,
-          bankAccount: !bankAccount
-        }
+        missing: missingFields
       });
     }
 
-    // Parse address components (simple parsing - you might want to improve this)
-    const addressParts = address?.split(',') || [];
-    const city = addressParts[1]?.trim() || 'Chicago';
-    const state = addressParts[2]?.trim() || 'IL';
-    const postalCode = address?.match(/\d{5}(?:-\d{4})?/)?.[0] || '60654';
+    // Validate date of birth
+    const dobDate = new Date(
+      parseInt(dob.year),
+      parseInt(dob.month) - 1,
+      parseInt(dob.day)
+    );
+    
+    if (isNaN(dobDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date of birth', code: 'INVALID_DOB' });
+    }
+    
+    const age = new Date().getFullYear() - parseInt(dob.year);
+    if (age < 18) {
+      return res.status(400).json({ error: 'Account holder must be at least 18 years old', code: 'AGE_RESTRICTION' });
+    }
+
+    // Validate SSN last 4
+    const ssnDigits = safeString(ssnLast4).replace(/\D/g, '');
+    if (ssnDigits.length !== 4) {
+      return res.status(400).json({ error: 'Last 4 of SSN must be exactly 4 digits', code: 'INVALID_SSN' });
+    }
+
+    // Parse name
+    const { firstName, lastName } = extractNameParts(fullName);
+
+    // Handle address (now expecting an object from frontend)
+    const addressData = address || {};
+    const individualAddress = {
+      line1: safeString(addressData.line1) || '123 Main St',
+      city: safeString(addressData.city) || 'Chicago',
+      state: safeString(addressData.state) || 'IL',
+      postal_code: safeString(addressData.postal_code) || '60654',
+      country: 'US',
+    };
 
     // Create Stripe connected account
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'US',
-      email,
+      email: safeString(email),
       business_type: 'individual',
       business_profile: {
-        name: businessName,
-        url: website || `https://driftpos.com/restaurant/${restaurantId}`,
-        mcc: '5812', // Eating places and restaurants
+        name: safeString(businessName),
+        url: website || `https://driftpos.com/restaurant/${safeString(restaurantId)}`,
+        mcc: '5812',
       },
       individual: {
-        first_name: fullName.split(' ')[0],
-        last_name: fullName.split(' ').slice(1).join(' ') || fullName.split(' ')[0],
-        email,
-        phone,
-        address: {
-          line1: addressParts[0]?.trim() || address,
-          city,
-          state,
-          postal_code: postalCode,
-          country: 'US',
-        },
+        first_name: firstName,
+        last_name: lastName,
+        email: safeString(email),
+        phone: safeString(phone),
+        address: individualAddress,
         dob: {
-          day: 1,
-          month: 1,
-          year: 1900,
+          day: parseInt(dob.day),
+          month: parseInt(dob.month),
+          year: parseInt(dob.year)
         },
-        id_number: taxId?.replace(/\D/g, '') || undefined,
+        id_number: taxId?.replace(/\D/g, '') || `0000${ssnDigits}`,
       },
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
       metadata: {
-        restaurantId,
+        restaurantId: safeString(restaurantId),
         platform: 'Drift POS',
         createdAt: new Date().toISOString()
       },
+      tos_acceptance: tosAcceptance ? {
+        date: tosAcceptance.date || Math.floor(Date.now() / 1000),
+        ip: tosAcceptance.ip || req.ip || req.connection.remoteAddress || '0.0.0.0'
+      } : undefined,
     });
 
     console.log(`✅ Stripe account created: ${account.id}`);
@@ -128,14 +201,24 @@ router.post('/stripe/create-account', async (req, res) => {
     // Add bank account to the Stripe account
     if (bankAccount) {
       try {
+        const routingDigits = safeString(bankAccount.routingNumber).replace(/\D/g, '');
+        if (routingDigits.length !== 9) {
+          throw new Error('Routing number must be 9 digits');
+        }
+
+        const accountDigits = safeString(bankAccount.accountNumber).replace(/\D/g, '');
+        if (accountDigits.length < 4 || accountDigits.length > 17) {
+          throw new Error('Account number must be between 4 and 17 digits');
+        }
+
         const bankAccountToken = await stripe.tokens.create({
           bank_account: {
             country: 'US',
             currency: 'usd',
-            account_holder_name: bankAccount.accountHolderName,
+            account_holder_name: safeString(bankAccount.accountHolderName) || firstName + ' ' + lastName,
             account_holder_type: 'individual',
-            routing_number: bankAccount.routingNumber.replace(/\D/g, ''),
-            account_number: bankAccount.accountNumber.replace(/\D/g, ''),
+            routing_number: routingDigits,
+            account_number: accountDigits,
           },
         });
 
@@ -144,27 +227,36 @@ router.post('/stripe/create-account', async (req, res) => {
         });
 
         console.log(`✅ Bank account added to Stripe account`);
-      } catch (bankError) {
-        console.error('⚠️ Bank account addition failed:', bankError);
-        // Continue even if bank account fails - can be added later
+      } catch (bankError: any) {
+        console.error('⚠️ Bank account addition failed:', bankError.message);
+        await stripe.accounts.update(account.id, {
+          metadata: {
+            bank_account_error: bankError.message,
+            bank_account_error_time: new Date().toISOString()
+          }
+        });
       }
     }
 
     // Save Stripe account ID to database
     try {
-      // You'll need to import prisma at the top of this file
       const { prisma } = await import('../index');
       
       await prisma.restaurant.update({
-        where: { id: restaurantId },
+        where: { id: safeString(restaurantId) },
         data: { 
-          stripeAccount: account.id // Using the field from your schema
+          stripeAccount: account.id
         }
       });
       console.log(`✅ Restaurant updated with Stripe account ID`);
-    } catch (dbError) {
-      console.error('⚠️ Database update failed:', dbError);
-      // Account is created but we couldn't save the ID
+    } catch (dbError: any) {
+      console.error('⚠️ Database update failed:', dbError.message);
+      await stripe.accounts.update(account.id, {
+        metadata: {
+          db_update_error: dbError.message,
+          restaurantId: safeString(restaurantId)
+        }
+      });
     }
 
     res.json({ 
@@ -174,11 +266,19 @@ router.post('/stripe/create-account', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('❌ Stripe account creation error:', error);
+    console.error('❌ Stripe account creation error:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
     
     if (error.type === 'StripeInvalidRequestError') {
       if (error.code === 'resource_already_exists') {
-        return res.status(400).json({ error: 'Email already registered with Stripe', code: 'duplicate_email' });
+        return res.status(400).json({ 
+          error: 'Email already registered with Stripe', 
+          code: 'duplicate_email' 
+        });
       }
       return res.status(400).json({ 
         error: error.message, 
@@ -187,32 +287,56 @@ router.post('/stripe/create-account', async (req, res) => {
     }
     
     if (error.code === 'rate_limit_exceeded') {
-      return res.status(429).json({ error: 'Too many requests', code: 'rate_limit' });
+      return res.status(429).json({ 
+        error: 'Too many requests', 
+        code: 'rate_limit' 
+      });
     }
     
     res.status(500).json({ 
       error: 'Failed to create Stripe account', 
       code: 'server_error',
-      message: error.message 
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-
-// Check account status
+// Check account status - COMPLETELY FIXED TYPE ERRORS
 router.get('/stripe/account-status/:accountId', async (req, res) => {
   try {
     const { accountId } = req.params;
     if (!accountId) return res.status(400).json({ error: 'Account ID required', code: 'missing_account_id' });
 
     const account = await stripe.accounts.retrieve(accountId);
+    
+    // Use type assertion to tell TypeScript the shape of requirements
+    const requirements = (account.requirements || {}) as {
+      currently_due?: string[];
+      eventually_due?: string[];
+      past_due?: string[];
+      pending_verification?: string[];
+    };
+    
+    // Safe access with fallbacks
+    const currentlyDue = requirements.currently_due || [];
+    const eventuallyDue = requirements.eventually_due || [];
+    const pastDue = requirements.past_due || [];
+    const pendingVerification = requirements.pending_verification || [];
+    
     res.json({
-      details_submitted: account.details_submitted,
-      charges_enabled: account.charges_enabled,
-      payouts_enabled: account.payouts_enabled,
-      isOnboardingComplete: account.details_submitted && account.charges_enabled,
+      details_submitted: account.details_submitted || false,
+      charges_enabled: account.charges_enabled || false,
+      payouts_enabled: account.payouts_enabled || false,
+      isOnboardingComplete: !!(account.details_submitted && account.charges_enabled && account.payouts_enabled),
+      requirements: {
+        currently_due: currentlyDue,
+        eventually_due: eventuallyDue,
+        past_due: pastDue,
+        pending_verification: pendingVerification
+      }
     });
   } catch (error: any) {
+    console.error('❌ Account status error:', error);
     if (error.code === 'resource_missing') {
       return res.status(404).json({ error: 'Account not found', code: 'account_not_found' });
     }
@@ -263,8 +387,13 @@ router.post('/stripe/payment', async (req, res) => {
     });
 
     res.json({ clientSecret: paymentIntent.client_secret });
-  } catch (error) {
-    res.status(500).json({ error: 'Payment failed', code: 'payment_error' });
+  } catch (error: any) {
+    console.error('❌ Payment error:', error);
+    res.status(500).json({ 
+      error: 'Payment failed', 
+      code: 'payment_error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -277,9 +406,21 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
 
   try {
     const event = stripe.webhooks.constructEvent(req.body, sig!, webhookSecret);
-    // Handle webhook events as needed
+    
+    switch (event.type) {
+      case 'account.updated':
+        console.log('🔄 Account updated:', event.data.object.id);
+        break;
+      case 'payment_intent.succeeded':
+        console.log('💰 Payment succeeded:', event.data.object.id);
+        break;
+      default:
+        console.log('📨 Unhandled webhook event:', event.type);
+    }
+    
     res.json({ received: true });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ Webhook error:', error);
     res.status(400).json({ error: 'Webhook error' });
   }
 });
@@ -288,11 +429,17 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
 router.post('/stripe/disconnect/:accountId', async (req, res) => {
   try {
     const { accountId } = req.params;
+    
     await stripe.accounts.update(accountId, {
-      metadata: { disconnected_at: new Date().toISOString(), disconnected_by: 'platform' }
+      metadata: { 
+        disconnected_at: new Date().toISOString(), 
+        disconnected_by: 'platform' 
+      }
     });
+    
     res.json({ success: true, message: 'Account disconnected' });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ Disconnect error:', error);
     res.status(500).json({ error: 'Failed to disconnect account', code: 'server_error' });
   }
 });
