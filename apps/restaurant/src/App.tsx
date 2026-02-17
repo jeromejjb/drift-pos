@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 // Component to handle external redirect
 function RedirectToLanding() {
   useEffect(() => {
-    window.location.href = 'https://drift-landing.onrender.com';
+    window.location.href = 'https://driftpos.com';
   }, []);
   return null;
 }

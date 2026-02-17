@@ -202,7 +202,7 @@ export function SignupPage() {
   };
 
   const API_URL = 'https://drift-api-7vs7.onrender.com';
-  const RESTAURANT_URL = 'https://drift-restaurant.onrender.com';
+  const RESTAURANT_URL = 'https://restaurant.driftpos.com';
 
   // Step validation
   const isStep1Valid = () => {
