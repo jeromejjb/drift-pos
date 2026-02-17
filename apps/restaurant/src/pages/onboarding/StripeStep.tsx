@@ -118,66 +118,60 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
     return value.replace(/\D/g, '').slice(0, 17);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      const API_URL = import.meta.env.VITE_API_URL;
-      
-      // Create Stripe account with all info
-      const response = await fetch(`${API_URL}/api/stripe/create-account`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantId,
-          // Business info
-          email: formData.email,
-          businessName: formData.businessName,
-          fullName: formData.fullName,
-          phone: formData.phone,
-          address: formData.businessAddress,
-          taxId: formData.taxId || undefined,
-          website: formData.website || `https://driftpos.com/restaurant/${restaurantId}`,
-          
-          // Bank info
-          bankAccount: {
-            accountHolderName: formData.accountHolderName,
-            routingNumber: formData.routingNumber.replace(/\D/g, ''),
-            accountNumber: formData.accountNumber.replace(/\D/g, ''),
-            accountType: formData.accountType
-          }
-        })
-      });
+  try {
+    const API_URL = import.meta.env.VITE_API_URL;
+    
+    const response = await fetch(`${API_URL}/api/stripe/create-account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restaurantId,
+        email: formData.email,
+        businessName: formData.businessName,
+        fullName: formData.fullName,
+        phone: formData.phone,
+        address: formData.businessAddress,
+        taxId: formData.taxId,
+        website: formData.website,
+        bankAccount: {
+          accountHolderName: formData.accountHolderName,
+          routingNumber: formData.routingNumber,
+          accountNumber: formData.accountNumber,
+          accountType: formData.accountType
+        }
+      })
+    });
 
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to set up payments');
-      }
-
-      // Save the account info
-      updateData({ 
-        stripeAccountId: result.accountId,
-        paymentsEnabled: true,
-        ...formData
-      });
-      
-      setSuccess(true);
-      
-      // Move to next step
-      setTimeout(() => {
-        onNext();
-      }, 1500);
-
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to set up payments');
     }
-  };
 
+    // Save the account info
+    updateData({ 
+      stripeAccountId: result.accountId,
+      paymentsEnabled: true,
+      ...formData
+    });
+    
+    setSuccess(true);
+    
+    setTimeout(() => {
+      onNext();
+    }, 1500);
+
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
       {/* Step indicator */}
