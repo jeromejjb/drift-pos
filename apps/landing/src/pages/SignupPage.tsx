@@ -261,7 +261,8 @@ export function SignupPage() {
           role: formData.role,
           businessType: formData.businessType,
           teamSize: formData.teamSize,
-          phone: phoneDigits || null
+          phone: phoneDigits || null,
+          tableCount: 5
         }),
       });
 
@@ -466,18 +467,25 @@ export function SignupPage() {
             )}
           </div>
           
-          {/* Great Lakes pride */}
+            {/* Great Lakes pride - UPDATED with image matching heart color */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
             className="mt-auto"
           >
-            <div className="flex items-center gap-2 text-white/40 text-sm">
-              <Heart className="w-4 h-4" />
-              <span>Built on the Great Lakes</span>
+            <div className="flex items-center justify-center gap-2 text-white/40 text-sm">
+              <span>Built with</span>
+              <Heart className="w-4 h-4 text-white/40" />
+              <span>on the</span>
+              <img 
+                src="/greatlakes.png" 
+                alt="Great Lakes" 
+                className="h-5 w-auto inline-block opacity-40 hover:opacity-60 transition-opacity"
+                style={{ filter: 'brightness(0) invert(1)' }} // Makes white image match heart color
+              />
             </div>
-            <div className="flex gap-6 text-white/20 text-xs mt-2">
+            <div className="flex gap-6 text-white/20 text-xs mt-2 justify-center">
               <span>SOC 2 Type II</span>
               <span>PCI DSS Level 1</span>
               <span>GDPR Compliant</span>
