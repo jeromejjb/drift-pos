@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { User, Store, CreditCard, Bell, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
@@ -7,6 +7,7 @@ import { PlanBadge } from '../components/ui/PlanBadge';
 
 export function SettingsPage() {
   const { user } = useUser();
+  const { restaurantId: urlRestaurantId } = useParams<{ restaurantId: string }>();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'profile');
   const [saving, setSaving] = useState(false);
@@ -39,10 +40,11 @@ export function SettingsPage() {
   }, [user]);
 
   useEffect(() => {
-    if (user?.restaurantId) {
-      fetchRestaurantDetails(user.restaurantId);
+    const rid = user?.restaurantId || urlRestaurantId || localStorage.getItem('drift-restaurant-id');
+    if (rid) {
+      fetchRestaurantDetails(rid);
     }
-  }, [user]);
+  }, [user?.restaurantId, urlRestaurantId]);
 
   const fetchRestaurantDetails = async (restaurantId: string) => {
     try {
@@ -68,10 +70,14 @@ export function SettingsPage() {
     setSaveSuccess(false);
     setSaveError('');
     
+    const token = localStorage.getItem('drift-token');
     try {
       const response = await fetch(`${API_URL}/api/users/${user.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(profile)
       });
       
@@ -90,16 +96,21 @@ export function SettingsPage() {
   };
 
   const handleSaveRestaurant = async () => {
-    if (!user?.restaurantId) return;
+    const rid = user?.restaurantId || urlRestaurantId;
+    if (!rid) return;
     
     setSaving(true);
     setSaveSuccess(false);
     setSaveError('');
     
+    const token = localStorage.getItem('drift-token');
     try {
-      const response = await fetch(`${API_URL}/api/restaurants/${user.restaurantId}`, {
+      const response = await fetch(`${API_URL}/api/restaurants/${rid}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(restaurant)
       });
       

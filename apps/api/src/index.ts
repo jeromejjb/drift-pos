@@ -1,6 +1,6 @@
+import './env';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import { createServer } from 'http';
@@ -13,11 +13,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { randomBytes } from 'crypto';
+import twilio from 'twilio';
 import stripeRouter from './routes/stripe';
-import path from 'path'; 
-import fs from 'fs'; 
-
-dotenv.config();
+import p2pRouter from './routes/p2p';
+import path from 'path';
+import fs from 'fs';
 
 
 
@@ -165,8 +165,38 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Drift API operational', timestamp: new Date().toISOString() });
 });
 
+// Supabase Auth Send SMS Hook — receives { user: { phone }, sms: { otp } } and sends via Twilio
+app.post('/api/auth/send-sms', async (req, res) => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!sid || !token || !from) {
+    console.warn('Send SMS hook: Twilio not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)');
+    return res.status(503).json({ error: 'SMS provider not configured' });
+  }
+  const phone = req.body?.user?.phone;
+  const otp = req.body?.sms?.otp;
+  if (!phone || !otp) {
+    return res.status(400).json({ error: 'Missing phone or otp' });
+  }
+  try {
+    const client = twilio(sid, token);
+    await client.messages.create({
+      body: `Your Drift code is ${otp}`,
+      from,
+      to: phone,
+    });
+    res.status(200).send();
+  } catch (err: any) {
+    console.error('Send SMS hook error:', err?.message || err);
+    res.status(500).json({ error: err?.message || 'Failed to send SMS' });
+  }
+});
+
 // Stripe routes
 app.use('/api', stripeRouter);
+// P2P routes (Supabase auth)
+app.use('/api', p2pRouter);
 
 // Auth middleware
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -236,12 +266,18 @@ app.post('/api/auth/register', async (req, res) => {
     res.status(201).json({
       success: true,
       token,
+      userId: result.user.id,
       restaurantId: result.restaurant.id,
       tableCount: result.restaurant.tables.length,
       user: { id: result.user.id, email: result.user.email, name: result.user.name }
     });
-  } catch (error) {
-    res.status(500).json({ error: 'Registration failed', code: 'SERVER_ERROR' });
+  } catch (error: any) {
+    console.error('Registration error:', error?.message || error);
+    const message = error?.message && typeof error.message === 'string' ? error.message : 'Registration failed';
+    res.status(500).json({
+      error: message.includes('Unique constraint') ? 'An account with this email already exists.' : message,
+      code: 'SERVER_ERROR'
+    });
   }
 });
 
@@ -365,6 +401,20 @@ app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, 
   }
 });
 
+// Test tables for Dine tab (no QR needed) — returns first N tables from DB
+app.get('/api/test-tables', async (req, res) => {
+  try {
+    const tables = await prisma.table.findMany({
+      take: 10,
+      orderBy: { number: 'asc' },
+      include: { restaurant: { select: { name: true } } }
+    });
+    res.json(tables.map((t) => ({ id: t.id, number: t.number, restaurantName: t.restaurant.name })));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch test tables', code: 'SERVER_ERROR' });
+  }
+});
+
 app.get('/api/table/:tableId/restaurant', async (req, res) => {
   try {
     const { tableId } = req.params;
@@ -443,14 +493,15 @@ app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) 
 
     console.log(`📋 Found ${dbTables.length} tables in database:`, dbTables.map(t => ({ number: t.number, id: t.id })));
 
-    // Match by table NUMBER instead of ID
+    // Match by table NUMBER; create missing tables so onboarding table count can exceed signup default
     for (const requestedTable of requestedTables) {
-      // Find the table with the matching number in the database
-      const dbTable = dbTables.find(t => t.number === requestedTable.number);
-      
+      let dbTable = dbTables.find(t => t.number === requestedTable.number);
       if (!dbTable) {
-        console.warn(`⚠️ Table number ${requestedTable.number} not found in database for restaurant ${restaurantId}`);
-        continue;
+        dbTable = await prisma.table.create({
+          data: { restaurantId, number: requestedTable.number }
+        });
+        dbTables.push(dbTable);
+        console.log(`➕ Created table ${dbTable.number} for restaurant ${restaurantId}`);
       }
 
       const url = `${baseUrl}/table/${dbTable.id}`;
@@ -537,6 +588,49 @@ app.get('/api/restaurant/:restaurantId/menu', async (req, res) => {
     res.json(categories);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch menu', code: 'SERVER_ERROR' });
+  }
+});
+
+/** Bulk import menu during onboarding. Requires auth. */
+app.post('/api/restaurants/:restaurantId/menu/bulk', authenticateToken, async (req: any, res) => {
+  try {
+    const { restaurantId } = req.params;
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
+    const { categories: inputCategories } = req.body;
+    if (!inputCategories || !Array.isArray(inputCategories)) {
+      return res.status(400).json({ error: 'categories array required', code: 'MISSING_FIELDS' });
+    }
+    let sortOrder = 0;
+    for (const cat of inputCategories) {
+      const name = (cat.name || '').trim();
+      if (!name) continue;
+      const category = await prisma.menuCategory.create({
+        data: { name, restaurantId, sortOrder: sortOrder++ }
+      });
+      const items = Array.isArray(cat.items) ? cat.items : [];
+      for (const item of items) {
+        const itemName = (item.name || '').trim();
+        if (!itemName) continue;
+        const price = parseFloat(item.price);
+        if (isNaN(price) || price < 0) continue;
+        await prisma.menuItem.create({
+          data: {
+            name: itemName,
+            description: (item.description || '').trim() || null,
+            price,
+            categoryId: category.id,
+            restaurantId,
+            isAvailable: true
+          }
+        });
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Bulk menu import error:', error);
+    res.status(500).json({ error: 'Failed to import menu', code: 'SERVER_ERROR' });
   }
 });
 
@@ -907,7 +1001,7 @@ app.patch('/api/users/:userId', authenticateToken, async (req: any, res) => {
 // STATIC FILE SERVING AND CLIENT-SIDE ROUTING
 // ============================================
 
-const landingBuildPath = path.join(__dirname, '../landing/dist');
+const landingBuildPath = path.join(__dirname, '../../landing/dist');
 console.log('📁 Serving static files from:', landingBuildPath);
 
 // Check if build exists
@@ -918,7 +1012,7 @@ if (fs.existsSync(landingBuildPath)) {
   app.use(express.static(landingBuildPath));
 
   // Handle client-side routing - THIS IS THE KEY FIX FOR REFRESHES
-  app.get('*', (req, res) => {
+  app.get(/^\/(?!api).*/, (req, res) => {
     // Skip API routes
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'API endpoint not found', code: 'NOT_FOUND' });
@@ -937,13 +1031,11 @@ if (fs.existsSync(landingBuildPath)) {
 // 404 HANDLER - ONLY FOR API ROUTES NOW
 // ============================================
 
-// This will only catch API routes that don't exist
+// 404 handler: JSON for API routes, plain for others
 app.use((req, res) => {
-  // Only return JSON for API routes
   if (req.path.startsWith('/api')) {
-    res.status(404).json({ error: 'API endpoint not found', code: 'NOT_FOUND' });
+    res.status(404).json({ error: 'Endpoint not found', code: 'NOT_FOUND' });
   } else {
-    // If we get here, it means the static file serving didn't work
     res.status(404).send('Not found');
   }
 });

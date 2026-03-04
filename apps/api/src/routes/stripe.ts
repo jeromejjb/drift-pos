@@ -5,6 +5,28 @@ import express from 'express';
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+// Platform fee rates: 2.5% base, 1.5% at volume ($50k+/month)
+const BASE_RATE = 0.025;
+const VOLUME_RATE = 0.015;
+const VOLUME_THRESHOLD_MONTHLY = 50_000;
+
+/** Returns the platform fee rate for a restaurant (volume discount if over threshold). */
+async function getFeeRateForRestaurant(restaurantId: string): Promise<number> {
+  const { prisma } = await import('../index');
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const result = await prisma.order.aggregate({
+    where: {
+      restaurantId,
+      status: 'COMPLETED',
+      completedAt: { gte: startOfMonth }
+    },
+    _sum: { total: true }
+  });
+  const monthlyTotal = result._sum.total ?? 0;
+  return monthlyTotal >= VOLUME_THRESHOLD_MONTHLY ? VOLUME_RATE : BASE_RATE;
+}
+
 // Helper function to safely parse strings
 const safeString = (value: any): string => {
   if (!value) return '';
@@ -144,6 +166,29 @@ router.post('/stripe/create-account', async (req, res) => {
       return res.status(400).json({ error: 'Last 4 of SSN must be exactly 4 digits', code: 'INVALID_SSN' });
     }
 
+    const rawTaxId = taxId?.replace(/\D/g, '');
+    let idNumber = rawTaxId && rawTaxId.length >= 4 ? rawTaxId.slice(-9) : `0000${ssnDigits}`;
+    if (idNumber.length === 8) idNumber = `0${idNumber}`;
+
+    const isTestMode = (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_test_');
+    const allSameDigit = /^(\d)\1+$/.test(idNumber);
+    const sequential = /^123456789$/.test(idNumber) || /^987654321$/.test(idNumber);
+
+    if (allSameDigit || sequential) {
+      if (isTestMode) {
+        idNumber = '000000000';
+      } else {
+        return res.status(400).json({
+          error: 'That SSN or Tax ID is not accepted. Please use your real last 4 digits of SSN.',
+          code: 'INVALID_TAX_ID',
+        });
+      }
+    }
+
+    if (isTestMode && (allSameDigit || sequential || idNumber === '000022222' || idNumber === '222222222')) {
+      idNumber = '000000000';
+    }
+
     // Parse name
     const { firstName, lastName } = extractNameParts(fullName);
 
@@ -179,7 +224,7 @@ router.post('/stripe/create-account', async (req, res) => {
           month: parseInt(dob.month),
           year: parseInt(dob.year)
         },
-        id_number: taxId?.replace(/\D/g, '') || `0000${ssnDigits}`,
+        id_number: idNumber,
       },
       capabilities: {
         card_payments: { requested: true },
@@ -238,31 +283,35 @@ router.post('/stripe/create-account', async (req, res) => {
       }
     }
 
-    // Save Stripe account ID to database
-    try {
-      const { prisma } = await import('../index');
-      
-      await prisma.restaurant.update({
-        where: { id: safeString(restaurantId) },
-        data: { 
-          stripeAccount: account.id
-        }
-      });
-      console.log(`✅ Restaurant updated with Stripe account ID`);
-    } catch (dbError: any) {
-      console.error('⚠️ Database update failed:', dbError.message);
-      await stripe.accounts.update(account.id, {
-        metadata: {
-          db_update_error: dbError.message,
-          restaurantId: safeString(restaurantId)
-        }
-      });
-    }
-
-    res.json({ 
-      success: true, 
+    // Respond immediately so the client doesn't wait for DB
+    res.json({
+      success: true,
       accountId: account.id,
-      message: 'Stripe account created successfully' 
+      message: 'Stripe account created successfully'
+    });
+
+    // Save Stripe account ID to database in background (non-blocking)
+    const rid = safeString(restaurantId);
+    const aid = account.id;
+    setImmediate(async () => {
+      try {
+        const { prisma } = await import('../index');
+        await prisma.restaurant.update({
+          where: { id: rid },
+          data: { stripeAccount: aid }
+        });
+        console.log(`✅ Restaurant updated with Stripe account ID`);
+      } catch (dbError: any) {
+        console.error('⚠️ Database update failed:', dbError.message);
+        try {
+          await stripe.accounts.update(aid, {
+            metadata: {
+              db_update_error: dbError.message,
+              restaurantId: rid
+            }
+          });
+        } catch (_) {}
+      }
     });
 
   } catch (error: any) {
@@ -275,14 +324,21 @@ router.post('/stripe/create-account', async (req, res) => {
     
     if (error.type === 'StripeInvalidRequestError') {
       if (error.code === 'resource_already_exists') {
-        return res.status(400).json({ 
-          error: 'Email already registered with Stripe', 
-          code: 'duplicate_email' 
+        return res.status(400).json({
+          error: 'Email already registered with Stripe',
+          code: 'duplicate_email'
         });
       }
-      return res.status(400).json({ 
-        error: error.message, 
-        code: error.code || 'stripe_error' 
+      const msg = String(error.message || '');
+      if (msg.includes('Invalid Tax ID') || msg.includes('not an allowed value')) {
+        return res.status(400).json({
+          error: 'That SSN or Tax ID is not accepted. Use your real last 4 digits of SSN, or in test mode use 0000.',
+          code: 'invalid_tax_id'
+        });
+      }
+      return res.status(400).json({
+        error: error.message,
+        code: error.code || 'stripe_error'
       });
     }
     
@@ -369,7 +425,7 @@ router.post('/stripe/login-link/:accountId', async (req, res) => {
   }
 });
 
-// Process payment
+// Process payment (generic: amount + destination)
 router.post('/stripe/payment', async (req, res) => {
   try {
     const { amount, restaurantStripeId, currency = 'usd' } = req.body;
@@ -382,16 +438,68 @@ router.post('/stripe/payment', async (req, res) => {
       amount: amountInCents,
       currency,
       transfer_data: { destination: restaurantStripeId },
-      application_fee_amount: Math.round(amountInCents * 0.035),
+      application_fee_amount: Math.round(amountInCents * BASE_RATE),
       metadata: { platform: 'Drift POS' }
     });
 
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (error: any) {
     console.error('❌ Payment error:', error);
-    res.status(500).json({ 
-      error: 'Payment failed', 
+    res.status(500).json({
+      error: 'Payment failed',
       code: 'payment_error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Create a PaymentIntent for an existing order (diner checkout). Transfers to restaurant's connected account.
+router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { customerId } = req.body || {};
+    if (!orderId) return res.status(400).json({ error: 'Order ID required', code: 'MISSING_ORDER_ID' });
+
+    const { prisma } = await import('../index');
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { restaurant: true }
+    });
+    if (!order) return res.status(404).json({ error: 'Order not found', code: 'ORDER_NOT_FOUND' });
+
+    const stripeAccount = order.restaurant.stripeAccount ?? null;
+    if (!stripeAccount) {
+      return res.status(400).json({
+        error: 'Restaurant is not set up for payments yet.',
+        code: 'RESTAURANT_NO_STRIPE'
+      });
+    }
+
+    const amount = order.total + (order.tipAmount ?? 0);
+    if (amount <= 0) return res.status(400).json({ error: 'Order total must be greater than zero', code: 'INVALID_AMOUNT' });
+
+    const feeRate = await getFeeRateForRestaurant(order.restaurantId);
+    const amountInCents = Math.round(amount * 100);
+    const piParams: any = {
+      amount: amountInCents,
+      currency: 'usd',
+      payment_method_types: ['card'],
+      transfer_data: { destination: stripeAccount },
+      application_fee_amount: Math.round(amountInCents * feeRate),
+      metadata: { orderId, platform: 'Drift POS' }
+    };
+    if (customerId && typeof customerId === 'string') {
+      piParams.customer = customerId;
+      piParams.setup_future_usage = 'off_session';
+    }
+    const paymentIntent = await stripe.paymentIntents.create(piParams);
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error: any) {
+    console.error('❌ Create payment intent error:', error);
+    res.status(500).json({
+      error: 'Failed to create payment',
+      code: 'server_error',
       message: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -411,13 +519,67 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
       case 'account.updated':
         console.log('🔄 Account updated:', event.data.object.id);
         break;
-      case 'payment_intent.succeeded':
-        console.log('💰 Payment succeeded:', event.data.object.id);
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as {
+          id: string;
+          amount: number;
+          metadata?: { orderId?: string; p2p?: string; senderId?: string; recipientId?: string; amountCents?: string; feeCents?: string; note?: string };
+        };
+        const meta = paymentIntent.metadata || {};
+        if (meta.p2p === '1' && meta.senderId && meta.recipientId) {
+          try {
+            const { prisma } = await import('../index');
+            await prisma.p2PTransfer.create({
+              data: {
+                senderId: meta.senderId,
+                recipientId: meta.recipientId,
+                amountCents: parseInt(meta.amountCents || '0', 10),
+                feeCents: parseInt(meta.feeCents || '0', 10),
+                note: meta.note || null,
+                stripePaymentIntentId: paymentIntent.id,
+                status: 'SUCCEEDED',
+              },
+            });
+            console.log('💰 P2P transfer recorded:', meta.senderId, '->', meta.recipientId);
+          } catch (dbErr: any) {
+            console.error('❌ P2P webhook DB failed:', dbErr.message);
+          }
+        } else if (meta.orderId) {
+          try {
+            const { prisma } = await import('../index');
+            const order = await prisma.order.findUnique({ where: { id: meta.orderId } });
+            if (order) {
+              const amount = paymentIntent.amount / 100;
+              await prisma.transaction.create({
+                data: {
+                  orderId: order.id,
+                  userId: order.userId,
+                  amount,
+                  currency: 'usd',
+                  status: 'SUCCEEDED',
+                  stripePaymentId: paymentIntent.id,
+                  succeededAt: new Date(),
+                  type: 'PAYMENT'
+                }
+              });
+              await prisma.order.update({
+                where: { id: order.id },
+                data: { completedAt: new Date(), status: 'COMPLETED' }
+              });
+              console.log('💰 Payment succeeded: order', meta.orderId, 'updated');
+            }
+          } catch (dbErr: any) {
+            console.error('❌ Webhook DB update failed:', dbErr.message);
+          }
+        } else {
+          console.log('💰 Payment succeeded:', paymentIntent.id);
+        }
         break;
+      }
       default:
         console.log('📨 Unhandled webhook event:', event.type);
     }
-    
+
     res.json({ received: true });
   } catch (error: any) {
     console.error('❌ Webhook error:', error);

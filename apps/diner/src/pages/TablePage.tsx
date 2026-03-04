@@ -39,10 +39,10 @@ export function TablePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-200 border-t-black rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-400">Finding your table...</p>
+          <div className="w-10 h-10 border-2 border-[var(--drift-border)] border-t-[var(--drift-ink)] rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-[var(--drift-ink-muted)] text-sm">Finding your table…</p>
         </div>
       </div>
     );
@@ -50,15 +50,15 @@ export function TablePage() {
 
   if (error || !restaurant) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex items-center justify-center p-4">
         <Card padding="lg" className="text-center max-w-sm">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-[var(--drift-error-bg)] rounded-[var(--drift-radius-xl)] flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">😕</span>
           </div>
-          <h2 className="text-xl font-medium mb-2">Table not found</h2>
-          <p className="text-gray-400 text-sm mb-6">The QR code might be invalid</p>
+          <h2 className="text-xl font-semibold text-[var(--drift-ink)] mb-2">Table not found</h2>
+          <p className="text-[var(--drift-ink-muted)] text-sm mb-6">The QR code might be invalid</p>
           <Button onClick={() => navigate('/')} fullWidth>
-            Scan Again
+            Scan again
           </Button>
         </Card>
       </div>
@@ -66,63 +66,41 @@ export function TablePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Back button */}
-      <button 
+    <div className="min-h-screen bg-[var(--drift-surface-elevated)]">
+      <button
         onClick={() => navigate('/')}
-        className="absolute top-6 left-4 p-3 text-gray-400 hover:text-black active:bg-gray-50 rounded-full transition-all z-10"
+        className="absolute top-6 left-4 p-3 text-[var(--drift-ink-muted)] hover:text-[var(--drift-ink)] active:bg-[var(--drift-surface-overlay)] rounded-full transition-colors z-10"
+        aria-label="Back"
       >
         <ArrowLeft className="w-5 h-5" />
       </button>
 
       <div className="container max-w-md mx-auto px-4 pt-16 pb-8">
-        
-        {/* Restaurant name */}
         <div className="text-center mb-8 animate-fade-in">
-          <p className="text-xs text-gray-300 tracking-widest mb-2">WELCOME TO</p>
-          <h1 className="text-3xl font-light">{restaurant.name}</h1>
+          <p className="text-[11px] uppercase tracking-wider text-[var(--drift-ink-subtle)]">drift · dine</p>
+          <h1 className="text-2xl font-semibold text-[var(--drift-ink)] mt-1">{restaurant.name}</h1>
         </div>
 
-        {/* Table card - Hero element */}
         <div className="relative mb-8 animate-slide-up">
-          {/* Background decoration */}
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white rounded-3xl -rotate-1 scale-95 opacity-50"></div>
-          
           <Card padding="xl" className="relative text-center">
-            <p className="text-sm text-gray-400 mb-2">You're at</p>
-            
-            {/* Animated number */}
+            <p className="text-sm text-[var(--drift-ink-muted)] mb-2">You're at</p>
             <div className="relative">
-              <span className="text-9xl font-light block leading-none animate-pop">
+              <span className="text-8xl font-semibold block leading-none text-[var(--drift-ink)]">
                 {tableNumber}
               </span>
-              <div className="absolute -top-2 -right-2 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="absolute -top-2 -right-2 w-3 h-3 bg-[var(--drift-accent)] rounded-full" />
             </div>
-            
-            <p className="text-gray-300 mt-2">Table {tableNumber}</p>
-
-            {/* Decorative dots */}
-            <div className="flex justify-center gap-2 mt-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="w-1 h-1 bg-gray-200 rounded-full"></div>
-              ))}
-            </div>
+            <p className="text-[var(--drift-ink-muted)] mt-2">Table {tableNumber}</p>
           </Card>
         </div>
 
-        {/* Action buttons */}
         <div className="space-y-3 animate-slide-up">
-          <Button 
-            onClick={handleConfirm} 
-            fullWidth 
-            disabled={confirming}
-            className="shadow-lg"
-          >
+          <Button onClick={handleConfirm} fullWidth disabled={confirming}>
             {confirming ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Just a moment...</span>
-              </div>
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Just a moment…
+              </span>
             ) : (
               <span className="flex items-center gap-2">
                 That's me
@@ -130,18 +108,16 @@ export function TablePage() {
               </span>
             )}
           </Button>
-
-          <button 
+          <button
             onClick={() => navigate('/')}
-            className="w-full text-center text-gray-400 py-3 text-sm active:text-black transition-colors"
+            className="w-full text-center text-[var(--drift-ink-muted)] py-3 text-sm hover:text-[var(--drift-ink)] transition-colors"
           >
             Not my table
           </button>
         </div>
 
-        {/* Trust badge */}
-        <p className="text-center text-xs text-gray-300 mt-8">
-          🔒 Your payment is secure with Drift
+        <p className="text-center text-xs text-[var(--drift-ink-subtle)] mt-8">
+          Check out with Drift — secure payment
         </p>
       </div>
     </div>

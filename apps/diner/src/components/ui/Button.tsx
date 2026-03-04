@@ -1,39 +1,41 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, ButtonHTMLAttributes } from 'react';
 
-interface ButtonProps {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'text';
   fullWidth?: boolean;
-  onClick?: () => void;
-  disabled?: boolean;
   className?: string;
   icon?: ReactNode;
 }
 
 const variantStyles = {
-  primary: 'bg-black text-white hover:bg-gray-800',
-  secondary: 'bg-white border border-gray-200 text-black hover:border-black',
-  text: 'text-gray-400 hover:text-black bg-transparent',
+  primary:
+    'bg-[var(--drift-accent)] text-white hover:bg-[var(--drift-accent-hover)] active:scale-[0.98] shadow-[var(--drift-shadow-sm)]',
+  secondary:
+    'bg-[var(--drift-surface)] border border-[var(--drift-border)] text-[var(--drift-ink)] hover:bg-[var(--drift-surface-overlay)] hover:border-[var(--drift-border-strong)]',
+  text:
+    'bg-transparent text-[var(--drift-ink-muted)] hover:text-[var(--drift-ink)]',
 };
 
-export function Button({ 
-  children, 
-  variant = 'primary', 
-  fullWidth = false, 
-  onClick, 
+export function Button({
+  children,
+  variant = 'primary',
+  fullWidth = false,
   disabled = false,
   className = '',
-  icon
+  icon,
+  ...props
 }: ButtonProps) {
   return (
     <button
-      onClick={onClick}
       disabled={disabled}
+      {...props}
       className={`
         ${fullWidth ? 'w-full' : ''}
         ${variantStyles[variant]}
-        py-4 px-6 rounded-xl font-medium transition-all
-        disabled:opacity-50 disabled:cursor-not-allowed
+        min-h-[44px] py-3 px-6 rounded-[var(--drift-radius-pill)] font-semibold text-[15px]
+        transition-all duration-[var(--drift-duration)] ease-[var(--drift-ease)]
+        disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
         flex items-center justify-center gap-2
         ${className}
       `}

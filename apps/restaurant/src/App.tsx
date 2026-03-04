@@ -22,15 +22,36 @@ function RedirectToLandingLogin() {
   return null;
 }
 
+// Generic redirect for any path
+function RedirectToLandingPath() {
+  useEffect(() => {
+    const path = window.location.pathname;
+    window.location.href = `https://driftpos.com${path}`;
+  }, []);
+  return null;
+}
+
 function App() {
   // Check if user is authenticated
   const token = localStorage.getItem('drift-token');
   const restaurantId = localStorage.getItem('drift-restaurant-id');
 
+  // All marketing paths that should redirect to landing
+  const marketingPaths = [
+    'pricing', 'faq',
+    'about', 'blog', 'careers',
+    'privacy', 'terms', 'security'
+  ];
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Redirect ALL auth-related paths to landing */}
+        {/* Map through all marketing paths */}
+        {marketingPaths.map(path => (
+          <Route key={path} path={`/${path}`} element={<RedirectToLanding />} />
+        ))}
+        
+        {/* Auth pages */}
         <Route path="/" element={<RedirectToLanding />} />
         <Route path="/login" element={<RedirectToLandingLogin />} />
         <Route path="/signup" element={<RedirectToLanding />} />
@@ -69,6 +90,9 @@ function App() {
             token ? <SettingsPage /> : <RedirectToLandingLogin />
           } 
         />
+        
+        {/* CATCH-ALL: Redirect any other unknown path to landing */}
+        <Route path="*" element={<RedirectToLandingPath />} />
       </Routes>
     </BrowserRouter>
   );

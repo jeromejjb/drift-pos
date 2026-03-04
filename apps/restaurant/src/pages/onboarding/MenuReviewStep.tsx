@@ -339,12 +339,25 @@ export function MenuReviewStep({ data, updateData, onNext, onPrev }: Props) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Price ($)</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={editFormData.price}
-                  onChange={(e) => setEditFormData({ ...editFormData, price: parseFloat(e.target.value) })}
+                  type="text"
+                  inputMode="decimal"
+                  value={editFormData.price === undefined || editFormData.price === null ? '' : String(editFormData.price)}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d.]/g, '');
+                    const parts = raw.split('.');
+                    const limited =
+                      parts.length > 1
+                        ? parts[0].slice(0, 6) + '.' + parts[1].slice(0, 2)
+                        : parts[0].slice(0, 6);
+                    const num = limited === '' || limited === '.' ? undefined : parseFloat(limited);
+                    setEditFormData({ ...editFormData, price: num ?? 0 });
+                  }}
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                  placeholder="0.00"
                 />
+                {editFormData.price !== undefined && (editFormData.price < 0 || !Number.isFinite(editFormData.price)) && (
+                  <p className="text-xs text-red-500 mt-1">Enter a valid price (e.g. 12.99)</p>
+                )}
               </div>
 
               <div className="flex items-center gap-4">

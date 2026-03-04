@@ -17,6 +17,8 @@ interface MenuItem {
   category: string;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+
 export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete }: QuickOrderModalProps) {
   const [search, setSearch] = useState('');
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -33,7 +35,7 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
   const fetchMenu = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/restaurant/${restaurantId}/menu`);
+      const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/menu`);
       if (response.ok) {
         const data = await response.json();
         // Flatten categories into items list
@@ -82,7 +84,7 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
         quantity
       }));
 
-      const response = await fetch('/api/orders', {
+      const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -16,7 +16,7 @@ model Restaurant {
   timezone      String         @default("America/New_York")
   supabaseUserId String?        @unique
   email          String?
-    stripeAccountId String? 
+  stripeAccountId String? 
   
   tables        Table[]
   categories    MenuCategory[]
@@ -194,6 +194,8 @@ model User {
   orders           Order[]
   transactions     Transaction[]
   orderItems       OrderItem[]
+  p2pSent          P2PTransfer[] @relation("P2PSender")
+  p2pReceived      P2PTransfer[] @relation("P2PRecipient")
   
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
@@ -205,6 +207,25 @@ model User {
   @@unique([supabaseId], map: "users_supabase_id_idx")
   @@index([createdAt], map: "users_created_at_idx")
   @@map("users")
+}
+
+model P2PTransfer {
+  id                    String   @id @default(cuid())
+  senderId              String
+  sender                User     @relation("P2PSender", fields: [senderId], references: [id])
+  recipientId           String
+  recipient             User     @relation("P2PRecipient", fields: [recipientId], references: [id])
+  amountCents           Int
+  feeCents              Int      @default(0)
+  note                  String?
+  stripePaymentIntentId String?  @unique(map: "p2p_stripe_pi_unique")
+  status                String   @default("PENDING") // PENDING, SUCCEEDED, FAILED
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([senderId], map: "p2p_sender_idx")
+  @@index([recipientId], map: "p2p_recipient_idx")
+  @@index([createdAt], map: "p2p_created_idx")
+  @@map("p2p_transfers")
 }
 
 model DemoRequest {

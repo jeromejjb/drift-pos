@@ -1,185 +1,208 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Apple, CreditCard } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { API_URL, STRIPE_PUBLISHABLE_KEY } from '../lib/api';
+import { toPaymentError } from '../lib/userErrors';
+import { InlineError } from '../components/ui/InlineError';
+
+const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
 
 export function PaymentPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  const { accessToken } = useAuth();
+  const [dinerProfile, setDinerProfile] = useState<{ id: string; stripeCustomerId?: string } | null>(null);
   const [tipPercent, setTipPercent] = useState(18);
-  const [processing, setProcessing] = useState(false);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [restaurantId, setRestaurantId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [piLoading, setPiLoading] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load cart data when component mounts
   useEffect(() => {
     const savedCart = localStorage.getItem('drift-cart');
     const savedRestaurant = localStorage.getItem('drift-restaurant');
-    
-    console.log('📦 PaymentPage - URL params:', { tableId });
-    console.log('📦 PaymentPage - Loading from localStorage:', {
-      cart: savedCart,
-      restaurant: savedRestaurant
-    });
-    
     if (savedCart) {
       try {
-        const parsedCart = JSON.parse(savedCart);
-        setCartItems(parsedCart);
-        console.log('✅ Cart loaded:', parsedCart);
-      } catch (error) {
-        console.error('❌ Failed to parse cart:', error);
-      }
+        setCartItems(JSON.parse(savedCart));
+      } catch (_) {}
     }
-    
-    if (savedRestaurant) {
-      setRestaurantId(savedRestaurant);
-      console.log('✅ Restaurant ID loaded:', savedRestaurant);
-    }
-    
+    if (savedRestaurant) setRestaurantId(savedRestaurant);
     setLoading(false);
   }, [tableId]);
 
+  useEffect(() => {
+    if (accessToken) {
+      fetch(`${API_URL}/api/diner/me`, { headers: { Authorization: `Bearer ${accessToken}` } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => data && setDinerProfile({ id: data.id, stripeCustomerId: data.stripeCustomerId }))
+        .catch(() => {});
+    }
+  }, [accessToken]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+      <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--drift-border)] border-t-[var(--drift-ink)]" />
       </div>
     );
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.1;
   const tip = (subtotal * tipPercent) / 100;
   const total = subtotal + tax + tip;
 
-    // In handlePayment function, prefix unused parameter
-const handlePayment = async (_method: string) => {
-  setProcessing(true);
-    
+  const createOrderAndGetPaymentIntent = useCallback(async () => {
+    setError(null);
+    setClientSecret(null);
+    if (!tableId || !restaurantId || !cartItems.length) {
+      setError('Missing table, restaurant, or cart. Please go back to the menu.');
+      return;
+    }
+    if (!STRIPE_PUBLISHABLE_KEY) {
+      setError('Card payment isn’t available right now. Please pay at the table or try again later.');
+      return;
+    }
+    setPiLoading(true);
     try {
-      // Validate all required fields
-      console.log('🔍 Payment validation:', {
-        restaurantId,
-        tableId,
-        cartItems,
-        total,
-        tip
-      });
-
-      if (!tableId) {
-        throw new Error('Table ID is missing from URL. Please go back to the menu.');
-      }
-
-      if (!restaurantId) {
-        throw new Error('Restaurant ID is missing. Please go back to the menu.');
-      }
-
-      if (!cartItems.length) {
-        throw new Error('Your cart is empty.');
-      }
-
-      // Create the order in your API
-      const orderResponse = await fetch('https://drift-api-7vs7.onrender.com/api/orders', {
+      const userId = dinerProfile?.id ?? 'guest-' + Math.random().toString(36).slice(2, 11);
+      const orderRes = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
         body: JSON.stringify({
-          restaurantId: restaurantId,
-          tableId: tableId,
-          userId: 'test-user-123',
-          items: cartItems.map(item => ({
+          restaurantId,
+          tableId,
+          userId,
+          items: cartItems.map((item: any) => ({
             menuItemId: item.id,
             quantity: item.quantity,
-            price: item.price
+            price: item.price,
           })),
-          total: total,
-          tip: tip
-        })
+          total,
+          tip,
+        }),
       });
-
-      // Get response text for debugging
-      const responseText = await orderResponse.text();
-      console.log('📡 API Response:', {
-        status: orderResponse.status,
-        body: responseText
-      });
-      
-      if (!orderResponse.ok) {
-        throw new Error(`Failed to create order: ${responseText}`);
+      const orderText = await orderRes.text();
+      if (!orderRes.ok) {
+        const errData = orderText ? (() => { try { return JSON.parse(orderText); } catch { return {}; } })() : {};
+        setError(toPaymentError(errData.error || orderText, orderRes.status));
+        return;
       }
-      
-      const orderData = JSON.parse(responseText);
-      console.log('✅ Order created:', orderData);
-      
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Clear cart
-      localStorage.removeItem('drift-cart');
-      localStorage.removeItem('drift-restaurant');
-      
-      // Navigate to confirmation
-      navigate(`/confirmation/${orderData.id}`);
-      
-    } catch (error) {
-      console.error('❌ Payment failed:', error);
-      setProcessing(false);
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      alert(errorMessage);
+      const order = JSON.parse(orderText);
+      setOrderId(order.id);
+
+      const payRes = await fetch(
+        `${API_URL}/api/stripe/order/${order.id}/create-payment-intent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
+        }
+      );
+      const payJson = await payRes.json().catch(() => ({}));
+      if (!payRes.ok) {
+        if (payJson.code === 'RESTAURANT_NO_STRIPE') {
+          setError("This restaurant isn't set up for card payments yet. Please pay at the table.");
+        } else {
+          setError(toPaymentError(payJson.error, payRes.status));
+        }
+        return;
+      }
+      if (payJson.clientSecret) {
+        setClientSecret(payJson.clientSecret);
+        localStorage.setItem('drift-pending-order', order.id);
+      } else {
+        setError(toPaymentError('Invalid payment response'));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      setError(toPaymentError(msg));
+    } finally {
+      setPiLoading(false);
     }
+  }, [tableId, restaurantId, cartItems, total, tip, dinerProfile?.id, dinerProfile?.stripeCustomerId, accessToken]);
+
+  // Effortless: create order + PI as soon as we have cart and tip
+  useEffect(() => {
+    if (loading || !cartItems.length || !restaurantId || !tableId) return;
+    createOrderAndGetPaymentIntent();
+  }, [loading, cartItems.length, restaurantId, tableId, tipPercent, createOrderAndGetPaymentIntent]);
+
+  const handlePaymentSuccess = () => {
+    localStorage.removeItem('drift-cart');
+    localStorage.removeItem('drift-restaurant');
+    const id = orderId || localStorage.getItem('drift-pending-order');
+    localStorage.removeItem('drift-pending-order');
+    if (id) navigate(`/confirmation/${id}`);
   };
 
+  if (!cartItems.length || !restaurantId || !tableId) {
+    return (
+      <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex flex-col items-center justify-center p-4 relative">
+        <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 text-[var(--drift-ink)] hover:bg-[var(--drift-surface-overlay)] rounded-[var(--drift-radius)]">← Back</button>
+        <p className="text-[var(--drift-ink-muted)] text-center">Your cart is empty. Go back to the menu to add items.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3">
+    <div className="min-h-screen bg-[var(--drift-surface-elevated)]">
+      <div className="sticky top-0 bg-[var(--drift-surface-elevated)]/95 backdrop-blur-md border-b border-[var(--drift-border)] px-5 py-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)}>
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 -ml-2 rounded-[var(--drift-radius)] text-[var(--drift-ink-muted)] hover:text-[var(--drift-ink)] hover:bg-[var(--drift-surface-overlay)]"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <div className="text-xs text-gray-400">drift</div>
-            <div className="font-medium">Payment</div>
+            <p className="text-[11px] uppercase tracking-wider text-[var(--drift-ink-subtle)]">drift · dine</p>
+            <h2 className="text-lg font-semibold text-[var(--drift-ink)]">Pay</h2>
           </div>
         </div>
       </div>
 
-      <div className="px-4 py-6">
-        {/* Order summary */}
-        <div className="bg-gray-50 rounded-xl p-4 mb-6">
-          <h3 className="font-medium mb-3">Order Summary</h3>
-          <div className="space-y-2 text-sm">
-            {cartItems.map((item, index) => (
+      <div className="px-5 py-6 max-w-md mx-auto pb-24 safe-bottom">
+        <div className="bg-[var(--drift-surface)] border border-[var(--drift-border)] rounded-[var(--drift-radius-xl)] p-5 mb-5 shadow-[var(--drift-shadow-sm)]">
+          <h3 className="font-semibold text-[var(--drift-ink)] mb-3">Order</h3>
+          <div className="space-y-2.5 text-[15px] text-[var(--drift-ink-muted)]">
+            {cartItems.map((item: any, index: number) => (
               <div key={index} className="flex justify-between">
                 <span>{item.quantity}x {item.name}</span>
-                <span>${(item.price * item.quantity).toFixed(2)}</span>
+                <span className="text-[var(--drift-ink)]">${(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}
-            <div className="border-t border-gray-200 my-2 pt-2">
+            <div className="border-t border-[var(--drift-border)] mt-3 pt-3">
               <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>Subtotal</span>
+                <span className="text-[var(--drift-ink)]">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Tax</span>
-                <span>${tax.toFixed(2)}</span>
+                <span>Tax</span>
+                <span className="text-[var(--drift-ink)]">${tax.toFixed(2)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tip selection */}
-        <div className="mb-6">
-          <h3 className="font-medium mb-3">Add Tip</h3>
+        <div className="mb-5">
+          <h3 className="font-semibold text-[var(--drift-ink)] mb-3">Tip</h3>
           <div className="flex gap-2">
-            {[15, 18, 20, 25].map(percent => (
+            {[15, 18, 20, 25].map((percent) => (
               <button
                 key={percent}
                 onClick={() => setTipPercent(percent)}
-                className={`flex-1 py-3 rounded-xl border transition-colors ${
+                disabled={piLoading}
+                className={`flex-1 py-3 rounded-[var(--drift-radius-pill)] border transition-all disabled:opacity-60 ${
                   tipPercent === percent
-                    ? 'bg-black text-white border-black'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'bg-[var(--drift-accent)] text-white border-[var(--drift-accent)] shadow-[var(--drift-shadow-sm)]'
+                    : 'border-[var(--drift-border)] text-[var(--drift-ink)] hover:border-[var(--drift-accent)]/50 hover:bg-[var(--drift-accent-muted)]'
                 }`}
               >
                 {percent}%
@@ -188,35 +211,73 @@ const handlePayment = async (_method: string) => {
           </div>
         </div>
 
-        {/* Total */}
-        <div className="bg-black text-white rounded-xl p-4 mb-6">
+        <div className="bg-[var(--drift-accent)] text-white rounded-[var(--drift-radius-xl)] p-5 mb-5 shadow-[0_4px_16px_var(--drift-accent-glow)]">
           <div className="flex justify-between items-center">
-            <span className="text-gray-300">Total</span>
-            <span className="text-2xl font-light">${total.toFixed(2)}</span>
+            <span className="text-white/90 font-medium">Total</span>
+            <span className="text-3xl font-bold tabular-nums">${total.toFixed(2)}</span>
           </div>
         </div>
 
-        {/* Payment methods */}
-        <div className="space-y-3">
-          <button
-            onClick={() => handlePayment('apple')}
-            disabled={processing}
-            className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <Apple className="w-5 h-5" />
-            {processing ? 'Processing...' : 'Pay with Apple Pay'}
-          </button>
+        {error && (
+          <div className="mb-4">
+            <InlineError message={error} onRetry={() => { setError(null); createOrderAndGetPaymentIntent(); }} />
+          </div>
+        )}
 
-          <button
-            onClick={() => handlePayment('card')}
-            disabled={processing}
-            className="w-full bg-white hover:bg-gray-50 text-black font-medium py-4 px-6 rounded-xl border border-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <CreditCard className="w-5 h-5" />
-            {processing ? 'Processing...' : 'Pay with Card'}
-          </button>
-        </div>
+        {piLoading && !clientSecret ? (
+          <div className="py-10 flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--drift-border)] border-t-[var(--drift-accent)]" />
+            <p className="text-[15px] text-[var(--drift-ink-muted)]">Preparing payment…</p>
+          </div>
+        ) : clientSecret && stripePromise ? (
+          <Elements stripe={stripePromise} options={{ clientSecret }} key={clientSecret}>
+            <CheckoutForm onSuccess={handlePaymentSuccess} amount={total} />
+          </Elements>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function CheckoutForm({ onSuccess, amount }: { onSuccess: () => void; amount: number }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setProcessing(true);
+    setError(null);
+    const { error: confirmError } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.origin + '/payment/return',
+        payment_method_data: {
+          billing_details: {},
+        },
+      },
+    });
+    setProcessing(false);
+    if (confirmError) {
+      setError(toPaymentError(confirmError.message));
+      return;
+    }
+    onSuccess();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <PaymentElement options={{ layout: { type: 'accordion', radios: 'never', spacedAccordionItems: false } }} />
+      {error && <InlineError message={error} />}
+      <button
+        type="submit"
+        disabled={!stripe || processing}
+        className="w-full min-h-[48px] bg-[var(--drift-accent)] hover:bg-[var(--drift-accent-hover)] disabled:opacity-50 text-white font-semibold text-[15px] py-4 px-6 rounded-[var(--drift-radius-pill)] transition-all duration-[var(--drift-duration)] shadow-[var(--drift-shadow-sm)]"
+      >
+        {processing ? 'Processing…' : `Pay $${amount.toFixed(2)}`}
+      </button>
+    </form>
   );
 }

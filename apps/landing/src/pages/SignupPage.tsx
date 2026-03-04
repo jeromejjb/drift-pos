@@ -42,6 +42,7 @@ export function SignupPage() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [modalContent, setModalContent] = useState<'terms' | 'privacy'>('terms');
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [loadingSlow, setLoadingSlow] = useState(false);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -201,8 +202,8 @@ export function SignupPage() {
     return 'Strong';
   };
 
-  const API_URL = 'https://drift-api-7vs7.onrender.com';
-  const RESTAURANT_URL = 'https://restaurant.driftpos.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://restaurant.driftpos.com';
 
   // Step validation
   const isStep1Valid = () => {
@@ -242,14 +243,16 @@ export function SignupPage() {
     if (!isStep2Valid() || !formData.agreeTerms) return;
     
     setLoading(true);
+    setLoadingSlow(false);
     setError('');
+    let slowTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => setLoadingSlow(true), 4000);
     
     try {
-      // Store formatted phone for display
       const phoneToStore = formData.phone || '';
-      // Send digits to API
       const phoneDigits = formData.phone ? formData.phone.replace(/\D/g, '') : '';
       
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -264,9 +267,12 @@ export function SignupPage() {
           phone: phoneDigits || null,
           tableCount: 5
         }),
+        signal: controller.signal,
       });
+      window.clearTimeout(timeoutId);
 
       const data = await response.json();
+      if (slowTimer) clearTimeout(slowTimer);
       if (!response.ok) throw new Error(data.error || 'Failed to create account');
 
       setRedirecting(true);
@@ -279,8 +285,8 @@ export function SignupPage() {
         role: formData.role,
         businessType: formData.businessType,
         teamSize: formData.teamSize,
-        phone: phoneToStore, // Store formatted version
-        userId: data.userId,
+        phone: phoneToStore,
+        userId: data.userId ?? data.user?.id,
         restaurantId: data.restaurantId
       };
 
@@ -302,10 +308,12 @@ export function SignupPage() {
       
       setTimeout(() => {
         window.location.href = redirectUrl;
-      }, 300);
+      }, 100);
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create account');
+      if (slowTimer) clearTimeout(slowTimer);
+      const msg = err instanceof Error ? err.message : 'Failed to create account';
+      setError(err instanceof Error && err.name === 'AbortError' ? 'Request timed out. Please try again.' : msg);
       setLoading(false);
       setRedirecting(false);
     }
@@ -970,6 +978,11 @@ export function SignupPage() {
                         </span>
                       )}
                     </button>
+                    {loading && loadingSlow && (
+                      <p className="mt-3 text-center text-sm text-gray-500">
+                        This may take a moment on first load. Please don&apos;t close this page.
+                      </p>
+                    )}
                   </motion.div>
                 </motion.div>
               )}

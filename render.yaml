@@ -12,7 +12,7 @@ services:
     plan: free
     region: oregon
     rootDir: apps/api
-    buildCommand: npm install && npx prisma generate && npm run build
+    buildCommand: npm install && npm run build --workspace=apps/landing && npx prisma generate && npm run build
     startCommand: npm start
     preDeployCommand: npx prisma migrate deploy
     envVars:
@@ -41,7 +41,13 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://drift-api.onrender.com
+        value: https://drift-api-7vs7.onrender.com
+      - key: VITE_SUPABASE_URL
+        value: https://kywpomnuqfypfgxagnib.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: sb_publishable_DZd_H7Hcxw49NiWO7uAZgQ_goY2wMfN
+      - key: VITE_STRIPE_PUBLISHABLE_KEY
+        value: pk_live_51T1PjSPpOz4d8LjO5Oz3CW61EcbgXS2U19GarkBl2LUxZr0YW6jlOZsYGLKd1UPaDbPqvZgIlvYvu8ZiOMM9QCrn00XjkX013S
 
   # Restaurant Frontend - Static Site
   - type: static
@@ -53,11 +59,11 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://drift-api.onrender.com
+        value: https://drift-api-7vs7.onrender.com
       - key: VITE_SUPABASE_URL
-        value: https://kywpomnuqfypfgxagnib.supabase.co  # Replace with actual value
+        value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
-        value: sb_secret_gtes5uYZz-itbhcAd2oTmw_5uoJR6-D  # Replace with actual value
+        value: sb_publishable_DZd_H7Hcxw49NiWO7uAZgQ_goY2wMfN
 
   # Landing Page - Static Site
   - type: static
@@ -69,8 +75,8 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://drift-api.onrender.com
+        value: https://drift-api-7vs7.onrender.com
       - key: VITE_SUPABASE_URL
-        value: https://kywpomnuqfypfgxagnib.supabase.co  # Replace with actual value
+        value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
-        value: sb_secret_gtes5uYZz-itbhcAd2oTmw_5uoJR6-D  # Replace with actual value
+        value: sb_publishable_DZd_H7Hcxw49NiWO7uAZgQ_goY2wMfN

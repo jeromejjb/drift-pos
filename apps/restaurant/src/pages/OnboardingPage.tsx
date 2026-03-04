@@ -16,6 +16,7 @@ import {
   Briefcase,
   Users
 } from 'lucide-react';
+import { Button } from '../components/ui/Button';
 import { RestaurantInfoStep } from './onboarding/RestaurantInfoStep';
 import { TablesStep } from './onboarding/TablesStep';
 import { MenuImportStep } from './onboarding/MenuImportStep';
@@ -106,6 +107,7 @@ export function OnboardingPage() {
     const fullName = searchParams.get('fullName');
     const role = searchParams.get('role');
     const teamSize = searchParams.get('teamSize');
+    const phone = searchParams.get('phone');
     const token = searchParams.get('token');
     
     console.log('📦 Onboarding page loaded with URL params:', { 
@@ -116,6 +118,7 @@ export function OnboardingPage() {
       fullName,
       role,
       teamSize,
+      phone: phone ? '✅ Present' : '❌ Missing',
       token: token ? '✅ Present' : '❌ Missing'
     });
     
@@ -140,6 +143,7 @@ export function OnboardingPage() {
       fullName: fullName ? decodeURIComponent(fullName) : '',
       role: role ? decodeURIComponent(role) : '',
       teamSize: teamSize ? decodeURIComponent(teamSize) : '',
+      phone: phone ? decodeURIComponent(phone) : '',
     };
 
     console.log('👤 Profile from URL:', urlProfile);
@@ -209,6 +213,8 @@ export function OnboardingPage() {
         fullName: onboardingData.fullName,
         role: onboardingData.role,
         teamSize: onboardingData.teamSize,
+        phone: onboardingData.phone,
+        address: onboardingData.address,
       };
       
       localStorage.setItem('drift-user-profile', JSON.stringify(profileToSave));
@@ -245,13 +251,12 @@ export function OnboardingPage() {
             <span className="text-2xl">⚠️</span>
           </div>
           <h2 className="text-2xl font-light mb-2">Something went wrong</h2>
-          <p className="text-gray-400 mb-4">No restaurant ID provided. Please go back to signup.</p>
-          <button
-            onClick={() => window.location.href = 'https://drift-landing.onrender.com/signup'}
-            className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800"
+          <p className="text-gray-400 mb-4">No restaurant ID provided. Please complete signup first.</p>
+          <Button
+            onClick={() => { window.location.href = 'https://driftpos.com/signup'; }}
           >
             Back to Signup
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -343,33 +348,30 @@ export function OnboardingPage() {
         </div>
       )}
 
-      {/* Beautiful Step Navigation */}
+      {/* Step Navigation with long connector lines: business → … → bank → verify */}
       <div className="border-b border-gray-100 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="grid grid-cols-7 gap-2">
+          <div className="flex items-center w-full min-w-0">
             {steps.map((step, index) => {
               const StepIcon = step.icon;
               const isActive = index === currentStep;
               const isComplete = index < currentStep;
-              const isFuture = index > currentStep;
-              
+              const isLast = index === steps.length - 1;
               return (
-                <motion.div
-                  key={step.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="relative"
-                >
-                  <div className="flex flex-col items-center text-center">
-                    {/* Icon circle */}
+                <div key={step.id} className="contents">
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="flex flex-col items-center text-center shrink-0 min-w-[72px]"
+                  >
                     <div
                       className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-all ${
                         isActive
                           ? 'bg-black text-white shadow-lg scale-110'
                           : isComplete
-                          ? 'bg-green-100 text-green-600'
-                          : 'bg-gray-100 text-gray-400'
+                            ? 'bg-green-100 text-green-600'
+                            : 'bg-gray-100 text-gray-400'
                       }`}
                     >
                       {isComplete ? (
@@ -378,40 +380,41 @@ export function OnboardingPage() {
                         <StepIcon className="w-5 h-5" />
                       )}
                     </div>
-                    
-                    {/* Title */}
                     <span
-                      className={`text-xs font-medium mb-0.5 ${
-                        isActive
-                          ? 'text-black'
-                          : isComplete
-                          ? 'text-green-600'
-                          : 'text-gray-400'
+                      className={`text-xs font-medium ${
+                        isActive ? 'text-black' : isComplete ? 'text-green-600' : 'text-gray-400'
                       }`}
                     >
                       {step.title}
                     </span>
-                    
-                    {/* Description - hidden on small screens, visible on hover */}
-                    <span className="text-[10px] text-gray-300 hidden md:block">
+                    <span className="text-[10px] text-gray-300 hidden lg:block mt-0.5">
                       {step.description}
                     </span>
-
-                    {/* Active indicator line */}
                     {isActive && (
                       <motion.div
                         layoutId="activeStep"
-                        className="absolute -bottom-3 left-0 right-0 h-0.5 bg-black"
+                        className="w-full h-0.5 bg-black mt-2 rounded-full"
                         transition={{ duration: 0.2 }}
                       />
                     )}
-                  </div>
-                </motion.div>
+                  </motion.div>
+                  {/* Connector line between steps - longer for clearer flow */}
+                  {!isLast && (
+                    <div
+                      className="flex-1 min-w-[36px] mx-2 lg:mx-4 flex items-center self-start pt-5"
+                      aria-hidden
+                    >
+                      <div
+                        className={`h-0.5 w-full rounded-full transition-colors ${
+                          isComplete ? 'bg-green-400' : 'bg-gray-200'
+                        }`}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
-
-          {/* Current step description - visible on mobile */}
           <div className="mt-4 text-center md:hidden">
             <p className="text-sm text-gray-500">{steps[currentStep].description}</p>
           </div>

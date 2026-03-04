@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAddCard } from '../contexts/AddCardContext';
 import { QrCode, Camera, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Html5Qrcode } from 'html5-qrcode';
+import { API_URL } from '../lib/api';
+
+/** Test mode only in development — never on production (driftpos.com, app.driftpos.com) */
+const SHOW_TEST_MODE = import.meta.env.DEV;
+
+type TestTable = { id: string; number: number; restaurantName: string };
 
 export function ScanPage() {
   const navigate = useNavigate();
+  const { openAddCard } = useAddCard();
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTestOptions, setShowTestOptions] = useState(false);
+  const [testTables, setTestTables] = useState<TestTable[]>([]);
+  const [testTablesLoading, setTestTablesLoading] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerId = 'qr-reader';
 
@@ -108,119 +118,127 @@ const startCamera = async () => {
     }
   };
 
-  const useTestTable = (tableNumber: number) => {
-    // Map table numbers to actual table IDs
-    const tableIds: Record<number, string> = {
-      1: 'cmllhyepc0001zdv63vymrj0k',
-      2: 'cmllhyepc0002zdv6ef8sxvxi',
-      3: 'cmllhyepc0003zdv6rckof8zd'
-    };
-    
-    navigate(`/table/${tableIds[tableNumber]}`);
+  // Fetch test tables when user opens test options
+  useEffect(() => {
+    if (!showTestOptions || !API_URL) return;
+    setTestTablesLoading(true);
+    setTestTables([]);
+    fetch(`${API_URL}/api/test-tables`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: TestTable[]) => setTestTables(Array.isArray(list) ? list : []))
+      .catch(() => setTestTables([]))
+      .finally(() => setTestTablesLoading(false));
+  }, [showTestOptions]);
+
+  const useTestTable = (tableId: string) => {
+    navigate(`/table/${tableId}`);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      <div className="container max-w-md mx-auto px-4 py-8">
-        
-        {/* Header */}
-        <div className="text-center mb-12 animate-fade-in">
-          <h1 className="text-6xl font-light tracking-tight mb-3">drift</h1>
-          <p className="text-gray-400 text-lg">eat · drink · drift</p>
+    <div className="min-h-screen bg-[var(--drift-surface-elevated)] pb-20 safe-bottom">
+      <div className="container max-w-md mx-auto px-5 py-8">
+        {/* Header — same “drift” treatment as Pay / Money / Me */}
+        <div className="text-center mb-10 animate-fade-in">
+          <p className="text-[11px] uppercase tracking-widest text-[var(--drift-ink-subtle)] font-medium">drift</p>
+          <h1 className="text-4xl font-bold tracking-tight mt-1 text-[var(--drift-ink)]">Dine</h1>
+          <p className="text-[var(--drift-ink-muted)] text-[15px] mt-2">Scan to check out with Drift</p>
         </div>
 
         {!scanning ? (
-          /* Initial State - Show Scan Button */
           <>
             <Card padding="xl" className="mb-6 animate-slide-up">
               <div className="flex flex-col items-center">
-                {/* Animated QR icon */}
                 <div className="relative mb-8">
-                  <div className="w-24 h-24 bg-gray-50 rounded-3xl flex items-center justify-center animate-pulse-slow">
-                    <QrCode className="w-10 h-10 text-gray-400" />
+                  <div className="w-28 h-28 bg-[var(--drift-accent-muted)] rounded-[var(--drift-radius-2xl)] flex items-center justify-center">
+                    <QrCode className="w-14 h-14 text-[var(--drift-accent)]" strokeWidth={1.5} />
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-black rounded-full flex items-center justify-center">
-                    <Camera className="w-4 h-4 text-white" />
+                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[var(--drift-accent)] rounded-full flex items-center justify-center shadow-[var(--drift-shadow)]">
+                    <Camera className="w-5 h-5 text-white" />
                   </div>
                 </div>
-                
-                <h2 className="text-2xl font-medium text-center mb-3">
+                <h2 className="text-xl font-bold text-[var(--drift-ink)] text-center mb-2">
                   Scan to start
                 </h2>
-                <p className="text-gray-400 text-center mb-8 max-w-xs">
+                <p className="text-[var(--drift-ink-muted)] text-[15px] text-center mb-8 max-w-xs">
                   Point your camera at the QR code on your table
                 </p>
-
-                <Button 
-                  onClick={startCamera} 
+                <Button
+                  onClick={startCamera}
                   fullWidth
                   icon={<Camera className="w-5 h-5" />}
-                  className="shadow-lg"
+                  className="py-4"
                 >
-                  Open Camera
+                  Open camera
                 </Button>
-
-                {/* Test Mode Toggle */}
-                <button
-                  onClick={() => setShowTestOptions(!showTestOptions)}
-                  className="mt-4 text-xs text-gray-300 hover:text-gray-400 transition-colors"
-                >
-                  {showTestOptions ? 'Hide test options' : 'Test mode'}
-                </button>
+                {SHOW_TEST_MODE && (
+                  <button
+                    onClick={() => setShowTestOptions(!showTestOptions)}
+                    className="mt-4 text-xs text-[var(--drift-ink-subtle)] hover:text-[var(--drift-ink-muted)] transition-colors"
+                  >
+                    {showTestOptions ? 'Hide test options' : 'Test mode'}
+                  </button>
+                )}
               </div>
             </Card>
 
-            {/* Test Options */}
-            {showTestOptions && (
+            {SHOW_TEST_MODE && showTestOptions && (
               <Card padding="md" className="mb-6 animate-slide-up">
-                <h3 className="font-medium mb-3">Test Tables</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map(num => (
-                    <button
-                      key={num}
-                      onClick={() => useTestTable(num)}
-                      className="py-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors flex flex-col items-center"
-                    >
-                      <span className="text-xl font-light">{num}</span>
-                      <span className="text-xs text-gray-400">Table {num}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-400 text-center mt-3">
-                  Use this for testing without QR codes
-                </p>
+                <h3 className="font-medium text-[var(--drift-ink)] mb-3">Test tables</h3>
+                {testTablesLoading ? (
+                  <p className="text-sm text-[var(--drift-ink-muted)] py-4 text-center">Loading tables…</p>
+                ) : testTables.length === 0 ? (
+                  <p className="text-sm text-[var(--drift-ink-muted)] py-4 text-center">
+                    No tables available. Start the API and add a restaurant with tables to test.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      {testTables.slice(0, 9).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => useTestTable(t.id)}
+                          className="py-4 bg-[var(--drift-surface-overlay)] rounded-[var(--drift-radius-xl)] hover:bg-[var(--drift-accent-muted)] hover:border-[var(--drift-accent)]/30 border border-transparent transition-all flex flex-col items-center"
+                        >
+                          <span className="text-xl font-medium text-[var(--drift-ink)]">{t.number}</span>
+                          <span className="text-xs text-[var(--drift-ink-muted)]">Table {t.number}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-[var(--drift-ink-muted)] text-center mt-3">
+                      Use for testing without QR codes
+                    </p>
+                  </>
+                )}
               </Card>
             )}
 
-            {/* Trust indicator */}
-            <p className="text-center text-sm text-gray-300 animate-fade-in">
-              Used by 50+ restaurants in NYC
+            <p className="text-center text-sm text-[var(--drift-ink-subtle)] animate-fade-in">
+              Check out with Drift — same app as Pay & Money
             </p>
+            <button
+              type="button"
+              onClick={openAddCard}
+              className="mt-6 w-full py-3 text-[15px] font-medium text-[var(--drift-ink-muted)] hover:text-[var(--drift-ink)] transition-colors"
+            >
+              Add card for faster checkout
+            </button>
           </>
         ) : (
-          /* Scanning State - Show Camera */
-          <div className="relative rounded-2xl overflow-hidden mb-6 animate-slide-up">
-            {/* QR Scanner Container */}
-            <div id={scannerId} className="w-full h-[500px] bg-black" />
-            
-            {/* Scanning Overlay */}
+          <div className="relative rounded-[var(--drift-radius-xl)] overflow-hidden mb-6 animate-slide-up">
+            <div id={scannerId} className="w-full h-[500px] bg-[var(--drift-ink)]" />
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-64 h-64 border-2 border-white rounded-2xl opacity-50"></div>
+                <div className="w-64 h-64 border-2 border-white rounded-[var(--drift-radius-lg)] opacity-50" />
               </div>
               <div className="absolute top-4 left-4 bg-black/50 backdrop-blur text-white px-4 py-2 rounded-full text-sm">
                 Position QR code in the square
               </div>
             </div>
-
-            {/* Error Message */}
             {error && (
-              <div className="absolute top-20 left-4 right-4 bg-red-500 text-white p-4 rounded-xl text-sm text-center">
+              <div className="absolute top-20 left-4 right-4 bg-[var(--drift-error-text)] text-white p-4 rounded-[var(--drift-radius-lg)] text-sm text-center">
                 {error}
               </div>
             )}
-
-            {/* Close Button */}
             <button
               onClick={stopCamera}
               className="absolute bottom-4 right-4 bg-black/50 backdrop-blur text-white p-3 rounded-full hover:bg-black/70 transition-colors z-10"
@@ -229,9 +247,6 @@ const startCamera = async () => {
             </button>
           </div>
         )}
-
-        {/* Decorative element */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
       </div>
     </div>
   );

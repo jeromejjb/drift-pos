@@ -18,6 +18,8 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
+import { config } from '../../lib/config';
+
 interface Props {
   restaurantId: string;
   data: any;
@@ -26,18 +28,19 @@ interface Props {
   onPrev: () => void;
 }
 
-export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) {
+export function RestaurantInfoStep({ restaurantId, data, updateData, onNext, onPrev }: Props) {
   const [formData, setFormData] = useState({
     restaurantName: '',
     email: '',
     phone: '',
-    address: '',
+    address: { line1: '', city: '', state: '', postal_code: '' },
     fullName: '',
     role: '',
     teamSize: ''
   });
 
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [postalCodeError, setPostalCodeError] = useState<string | null>(null);
 
   // Phone number formatting function
   const formatPhoneNumber = (value: string) => {
@@ -77,6 +80,21 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
     } else {
       setPhoneError(null);
     }
+  };
+
+  const formatPostalCode = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 9);
+    setFormData((prev) => ({ ...prev, address: { ...prev.address, postal_code: digits } }));
+    if (digits.length === 0) setPostalCodeError(null);
+    else if (digits.length !== 5 && digits.length !== 9) setPostalCodeError('ZIP must be 5 or 9 digits');
+    else setPostalCodeError(null);
+  };
+
+  const validatePostalCodeBlur = () => {
+    const digits = (formData.address.postal_code || '').replace(/\D/g, '');
+    if (digits.length === 0) setPostalCodeError(null);
+    else if (digits.length !== 5 && digits.length !== 9) setPostalCodeError('ZIP must be 5 or 9 digits');
+    else setPostalCodeError(null);
   };
 
   // Load from ALL sources on mount
@@ -124,24 +142,48 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
       }
     }
     
+    const addr = mergedData.address;
+    const addressObj =
+      addr && typeof addr === 'object' && !Array.isArray(addr)
+        ? {
+            line1: addr.line1 || '',
+            city: addr.city || '',
+            state: addr.state || '',
+            postal_code: addr.postal_code || ''
+          }
+        : {
+            line1: typeof addr === 'string' ? addr : '',
+            city: '',
+            state: '',
+            postal_code: ''
+          };
     setFormData({
       restaurantName: mergedData.restaurantName || mergedData.businessName || mergedData.name || '',
       email: mergedData.email || '',
       phone: phoneNumber,
-      address: mergedData.address || '',
+      address: addressObj,
       fullName: mergedData.fullName || '',
       role: mergedData.role || '',
       teamSize: mergedData.teamSize || ''
     });
   }, [data]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (formData.phone && !validatePhone(formData.phone)) {
+
+    if (formData.phone && !validatePhone(formData.phone)) return;
+    if (!formData.address.line1?.trim() || !formData.address.city?.trim() || !formData.address.state?.trim() || !formData.address.postal_code?.trim()) return;
+    const zipDigits = formData.address.postal_code.replace(/\D/g, '');
+    if (zipDigits.length !== 5 && zipDigits.length !== 9) {
+      setPostalCodeError('ZIP must be 5 or 9 digits');
       return;
     }
-    
+    setPostalCodeError(null);
+    setSaveError(null);
+
     const dataToSave = {
       name: formData.restaurantName,
       email: formData.email,
@@ -151,21 +193,36 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
       role: formData.role,
       teamSize: formData.teamSize
     };
-    
     updateData(dataToSave);
-    
+
     const onboarding = JSON.parse(localStorage.getItem('drift_onboarding') || '{}');
-    localStorage.setItem('drift_onboarding', JSON.stringify({
-      ...onboarding,
-      ...dataToSave
-    }));
-    
+    localStorage.setItem('drift_onboarding', JSON.stringify({ ...onboarding, ...dataToSave }));
     const profile = JSON.parse(localStorage.getItem('drift-user-profile') || '{}');
-    localStorage.setItem('drift-user-profile', JSON.stringify({
-      ...profile,
-      ...dataToSave
-    }));
-    
+    localStorage.setItem('drift-user-profile', JSON.stringify({ ...profile, ...dataToSave }));
+
+    const addressStr = [formData.address.line1, formData.address.city, formData.address.state, formData.address.postal_code].filter(Boolean).join(', ');
+    const token = localStorage.getItem('drift-token');
+    if (token) {
+      setSaving(true);
+      try {
+        const res = await fetch(`${config.apiUrl}/api/restaurants/${restaurantId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ name: formData.restaurantName, address: addressStr, phone: formData.phone || undefined })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setSaveError(err.error || 'Failed to save restaurant info');
+          setSaving(false);
+          return;
+        }
+      } catch {
+        setSaveError('Could not connect. Please try again.');
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
     onNext();
   };
 
@@ -289,16 +346,58 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
             </p>
           </div>
 
-          {/* Address */}
+          {/* Address - required for payouts later */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black transition-all"
-              placeholder="123 Main St, New York, NY 10001"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Business address <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-3">Used for payouts and verification.</p>
+            <div className="space-y-3">
+              <input
+                type="text"
+                required
+                value={formData.address.line1}
+                onChange={(e) => setFormData({ ...formData, address: { ...formData.address, line1: e.target.value } })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black transition-all"
+                placeholder="Street address"
+              />
+              <div className="grid grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  required
+                  value={formData.address.city}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black transition-all"
+                  placeholder="City"
+                />
+                <input
+                  type="text"
+                  required
+                  value={formData.address.state}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black transition-all"
+                  placeholder="State"
+                />
+                <div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    maxLength={9}
+                    value={formData.address.postal_code}
+                    onChange={(e) => formatPostalCode(e.target.value)}
+                    onBlur={validatePostalCodeBlur}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black transition-all ${
+                      postalCodeError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    }`}
+                    placeholder="12345 or 12345-6789"
+                  />
+                  {postalCodeError && (
+                    <p className="text-xs text-red-500 mt-1">{postalCodeError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Hidden fields to preserve signup data */}
@@ -306,18 +405,33 @@ export function RestaurantInfoStep({ data, updateData, onNext, onPrev }: Props) 
           <input type="hidden" name="role" value={formData.role} />
           <input type="hidden" name="teamSize" value={formData.teamSize} />
 
+          {saveError && (
+            <p className="text-sm text-red-600 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {saveError}
+            </p>
+          )}
+
           {/* Navigation */}
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onPrev} className="flex-1 group">
+            <Button type="button" variant="secondary" onClick={onPrev} className="flex-1 group" disabled={saving}>
               <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               Back
             </Button>
             <Button 
               type="submit" 
               className="flex-1 group"
-              disabled={!!phoneError}
+              disabled={saving ||
+                !!phoneError ||
+                !formData.address.line1?.trim() ||
+                !formData.address.city?.trim() ||
+                !formData.address.state?.trim() ||
+                !formData.address.postal_code?.trim() ||
+                (formData.address.postal_code.replace(/\D/g, '').length !== 5 && formData.address.postal_code.replace(/\D/g, '').length !== 9) ||
+                !!postalCodeError
+              }
             >
-              Continue
+              {saving ? 'Saving…' : 'Continue'}
               <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>

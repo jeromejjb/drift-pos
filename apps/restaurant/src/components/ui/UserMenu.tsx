@@ -16,10 +16,12 @@ export function UserMenu() {
       if (supabase) {
         await supabase.auth.signOut();
       }
+      localStorage.removeItem('drift-token');
       localStorage.removeItem('drift-restaurant-id');
       localStorage.removeItem('drift-user-email');
       localStorage.removeItem('drift-dev-mode');
-      window.location.href = 'https://drift-landing.onrender.com';
+      const landingUrl = import.meta.env.VITE_LANDING_URL || 'https://driftpos.com';
+      window.location.href = landingUrl;
     } catch (error) {
       console.error('Error signing out:', error);
       window.location.href = 'https://drift-landing.onrender.com';

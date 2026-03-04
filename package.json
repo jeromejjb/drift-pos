@@ -7,7 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/diner & npm run dev --workspace=apps/restaurant & npm run dev --workspace=apps/api"
+    "test:output": "./scripts/test-output.sh",
+    "test:restaurant": "node scripts/restaurant-flow-test.mjs",
+    "db:seed": "npm run db:seed -w apps/api",
+    "dev": "npm run dev --workspace=apps/diner & npm run dev --workspace=apps/restaurant & npm run dev --workspace=apps/api",
+    "dev:pay": "npm run dev --workspace=apps/api & npm run dev --workspace=apps/diner",
+    "build": "npm run build --workspace=apps/landing && npm run build --workspace=apps/api && npm run build --workspace=apps/diner && npm run build --workspace=apps/restaurant"
   },
   "dependencies": {
     "@stripe/connect-js": "^3.3.33",

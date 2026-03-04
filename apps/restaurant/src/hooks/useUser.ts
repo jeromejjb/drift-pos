@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+
 interface User {
   id: string;
   name: string;
@@ -16,6 +18,30 @@ interface User {
   };
 }
 
+/** Fetch user from JWT (drift-token) via /api/auth/verify */
+async function fetchUserFromJWT(): Promise<User | null> {
+  const token = localStorage.getItem('drift-token');
+  if (!token) return null;
+
+  const response = await fetch(`${API_URL}/api/auth/verify`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return null;
+
+  const { user: u, restaurant: r } = await response.json();
+  if (!u || !r) return null;
+
+  return {
+    id: u.id,
+    name: u.name || 'User',
+    email: u.email || '',
+    phone: u.phone,
+    role: 'owner' as const,
+    restaurantId: r.id,
+    subscription: { plan: 'free' as const, status: 'active' as const, features: [] },
+  };
+}
+
 export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,27 +50,32 @@ export function useUser() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        // Get authenticated user from Supabase
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        
-        if (!authUser) {
-          setUser(null);
+        // Prefer JWT (drift-token) - used by landing login/signup flow
+        const jwtUser = await fetchUserFromJWT();
+        if (jwtUser) {
+          setUser(jwtUser);
           setLoading(false);
           return;
         }
 
-        // Fetch user profile from your API
-        const response = await fetch(`/api/users/${authUser.id}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch user');
+        // Fallback: Supabase auth (if configured)
+        if (supabase) {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            const response = await fetch(`${API_URL}/api/users/${authUser.id}`, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('drift-token') || '' }` },
+            });
+            if (response.ok) {
+              const userData = await response.json();
+              setUser(userData);
+            }
+          }
         }
 
-        const userData = await response.json();
-        setUser(userData);
+        setUser(null);
       } catch (err) {
         console.error('Error fetching user:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -52,8 +83,8 @@ export function useUser() {
 
     fetchUser();
 
-    // Listen for auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Listen for Supabase auth changes (if configured)
+    const authListener = supabase?.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         fetchUser();
       } else if (event === 'SIGNED_OUT') {
@@ -62,7 +93,7 @@ export function useUser() {
     });
 
     return () => {
-      authListener?.subscription.unsubscribe();
+      authListener?.data?.subscription?.unsubscribe();
     };
   }, []);
 
