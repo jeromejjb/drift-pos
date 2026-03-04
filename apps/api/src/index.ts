@@ -956,17 +956,20 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
     if (restaurantId !== req.user.restaurantId) {
       return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
     }
-    const { period = '7d' } = req.query; // 7d, 30d
-    const days = period === '30d' ? 30 : 7;
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-    start.setHours(0, 0, 0, 0);
+    const { period = '7d' } = req.query; // 7d, 14d, 30d, 90d
+    const daysMap: Record<string, number> = { '7d': 7, '14d': 14, '30d': 30, '90d': 90 };
+    const days = daysMap[period as string] ?? 7;
+
+    const now = new Date();
+    const start = new Date(now);
+    start.setUTCDate(start.getUTCDate() - days);
+    start.setUTCHours(0, 0, 0, 0);
     const prevStart = new Date(start);
-    prevStart.setDate(prevStart.getDate() - days);
+    prevStart.setUTCDate(prevStart.getUTCDate() - days);
 
     const [orders, prevOrders, loyaltyCountResult] = await Promise.all([
       prisma.order.findMany({
-        where: { restaurantId, createdAt: { gte: start }, status: { not: 'CANCELLED' } },
+        where: { restaurantId, createdAt: { gte: start, lte: now }, status: { not: 'CANCELLED' } },
         include: { items: { include: { menuItem: true } } },
       }),
       prisma.order.findMany({
@@ -978,23 +981,24 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
 
     const revenue = orders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
     const prevRevenue = prevOrders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
-    const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+    const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : (revenue > 0 ? 100 : 0);
     const orderCount = orders.length;
     const prevOrderCount = prevOrders.length;
-    const orderChange = prevOrderCount > 0 ? ((orderCount - prevOrderCount) / prevOrderCount) * 100 : 0;
+    const orderChange = prevOrderCount > 0 ? ((orderCount - prevOrderCount) / prevOrderCount) * 100 : (orderCount > 0 ? 100 : 0);
     const avgCheck = orderCount > 0 ? revenue / orderCount : 0;
     const prevAvgCheck = prevOrderCount > 0 ? prevRevenue / prevOrderCount : 0;
-    const avgCheckChange = prevAvgCheck > 0 ? ((avgCheck - prevAvgCheck) / prevAvgCheck) * 100 : 0;
+    const avgCheckChange = prevAvgCheck > 0 ? ((avgCheck - prevAvgCheck) / prevAvgCheck) * 100 : (avgCheck > 0 ? 100 : 0);
 
-    const byDate = new Map<string, { revenue: number; orders: number }>();
+    const toDateKey = (d: Date) => d.toISOString().slice(0, 10);
+    const byDate = new Map<string, { date: string; revenue: number; orders: number }>();
     for (let d = 0; d < days; d++) {
       const date = new Date(start);
-      date.setDate(date.getDate() + d);
-      const key = date.toISOString().slice(0, 10);
-      byDate.set(key, { revenue: 0, orders: 0 });
+      date.setUTCDate(date.getUTCDate() + d);
+      const key = toDateKey(date);
+      byDate.set(key, { date: key, revenue: 0, orders: 0 });
     }
     for (const o of orders) {
-      const key = new Date(o.createdAt).toISOString().slice(0, 10);
+      const key = toDateKey(new Date(o.createdAt));
       const cur = byDate.get(key);
       if (cur) {
         cur.revenue += o.total + (o.tipAmount ?? 0);
@@ -1022,12 +1026,14 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
       .slice(0, 10)
       .map(({ name, revenue, count }) => ({ name, revenue, orders: count }));
 
+    const byDaySorted = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+
     res.json({
       period: `${days}d`,
       revenue: { current: revenue, previous: prevRevenue, changePercent: revenueChange },
       orders: { current: orderCount, previous: prevOrderCount, changePercent: orderChange },
       avgCheck: { current: avgCheck, previous: prevAvgCheck, changePercent: avgCheckChange },
-      byDay: Array.from(byDate.entries()).map(([date, data]) => ({ date, ...data })),
+      byDay: byDaySorted,
       topItems: topItemsFormatted,
       loyaltyMembers: loyaltyCount,
     });
