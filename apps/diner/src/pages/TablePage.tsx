@@ -1,40 +1,41 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, UtensilsCrossed, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getRestaurantByTableId, type Restaurant } from '../lib/api';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
+import { getRestaurantByTableId, getMenuByRestaurantId, type Restaurant } from '../lib/api';
+import type { Category } from '../types';
 
 export function TablePage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [confirming, setConfirming] = useState(false);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const loadRestaurant = async () => {
+    const load = async () => {
       if (!tableId) return;
       try {
         setLoading(true);
         const data = await getRestaurantByTableId(tableId);
         setRestaurant(data);
+        const cats = await getMenuByRestaurantId(data.id);
+        setCategories(Array.isArray(cats) ? cats : []);
       } catch (err) {
         setError('Could not find this table');
       } finally {
         setLoading(false);
       }
     };
-    loadRestaurant();
+    load();
   }, [tableId]);
 
   const currentTable = restaurant?.tables.find(t => t.id === tableId);
-  const tableNumber = currentTable?.number || '?';
+  const tableNumber = currentTable?.number ?? '?';
+  const isWalkIn = currentTable?.number === 0;
 
-  const handleConfirm = () => {
-    setConfirming(true);
-    setTimeout(() => navigate(`/menu/${tableId}`), 400);
+  const goToMenu = (categoryId?: string) => {
+    navigate(`/menu/${tableId}`, { state: categoryId ? { activeCategory: categoryId } : {} });
   };
 
   if (loading) {
@@ -51,22 +52,25 @@ export function TablePage() {
   if (error || !restaurant) {
     return (
       <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex items-center justify-center p-4">
-        <Card padding="lg" className="text-center max-w-sm">
+        <div className="bg-white rounded-2xl border border-[var(--drift-border)] p-8 text-center max-w-sm shadow-[var(--drift-shadow)]">
           <div className="w-16 h-16 bg-[var(--drift-error-bg)] rounded-[var(--drift-radius-xl)] flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">😕</span>
           </div>
           <h2 className="text-xl font-semibold text-[var(--drift-ink)] mb-2">Table not found</h2>
-          <p className="text-[var(--drift-ink-muted)] text-sm mb-6">The QR code might be invalid</p>
-          <Button onClick={() => navigate('/')} fullWidth>
+          <p className="text-[var(--drift-ink-muted)] text-sm mb-6">The QR code might be invalid or expired</p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full py-3.5 bg-[var(--drift-accent)] text-white font-semibold rounded-[var(--drift-radius-pill)] hover:bg-[var(--drift-accent-hover)] transition-colors"
+          >
             Scan again
-          </Button>
-        </Card>
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--drift-surface-elevated)]">
+    <div className="min-h-screen bg-[var(--drift-surface-elevated)] pb-24">
       <button
         onClick={() => navigate('/')}
         className="absolute top-6 left-4 p-3 text-[var(--drift-ink-muted)] hover:text-[var(--drift-ink)] active:bg-[var(--drift-surface-overlay)] rounded-full transition-colors z-10"
@@ -75,49 +79,62 @@ export function TablePage() {
         <ArrowLeft className="w-5 h-5" />
       </button>
 
-      <div className="container max-w-md mx-auto px-4 pt-16 pb-8">
-        <div className="text-center mb-8 animate-fade-in">
-          <p className="text-[11px] uppercase tracking-wider text-[var(--drift-ink-subtle)]">drift · dine</p>
-          <h1 className="text-2xl font-semibold text-[var(--drift-ink)] mt-1">{restaurant.name}</h1>
+      <div className="container max-w-md mx-auto px-4 pt-14 pb-8">
+        {/* Welcome — first 2 seconds matter */}
+        <div className="mb-8 animate-fade-in">
+          <p className="text-[11px] uppercase tracking-wider text-[var(--drift-ink-subtle)]">Welcome to</p>
+          <h1 className="text-2xl font-semibold text-[var(--drift-ink)] mt-0.5">{restaurant.name}</h1>
+          <p className="text-sm text-[var(--drift-ink-muted)] mt-2">
+            {isWalkIn ? 'Walk-in · Counter' : `Table ${tableNumber}`}
+          </p>
         </div>
 
-        <div className="relative mb-8 animate-slide-up">
-          <Card padding="xl" className="relative text-center">
-            <p className="text-sm text-[var(--drift-ink-muted)] mb-2">You're at</p>
-            <div className="relative">
-              <span className="text-8xl font-semibold block leading-none text-[var(--drift-ink)]">
-                {tableNumber}
-              </span>
-              <div className="absolute -top-2 -right-2 w-3 h-3 bg-[var(--drift-accent)] rounded-full" />
+        {/* Categories as tiles — research: main categories as clear buttons */}
+        <div className="mb-8">
+          <p className="text-sm font-medium text-[var(--drift-ink)] mb-3">Browse menu</p>
+          {categories.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {categories.slice(0, 6).map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => goToMenu(cat.id)}
+                  className="flex items-center justify-between p-4 bg-white border border-[var(--drift-border)] rounded-[var(--drift-radius-xl)] hover:border-[var(--drift-accent)]/50 hover:bg-[var(--drift-accent-muted)]/30 transition-all text-left group"
+                >
+                  <span className="font-medium text-[var(--drift-ink)]">{cat.name}</span>
+                  <ChevronRight className="w-5 h-5 text-[var(--drift-ink-muted)] group-hover:text-[var(--drift-accent)]" />
+                </button>
+              ))}
             </div>
-            <p className="text-[var(--drift-ink-muted)] mt-2">Table {tableNumber}</p>
-          </Card>
+          ) : (
+            <button
+              onClick={() => goToMenu()}
+              className="w-full flex items-center justify-center gap-3 p-5 bg-[var(--drift-accent)] text-white rounded-[var(--drift-radius-xl)] hover:bg-[var(--drift-accent-hover)] transition-colors"
+            >
+              <UtensilsCrossed className="w-5 h-5" />
+              <span className="font-semibold">View full menu</span>
+            </button>
+          )}
         </div>
 
-        <div className="space-y-3 animate-slide-up">
-          <Button onClick={handleConfirm} fullWidth disabled={confirming}>
-            {confirming ? (
-              <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Just a moment…
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                That's me
-                <Check className="w-4 h-4" />
-              </span>
-            )}
-          </Button>
+        {categories.length > 0 && (
           <button
-            onClick={() => navigate('/')}
-            className="w-full text-center text-[var(--drift-ink-muted)] py-3 text-sm hover:text-[var(--drift-ink)] transition-colors"
+            onClick={() => goToMenu()}
+            className="w-full py-3.5 bg-[var(--drift-ink)] text-white font-semibold rounded-[var(--drift-radius-pill)] hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            Not my table
+            View all categories
+            <ChevronRight className="w-4 h-4" />
           </button>
-        </div>
+        )}
+
+        <button
+          onClick={() => navigate('/')}
+          className="w-full text-center text-[var(--drift-ink-subtle)] py-3 text-sm hover:text-[var(--drift-ink-muted)] transition-colors mt-4"
+        >
+          Not my table
+        </button>
 
         <p className="text-center text-xs text-[var(--drift-ink-subtle)] mt-8">
-          Check out with Drift — secure payment
+          Order & pay at your table — no app download required
         </p>
       </div>
     </div>

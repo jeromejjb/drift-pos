@@ -141,7 +141,9 @@ const startCamera = async () => {
         <div className="text-center mb-10 animate-fade-in">
           <p className="text-[11px] uppercase tracking-widest text-[var(--drift-ink-subtle)] font-medium">drift</p>
           <h1 className="text-4xl font-bold tracking-tight mt-1 text-[var(--drift-ink)]">Dine</h1>
-          <p className="text-[var(--drift-ink-muted)] text-[15px] mt-2">Scan to check out with Drift</p>
+          <p className="text-[var(--drift-ink-muted)] text-[15px] mt-2 max-w-xs mx-auto">
+            Scan the QR code at your table to order and pay
+          </p>
         </div>
 
         {!scanning ? (
@@ -157,10 +159,10 @@ const startCamera = async () => {
                   </div>
                 </div>
                 <h2 className="text-xl font-bold text-[var(--drift-ink)] text-center mb-2">
-                  Scan to start
+                  Ready to order?
                 </h2>
                 <p className="text-[var(--drift-ink-muted)] text-[15px] text-center mb-8 max-w-xs">
-                  Point your camera at the QR code on your table
+                  Open your camera and scan the QR code on your table to browse the menu and pay
                 </p>
                 <Button
                   onClick={startCamera}
@@ -213,7 +215,7 @@ const startCamera = async () => {
             )}
 
             <p className="text-center text-sm text-[var(--drift-ink-subtle)] animate-fade-in">
-              Check out with Drift — same app as Pay & Money
+              Order, tip, and pay — all in one place
             </p>
             <button
               type="button"

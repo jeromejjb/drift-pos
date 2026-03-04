@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Gift } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
@@ -14,6 +14,7 @@ export function PaymentPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
   const { accessToken } = useAuth();
+  const isGuest = !accessToken;
   const [dinerProfile, setDinerProfile] = useState<{ id: string; stripeCustomerId?: string } | null>(null);
   const [tipPercent, setTipPercent] = useState(18);
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -217,6 +218,22 @@ export function PaymentPage() {
             <span className="text-3xl font-bold tabular-nums">${total.toFixed(2)}</span>
           </div>
         </div>
+
+        {isGuest && (
+          <div className="mb-4 p-4 bg-[var(--drift-accent-muted)] border border-[var(--drift-accent)]/20 rounded-[var(--drift-radius-xl)] flex items-center gap-3">
+            <Gift className="w-5 h-5 text-[var(--drift-accent)] shrink-0" />
+            <div>
+              <p className="font-medium text-[var(--drift-ink)] text-sm">Earn points on this order</p>
+              <p className="text-xs text-[var(--drift-ink-muted)]">Sign in to save points and get rewards</p>
+            </div>
+            <button
+              onClick={() => navigate(`/signin?return=${encodeURIComponent(window.location.pathname)}`)}
+              className="ml-auto text-sm font-semibold text-[var(--drift-accent)] hover:underline shrink-0"
+            >
+              Sign in
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4">

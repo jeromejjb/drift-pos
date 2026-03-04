@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Minus, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowLeft, ShoppingBag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { CartItem } from '../lib/api';
 
@@ -73,11 +73,17 @@ export function CartPage() {
 
       <div className="px-4 py-6 max-w-md mx-auto pb-40">
         {cart.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-[var(--drift-ink-muted)]">Your cart is empty</p>
+          <div className="text-center py-16 px-4 animate-fade-in">
+            <div className="w-20 h-20 bg-[var(--drift-accent-muted)] rounded-[var(--drift-radius-2xl)] flex items-center justify-center mx-auto mb-4">
+              <ShoppingBag className="w-10 h-10 text-[var(--drift-accent)]" strokeWidth={1.5} />
+            </div>
+            <h3 className="text-lg font-semibold text-[var(--drift-ink)] mb-2">Your cart is empty</h3>
+            <p className="text-[var(--drift-ink-muted)] text-sm mb-6 max-w-xs mx-auto">
+              Add something delicious from the menu to get started
+            </p>
             <button
               onClick={() => navigate(`/menu/${tableId}`)}
-              className="mt-4 text-[var(--drift-ink)] font-medium underline hover:no-underline"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--drift-accent)] text-white font-semibold rounded-[var(--drift-radius-pill)] hover:bg-[var(--drift-accent-hover)] transition-colors"
             >
               Browse menu
             </button>
@@ -148,9 +154,9 @@ export function CartPage() {
             </div>
             <button
               onClick={() => navigate(`/payment/${tableId}`)}
-              className="w-full bg-[var(--drift-ink)] hover:opacity-90 text-white font-medium py-3.5 px-6 rounded-[var(--drift-radius-lg)] transition-opacity"
+              className="w-full bg-[var(--drift-accent)] hover:bg-[var(--drift-accent-hover)] text-white font-semibold py-3.5 px-6 rounded-[var(--drift-radius-pill)] transition-all shadow-[var(--drift-shadow-sm)] active:scale-[0.99]"
             >
-              Check out with Drift
+              Check out — ${total.toFixed(2)}
             </button>
           </div>
         </div>

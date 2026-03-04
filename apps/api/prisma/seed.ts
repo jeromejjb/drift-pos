@@ -149,15 +149,20 @@ async function main() {
         update: {},
         create: { id: 'demo-guest', name: 'Demo Guest' },
       });
+      const dinerUser = await prisma.user.upsert({
+        where: { id: 'demo-diner' },
+        update: {},
+        create: { id: 'demo-diner', name: 'Demo Diner', email: 'diner@demo.driftpos.com' },
+      });
       const walkIn = allTables.find((t) => t.number === 0) || allTables[0];
       const orders = [
-        { table: walkIn, items: [menuItems[0], menuItems[1]], status: 'PENDING' as const },
-        { table: allTables[1] || allTables[0], items: [menuItems[2], menuItems[3], menuItems[4]], status: 'PREPARING' as const },
-        { table: allTables[2] || allTables[0], items: [menuItems[1], menuItems[5]], status: 'READY' as const },
-        { table: allTables[3] || allTables[0], items: [menuItems[0], menuItems[3]], status: 'SERVED' as const },
-        { table: allTables[4] || allTables[0], items: [menuItems[6], menuItems[7]], status: 'PENDING' as const },
-        { table: allTables[5] || allTables[0], items: [menuItems[8], menuItems[9]], status: 'PREPARING' as const },
-        { table: walkIn, items: [menuItems[10], menuItems[11]], status: 'READY' as const },
+        { table: walkIn, items: [menuItems[0], menuItems[1]], status: 'PENDING' as const, tip: 2 },
+        { table: allTables[1] || allTables[0], items: [menuItems[2], menuItems[3], menuItems[4]], status: 'PREPARING' as const, tip: 3 },
+        { table: allTables[2] || allTables[0], items: [menuItems[1], menuItems[5]], status: 'READY' as const, tip: 2 },
+        { table: allTables[3] || allTables[0], items: [menuItems[0], menuItems[3]], status: 'SERVED' as const, tip: 4 },
+        { table: allTables[4] || allTables[0], items: [menuItems[6], menuItems[7]], status: 'PENDING' as const, tip: 2 },
+        { table: allTables[5] || allTables[0], items: [menuItems[8], menuItems[9]], status: 'PREPARING' as const, tip: 3 },
+        { table: walkIn, items: [menuItems[10], menuItems[11]], status: 'READY' as const, tip: 2 },
       ];
       for (const o of orders) {
         const total = o.items.reduce((sum, i) => sum + i.price, 0);
@@ -167,7 +172,7 @@ async function main() {
             tableId: o.table.id,
             userId: guestUser.id,
             total,
-            tipAmount: 2,
+            tipAmount: o.tip,
             status: o.status,
             items: {
               create: o.items.map((item) => ({
@@ -180,10 +185,99 @@ async function main() {
           },
         });
       }
-      console.log('  ✓ Demo orders: 7 created (varied statuses)');
+      // Add completed orders for analytics demo (past 7 days)
+      const now = new Date();
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - d);
+        date.setHours(12 + (d % 3), 30, 0, 0);
+        const orderUser = d % 2 === 0 ? guestUser : dinerUser;
+        const m1 = menuItems[d % menuItems.length];
+        const m2 = menuItems[(d + 1) % menuItems.length];
+        const total = (m1?.price ?? 10) + (m2?.price ?? 8);
+        await prisma.order.create({
+          data: {
+            restaurantId: restaurant.id,
+            tableId: allTables[d % allTables.length].id,
+            userId: orderUser.id,
+            total,
+            tipAmount: Math.round(total * 0.18),
+            status: 'COMPLETED',
+            completedAt: date,
+            createdAt: date,
+            items: {
+              create: [
+                { menuItemId: m1.id, quantity: 1, price: m1.price, userId: orderUser.id },
+                { menuItemId: m2.id, quantity: 1, price: m2.price, userId: orderUser.id },
+              ],
+            },
+          },
+        });
+      }
+      console.log('  ✓ Demo orders: 14 created (7 active + 7 completed for analytics)');
+
+      // Seed loyalty data for demo
+      await prisma.dinerLoyalty.upsert({
+        where: { restaurantId_userId: { restaurantId: restaurant.id, userId: dinerUser.id } },
+        create: {
+          restaurantId: restaurant.id,
+          userId: dinerUser.id,
+          email: dinerUser.email ?? undefined,
+          points: 142,
+          tier: 'SILVER',
+          lastOrderAt: new Date(),
+        },
+        update: { points: 142, tier: 'SILVER', lastOrderAt: new Date() },
+      });
+      await prisma.dinerLoyalty.upsert({
+        where: { restaurantId_userId: { restaurantId: restaurant.id, userId: guestUser.id } },
+        create: {
+          restaurantId: restaurant.id,
+          userId: guestUser.id,
+          points: 68,
+          tier: 'BRONZE',
+          lastOrderAt: new Date(),
+        },
+        update: { points: 68, tier: 'BRONZE', lastOrderAt: new Date() },
+      });
+      console.log('  ✓ Demo loyalty: 2 members (Bronze 68 pts, Silver 142 pts)');
     }
   } else {
     console.log('  ✓ Demo orders: already exist');
+  }
+
+  // Always ensure demo loyalty data exists (for analytics demo)
+  const dinerUser = await prisma.user.upsert({
+    where: { id: 'demo-diner' },
+    update: {},
+    create: { id: 'demo-diner', name: 'Demo Diner', email: 'diner@demo.driftpos.com' },
+  });
+  const guestUser = await prisma.user.findUnique({ where: { id: 'demo-guest' } });
+  if (guestUser) {
+    await prisma.dinerLoyalty.upsert({
+      where: { restaurantId_userId: { restaurantId: restaurant.id, userId: dinerUser.id } },
+      create: {
+        restaurantId: restaurant.id,
+        userId: dinerUser.id,
+        email: dinerUser.email ?? undefined,
+        points: 142,
+        tier: 'SILVER',
+        lastOrderAt: new Date(),
+      },
+      update: { points: 142, tier: 'SILVER', lastOrderAt: new Date() },
+    });
+    await prisma.dinerLoyalty.upsert({
+      where: { restaurantId_userId: { restaurantId: restaurant.id, userId: guestUser.id } },
+      create: {
+        restaurantId: restaurant.id,
+        userId: guestUser.id,
+        points: 68,
+        tier: 'BRONZE',
+        lastOrderAt: new Date(),
+      },
+      update: { points: 68, tier: 'BRONZE', lastOrderAt: new Date() },
+    });
+    console.log('  ✓ Demo loyalty: 2 members');
   }
 
   console.log('');

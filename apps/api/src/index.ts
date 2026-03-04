@@ -846,6 +846,33 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+app.get('/api/order/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: { include: { menuItem: true } },
+        restaurant: { select: { name: true } },
+        table: { select: { number: true } },
+      },
+    });
+    if (!order) return res.status(404).json({ error: 'Order not found', code: 'NOT_FOUND' });
+    res.json({
+      id: order.id,
+      total: order.total,
+      tipAmount: order.tipAmount,
+      status: order.status,
+      createdAt: order.createdAt,
+      restaurantName: order.restaurant.name,
+      tableNumber: order.table?.number ?? 0,
+      items: order.items.map((i) => ({ name: i.menuItem.name, quantity: i.quantity, price: i.price })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch order', code: 'SERVER_ERROR' });
+  }
+});
+
 app.patch('/api/order/:orderId/status', async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -919,6 +946,93 @@ app.post('/api/demo/schedule', async (req, res) => {
     res.status(201).json({ success: true, message: 'Demo scheduled', id: demoRequest.id });
   } catch (error) {
     res.status(500).json({ error: 'Failed to schedule demo', code: 'SERVER_ERROR' });
+  }
+});
+
+// Restaurant analytics (for owners/staff)
+app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req: any, res) => {
+  try {
+    const { restaurantId } = req.params;
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
+    const { period = '7d' } = req.query; // 7d, 30d
+    const days = period === '30d' ? 30 : 7;
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    start.setHours(0, 0, 0, 0);
+    const prevStart = new Date(start);
+    prevStart.setDate(prevStart.getDate() - days);
+
+    const [orders, prevOrders, loyaltyCount] = await Promise.all([
+      prisma.order.findMany({
+        where: { restaurantId, createdAt: { gte: start }, status: { not: 'CANCELLED' } },
+        include: { items: { include: { menuItem: true } } },
+      }),
+      prisma.order.findMany({
+        where: { restaurantId, createdAt: { gte: prevStart, lt: start }, status: { not: 'CANCELLED' } },
+      }),
+      prisma.dinerLoyalty.count({ where: { restaurantId } }),
+    ]);
+
+    const revenue = orders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
+    const prevRevenue = prevOrders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
+    const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
+    const orderCount = orders.length;
+    const prevOrderCount = prevOrders.length;
+    const orderChange = prevOrderCount > 0 ? ((orderCount - prevOrderCount) / prevOrderCount) * 100 : 0;
+    const avgCheck = orderCount > 0 ? revenue / orderCount : 0;
+    const prevAvgCheck = prevOrderCount > 0 ? prevRevenue / prevOrderCount : 0;
+    const avgCheckChange = prevAvgCheck > 0 ? ((avgCheck - prevAvgCheck) / prevAvgCheck) * 100 : 0;
+
+    const byDate = new Map<string, { revenue: number; orders: number }>();
+    for (let d = 0; d < days; d++) {
+      const date = new Date(start);
+      date.setDate(date.getDate() + d);
+      const key = date.toISOString().slice(0, 10);
+      byDate.set(key, { revenue: 0, orders: 0 });
+    }
+    for (const o of orders) {
+      const key = new Date(o.createdAt).toISOString().slice(0, 10);
+      const cur = byDate.get(key);
+      if (cur) {
+        cur.revenue += o.total + (o.tipAmount ?? 0);
+        cur.orders += 1;
+      }
+    }
+
+    const itemRevenue = new Map<string, { name: string; revenue: number; count: number }>();
+    for (const order of orders) {
+      for (const oi of order.items) {
+        const id = oi.menuItemId;
+        const rev = (oi.price ?? 0) * (oi.quantity ?? 1);
+        const qty = oi.quantity ?? 1;
+        const cur = itemRevenue.get(id);
+        if (cur) {
+          cur.revenue += rev;
+          cur.count += qty;
+        } else {
+          itemRevenue.set(id, { name: oi.menuItem?.name ?? 'Unknown', revenue: rev, count: qty });
+        }
+      }
+    }
+    const topItemsFormatted = Array.from(itemRevenue.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10)
+      .map(({ name, revenue, count }) => ({ name, revenue, orders: count }));
+
+    res.json({
+      period: `${days}d`,
+      revenue: { current: revenue, previous: prevRevenue, changePercent: revenueChange },
+      orders: { current: orderCount, previous: prevOrderCount, changePercent: orderChange },
+      avgCheck: { current: avgCheck, previous: prevAvgCheck, changePercent: avgCheckChange },
+      byDay: Array.from(byDate.entries()).map(([date, data]) => ({ date, ...data })),
+      topItems: topItemsFormatted,
+      loyaltyMembers: loyaltyCount,
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.status(500).json({ error: 'Failed to load analytics', code: 'SERVER_ERROR' });
   }
 });
 

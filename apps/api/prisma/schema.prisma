@@ -22,6 +22,7 @@ model Restaurant {
   categories    MenuCategory[]
   menuItems     MenuItem[]
   orders        Order[]
+  dinerLoyalty  DinerLoyalty[]
   
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
@@ -194,6 +195,7 @@ model User {
   orders           Order[]
   transactions     Transaction[]
   orderItems       OrderItem[]
+  dinerLoyalty     DinerLoyalty[]
   p2pSent          P2PTransfer[] @relation("P2PSender")
   p2pReceived      P2PTransfer[] @relation("P2PRecipient")
   
@@ -226,6 +228,26 @@ model P2PTransfer {
   @@index([recipientId], map: "p2p_recipient_idx")
   @@index([createdAt], map: "p2p_created_idx")
   @@map("p2p_transfers")
+}
+
+model DinerLoyalty {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email        String?  // For guest→member conversion
+  points       Int      @default(0)
+  tier         LoyaltyTier @default(BRONZE)
+  lastOrderAt  DateTime? @map("last_order_at")
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([restaurantId, userId], map: "diner_loyalty_restaurant_user_unique")
+  @@index([restaurantId], map: "diner_loyalty_restaurant_idx")
+  @@index([userId], map: "diner_loyalty_user_idx")
+  @@map("diner_loyalty")
 }
 
 model DemoRequest {
@@ -279,4 +301,10 @@ enum TransactionType {
   REFUND
   PARTIAL_REFUND
   P2P
+}
+
+enum LoyaltyTier {
+  BRONZE
+  SILVER
+  GOLD
 }

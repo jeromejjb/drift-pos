@@ -16,7 +16,10 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 bg-[var(--drift-surface)]/98 backdrop-blur-md border-t border-[var(--drift-border)] safe-bottom z-50 shadow-[var(--drift-shadow-up)]">
       <div className="max-w-lg mx-auto flex items-center justify-around h-16 safe-bottom">
         {navItems.map(({ to, icon: Icon, label }) => {
-          const isActive = path === to || (to !== '/' && path.startsWith(to));
+          const isActive =
+            path === to ||
+            (to !== '/' && path.startsWith(to)) ||
+            (to === '/' && (path.startsWith('/table/') || path.startsWith('/menu/') || path.startsWith('/cart/')));
           return (
             <NavLink
               key={to}

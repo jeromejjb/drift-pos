@@ -189,6 +189,30 @@ router.get('/diner/default-payment-method', authenticateSupabase, async (req: Re
   }
 });
 
+// Get diner loyalty for a restaurant (requires sign-in)
+router.get('/diner/loyalty', authenticateSupabase, async (req: Request & { dinerUser: DinerUser }, res) => {
+  try {
+    const restaurantId = req.query.restaurantId as string;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId required', code: 'MISSING_FIELDS' });
+    const prisma = await getPrisma();
+    const loyalty = await prisma.dinerLoyalty.findUnique({
+      where: { restaurantId_userId: { restaurantId, userId: req.dinerUser.id } },
+    });
+    if (!loyalty) {
+      return res.json({ points: 0, tier: 'BRONZE', pointsToNextReward: 50 });
+    }
+    const pointsToNextReward = 50 - (loyalty.points % 50); // Every 50 pts = reward
+    res.json({
+      points: loyalty.points,
+      tier: loyalty.tier,
+      pointsToNextReward: pointsToNextReward === 50 ? 50 : pointsToNextReward,
+    });
+  } catch (e: any) {
+    console.error('Diner loyalty error:', e?.message);
+    res.status(500).json({ error: 'Failed to load loyalty', code: 'SERVER_ERROR' });
+  }
+});
+
 // Get diner profile (id for orders, stripeCustomerId for payment)
 router.get('/diner/me', authenticateSupabase, async (req: Request & { dinerUser: DinerUser }, res) => {
   try {

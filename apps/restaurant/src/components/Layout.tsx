@@ -12,7 +12,8 @@ import {
   X,
   Bell,
   Store,
-  Plus
+  Plus,
+  BarChart3
 } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import { useSubscription } from '../hooks/useSubscription';
@@ -70,7 +71,8 @@ export function Layout({ children, title }: LayoutProps) {
   }, [restaurantId, API_URL]);
 
   const navItems = [
-    { path: 'dashboard', icon: Home, label: 'Dashboard', description: 'Overview & analytics' },
+    { path: 'dashboard', icon: Home, label: 'Dashboard', description: 'Overview & orders' },
+    { path: 'analytics', icon: BarChart3, label: 'Analytics', description: 'Revenue & insights' },
     { path: 'tables', icon: Grid, label: 'Tables', description: 'Manage tables & QR codes' },
     { path: 'orders', icon: List, label: 'Orders', description: 'Active & past orders' },
     { path: 'menu', icon: Store, label: 'Menu', description: 'Edit your menu items' },

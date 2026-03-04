@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus } from 'lucide-react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { ShoppingCart, Plus, Minus, UtensilsCrossed } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getRestaurantByTableId, getMenuByRestaurantId, type Category } from '../lib/api';
 import { Button } from '../components/ui/Button';
@@ -9,6 +9,8 @@ import { Badge } from '../components/ui/Badge';
 export function MenuPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const stateCategory = (location.state as { activeCategory?: string })?.activeCategory;
   const [cartItems, setCartItems] = useState<Map<string, number>>(new Map());
   const [activeCategory, setActiveCategory] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -38,7 +40,12 @@ export function MenuPage() {
         const categoriesList = await getMenuByRestaurantId(restaurant.id);
         if (cancelled) return;
         setCategories(Array.isArray(categoriesList) ? categoriesList : []);
-        if (categoriesList.length > 0) setActiveCategory(categoriesList[0].id);
+        if (categoriesList.length > 0) {
+          const initial = stateCategory && categoriesList.some((c: Category) => c.id === stateCategory)
+            ? stateCategory
+            : categoriesList[0].id;
+          setActiveCategory(initial);
+        }
 
         const savedCart = localStorage.getItem('drift-cart');
         if (savedCart) {
@@ -112,6 +119,27 @@ export function MenuPage() {
     );
   }
 
+  const hasItems = categories.some((c) => c.items?.length > 0);
+
+  if (categories.length === 0 || !hasItems) {
+    return (
+      <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <div className="w-20 h-20 bg-[var(--drift-accent-muted)] rounded-[var(--drift-radius-2xl)] flex items-center justify-center mx-auto mb-4">
+            <UtensilsCrossed className="w-10 h-10 text-[var(--drift-accent)]" strokeWidth={1.5} />
+          </div>
+          <h2 className="text-xl font-semibold text-[var(--drift-ink)] mb-2">Menu coming soon</h2>
+          <p className="text-[var(--drift-ink-muted)] text-sm mb-6">
+            {restaurantName} is still setting up their menu. Check back later!
+          </p>
+          <Button onClick={() => navigate('/')} fullWidth variant="secondary">
+            Back to scan
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--drift-surface-elevated)] pb-36">
       <div className="sticky top-0 bg-[var(--drift-surface-elevated)]/95 backdrop-blur border-b border-[var(--drift-border)] px-4 py-3 z-20">
@@ -167,7 +195,9 @@ export function MenuPage() {
                 return (
                   <Card key={item.id} padding="md" className="hover:border-[var(--drift-border-strong)] transition-colors">
                     <div className="flex items-start gap-3">
-                      <div className="w-16 h-16 bg-[var(--drift-surface-overlay)] rounded-[var(--drift-radius)] flex-shrink-0" />
+                      <div className="w-16 h-16 bg-[var(--drift-accent-muted)] rounded-[var(--drift-radius)] flex-shrink-0 flex items-center justify-center">
+                        <UtensilsCrossed className="w-7 h-7 text-[var(--drift-accent)]/60" strokeWidth={1.5} />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>

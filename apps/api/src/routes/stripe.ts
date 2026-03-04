@@ -563,6 +563,20 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
                 where: { id: order.id },
                 data: { completedAt: new Date(), status: 'COMPLETED' }
               });
+              // Award loyalty points
+              try {
+                const { awardLoyaltyPoints } = await import('../lib/loyalty');
+                const user = await prisma.user.findUnique({ where: { id: order.userId } });
+                await awardLoyaltyPoints(prisma, {
+                  restaurantId: order.restaurantId,
+                  userId: order.userId,
+                  orderTotal: order.total + (order.tipAmount ?? 0),
+                  orderId: order.id,
+                  userEmail: user?.email ?? undefined,
+                });
+              } catch (loyaltyErr: any) {
+                console.warn('Loyalty award failed:', loyaltyErr.message);
+              }
               console.log('💰 Payment succeeded: order', meta.orderId, 'updated');
             }
           } catch (dbErr: any) {
