@@ -10,7 +10,7 @@ interface AuthGateProps {
   onDismiss: () => void;
 }
 
-const AUTH_UNAVAILABLE = "Sign-in isn't available right now. Please try again later.";
+const AUTH_UNAVAILABLE = "Sign-in isn't configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.";
 
 /**
  * Cash App–style auth gate: modal sign-in/sign-up so users stay in context.
@@ -51,7 +51,10 @@ export function AuthGate({ reason = 'to continue', onSuccess, onDismiss }: AuthG
         <div className="p-5 pb-10 safe-bottom">
           {!isAuthConfigured ? (
             <>
-              <p className="text-sm text-[var(--drift-ink-muted)] mb-6">{AUTH_UNAVAILABLE}</p>
+              <p className="text-sm text-[var(--drift-ink-muted)] mb-2">{AUTH_UNAVAILABLE}</p>
+              <p className="text-xs text-[var(--drift-ink-subtle)] mb-6">
+                Create a free project at <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline hover:text-[var(--drift-accent)]">supabase.com</a>, then copy Project URL and anon key to your root .env.
+              </p>
               <Button fullWidth onClick={onDismiss}>OK</Button>
             </>
           ) : (

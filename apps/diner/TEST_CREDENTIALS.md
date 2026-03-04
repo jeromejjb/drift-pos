@@ -52,6 +52,6 @@ Use these in **Create account** (AuthGate or `/signup`) to get a test user, then
 
 ## "Failed to fetch" or "Couldn't connect" on sign-in
 
-- **Root `.env`** — The diner reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the **repo root** `.env` (or from `.env.example` in dev). Ensure root `.env` exists and has the correct values.
+- **Root `.env`** — The diner reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the **repo root** `.env`. Copy `.env.example` to `.env` and add your Supabase values. For production (Render, etc.), set these in the build environment.
 - **Supabase project** — In [Supabase Dashboard](https://supabase.com/dashboard) → your project: check the project is **not paused** (free tier projects pause after inactivity). Use **Settings → API** and copy the **Project URL** and **anon public** key into root `.env`.
 - **Network** — If you're offline or behind a strict firewall, sign-in requests to Supabase may fail. Try again with a stable connection.

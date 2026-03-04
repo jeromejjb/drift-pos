@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { InlineError } from '../ui/InlineError';
 
-const AUTH_UNAVAILABLE = "Sign-in isn't available right now. Please try again later.";
+const AUTH_UNAVAILABLE = "Sign-in isn't configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env (see apps/diner/.env.example).";
 
 export interface AuthFormProps {
   onSuccess: () => void;
@@ -90,6 +90,9 @@ export function AuthForm({ onSuccess, compact = false }: AuthFormProps) {
     return (
       <div className={space}>
         <p className="text-sm text-[var(--drift-ink-muted)]">{AUTH_UNAVAILABLE}</p>
+        <p className="text-xs text-[var(--drift-ink-subtle)] mt-2">
+          Create a free project at <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline hover:text-[var(--drift-accent)]">supabase.com</a>, then copy Project URL and anon key to .env.
+        </p>
       </div>
     );
   }

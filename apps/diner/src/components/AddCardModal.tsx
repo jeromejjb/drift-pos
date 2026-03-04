@@ -112,7 +112,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardMo
             </div>
           ) : needsAuth ? (
             !isAuthConfigured ? (
-              <p className="text-sm text-[var(--drift-ink-muted)]">Sign-in isn't available right now.</p>
+              <p className="text-sm text-[var(--drift-ink-muted)]">Sign-in isn't configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.</p>
             ) : (
               <AuthForm onSuccess={() => {}} compact />
             )
