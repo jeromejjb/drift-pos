@@ -998,9 +998,12 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
       }).catch(() => []),
     ]);
     const loyaltyCount = typeof loyaltyCountResult === 'number' ? loyaltyCountResult : 0;
-    const loyaltyByTier = Array.isArray(loyaltyByTierResult)
-      ? loyaltyByTierResult.reduce((acc, r) => ({ ...acc, [r.tier]: r._count }), {} as Record<string, number>)
-      : {};
+    const loyaltyByTier: Record<string, number> = {};
+    if (Array.isArray(loyaltyByTierResult)) {
+      for (const r of loyaltyByTierResult) {
+        loyaltyByTier[r.tier] = r._count;
+      }
+    }
 
     const revenue = orders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
     const prevRevenue = prevOrders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
