@@ -20,7 +20,7 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
   const [cardsPerSheet, setCardsPerSheet] = useState<'6' | '9' | '12'>('9');
   const [downloading, setDownloading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
   const restaurantName = data?.restaurantInfo?.name || data?.name || localStorage.getItem('drift-restaurant-name') || 'Your Business';
 
   // Get the actual table count - handle both array and number formats

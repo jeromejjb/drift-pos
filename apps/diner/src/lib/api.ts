@@ -1,4 +1,4 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+export const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
 // Only ever use the publishable key (pk_*) in the browser. Never use the secret key (sk_*).
 const rawStripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';

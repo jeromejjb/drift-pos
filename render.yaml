@@ -14,7 +14,7 @@ services:
     rootDir: apps/api
     buildCommand: npm install && npm run build --workspace=apps/landing && npx prisma generate && npm run build
     startCommand: npm start
-    preDeployCommand: npx prisma migrate deploy
+    preDeployCommand: npx prisma migrate deploy && npx prisma db seed
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -41,7 +41,7 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://drift-api-7vs7.onrender.com
+        value: https://api.driftpos.com
       - key: VITE_SUPABASE_URL
         value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
@@ -59,7 +59,7 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://drift-api-7vs7.onrender.com
+        value: https://api.driftpos.com
       - key: VITE_SUPABASE_URL
         value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
@@ -75,7 +75,7 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://drift-api-7vs7.onrender.com
+        value: https://api.driftpos.com
       - key: VITE_SUPABASE_URL
         value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY

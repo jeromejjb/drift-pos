@@ -287,7 +287,7 @@ router.post('/stripe/create-account', async (req, res) => {
     res.json({
       success: true,
       accountId: account.id,
-      message: 'Stripe account created successfully'
+      message: 'Payment account created successfully'
     });
 
     // Save Stripe account ID to database in background (non-blocking)
@@ -325,7 +325,7 @@ router.post('/stripe/create-account', async (req, res) => {
     if (error.type === 'StripeInvalidRequestError') {
       if (error.code === 'resource_already_exists') {
         return res.status(400).json({
-          error: 'Email already registered with Stripe',
+          error: 'This email is already associated with another payment account.',
           code: 'duplicate_email'
         });
       }
@@ -350,7 +350,7 @@ router.post('/stripe/create-account', async (req, res) => {
     }
     
     res.status(500).json({ 
-      error: 'Failed to create Stripe account', 
+      error: 'Failed to create payment account', 
       code: 'server_error',
       message: process.env.NODE_ENV === 'development' ? error.message : undefined
     });

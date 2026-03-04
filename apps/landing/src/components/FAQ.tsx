@@ -12,7 +12,7 @@ const faqs = [
   },
   {
     question: 'How do restaurants get paid?',
-    answer: 'Payments are processed securely through Stripe. Funds are deposited directly into your bank account on a daily or weekly basis.'
+    answer: 'Payments are processed securely through our payment infrastructure. Funds are deposited directly into your bank account on a daily or weekly basis.'
   },
   {
     question: 'What about splitting bills?',

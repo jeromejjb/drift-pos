@@ -52,17 +52,26 @@ export function Security() {
         </div>
       </section>
 
-      {/* Certifications */}
+      {/* Certifications - see docs/COMPLIANCE.md for verification links */}
       <section className="py-12 px-4 bg-gray-50">
         <div className="container max-w-5xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: Shield, label: 'PCI DSS Level 1', verified: true },
-              { icon: FileCheck, label: 'SOC 2 Type II', verified: true },
+              { icon: Shield, label: 'PCI DSS Level 1', verified: true, href: undefined, title: 'PCI DSS Level 1 certified' },
+              { icon: FileCheck, label: 'SOC 2 Type II', verified: true, href: 'mailto:security@driftpos.com?subject=SOC%202%20Type%20II%20Report%20Request', title: 'Report available on request' },
               { icon: Globe, label: 'GDPR Compliant', verified: true },
               { icon: Key, label: '256-bit SSL', verified: true }
             ].map((cert, i) => {
               const Icon = cert.icon;
+              const content = (
+                <>
+                  <Icon className="w-8 h-8 mx-auto mb-3 text-gray-700 group-hover:text-black transition-colors" />
+                  <div className="text-sm font-medium mb-1">{cert.label}</div>
+                  {cert.verified && (
+                    <span className="text-xs text-green-600">✓ Verified</span>
+                  )}
+                </>
+              );
               return (
                 <motion.div
                   key={i}
@@ -72,10 +81,17 @@ export function Security() {
                   transition={{ delay: i * 0.1 }}
                   className="bg-white rounded-xl p-6 text-center hover:shadow-md transition-all group"
                 >
-                  <Icon className="w-8 h-8 mx-auto mb-3 text-gray-700 group-hover:text-black transition-colors" />
-                  <div className="text-sm font-medium mb-1">{cert.label}</div>
-                  {cert.verified && (
-                    <span className="text-xs text-green-600">✓ Verified</span>
+                  {cert.href ? (
+                    <a
+                      href={cert.href}
+                      {...(cert.href.startsWith('mailto:') ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                      title={cert.title}
+                      className="block"
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    content
                   )}
                 </motion.div>
               );
@@ -214,21 +230,17 @@ export function Security() {
             <CreditCard className="w-16 h-16 mx-auto mb-6 text-white/60" />
             <h2 className="text-4xl font-light mb-4">PCI DSS Level 1 Compliant</h2>
             <p className="text-white/60 mb-8 max-w-2xl mx-auto">
-              We meet the highest standards for payment security. Our systems are audited annually 
-              by independent third-party security firms. We maintain compliance with PCI DSS v3.2.1.
+              We meet the highest standards for payment security. Our payment infrastructure is PCI DSS Level 1 certified. 
+              Card data is handled by our validated payment processor and never touches our application servers.
             </p>
-            <div className="flex justify-center gap-6 text-sm text-white/80">
+            <div className="flex justify-center gap-6 text-sm text-white/80 flex-wrap">
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                PCI DSS Level 1
+              </span>
               <span className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400" />
                 Annual audits
-              </span>
-              <span className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                Vulnerability scans
-              </span>
-              <span className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                Penetration testing
               </span>
             </div>
           </motion.div>
@@ -248,13 +260,13 @@ export function Security() {
               <h3 className="text-xl font-light mb-4">SOC 2 Type II Report</h3>
               <p className="text-gray-400 text-sm mb-4">
                 Our SOC 2 Type II audit validates our controls for security, availability, 
-                and confidentiality. Available under NDA.
+                and confidentiality. Report available under NDA.
               </p>
               <a
-                href="mailto:security@driftpos.com"
+                href="mailto:security@driftpos.com?subject=SOC%202%20Type%20II%20Report%20Request"
                 className="text-sm text-black hover:underline"
               >
-                Request access →
+                Request report →
               </a>
             </motion.div>
 

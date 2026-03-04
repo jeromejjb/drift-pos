@@ -119,16 +119,16 @@ export function Privacy() {
               content: `We implement bank-grade security measures:
                 • 256-bit AES encryption for data at rest
                 • TLS 1.3 for data in transit
-                • PCI DSS Level 1 certified
+                • PCI DSS compliant
                 • Annual third-party security audits
                 • Never store full credit card numbers`,
-              legal: 'PCI DSS compliance verified'
+              legal: 'PCI DSS compliant'
             },
             {
               icon: RefreshCw,
               title: '4. Data Sharing',
               content: `We only share data with:
-                • Stripe, Inc. for payment processing (their privacy policy applies)
+                • Our payment processor for card transactions (industry-standard security)
                 • Legal authorities when required by law
                 • Service providers bound by confidentiality agreements
               We never sell your personal information to third parties.`,

@@ -83,7 +83,7 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
     setError(null);
 
     if (!formData.tosAccepted) {
-      setError('Please accept the Stripe Connected Account Agreement.');
+      setError('Please accept the Connected Account Agreement.');
       return;
     }
 
@@ -270,7 +270,7 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
           <CreditCard className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-3xl font-light mb-2">Bank Account</h2>
-        <p className="text-gray-400">Connect your bank to receive payouts. Secured by Stripe.</p>
+        <p className="text-gray-400">Connect your bank to receive payouts. Bank-level security.</p>
       </div>
 
       {error && (
@@ -514,16 +514,7 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
               className="mt-1 w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
             />
             <span className="text-sm text-gray-600">
-              I agree to the{' '}
-              <a
-                href="https://stripe.com/connect-account/legal"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-black"
-              >
-                Stripe Connected Account Agreement
-              </a>{' '}
-              and authorize Drift to send payouts to my bank account.
+              I agree to the Connected Account Agreement and authorize Drift to send payouts to my bank account.
             </span>
           </label>
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
 interface User {
   id: string;

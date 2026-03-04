@@ -17,7 +17,7 @@ interface MenuItem {
   category: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
 export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete }: QuickOrderModalProps) {
   const [search, setSearch] = useState('');

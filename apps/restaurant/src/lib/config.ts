@@ -1,6 +1,6 @@
 export const config = {
   // API URL - Vite will replace this at build time
-  apiUrl: import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com',
+  apiUrl: import.meta.env.VITE_API_URL || 'https://api.driftpos.com',
   
   // App URL - You'll need to add this to your .env and Vite config
   appUrl: import.meta.env.VITE_APP_URL || 'http://localhost:5174',

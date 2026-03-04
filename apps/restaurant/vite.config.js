@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
             tailwindcss(),
         ],
         define: {
-            'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com')
+            'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.driftpos.com')
         },
         server: {
             port: 5174,

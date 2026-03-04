@@ -58,7 +58,7 @@ export function DashboardPage() {
   const [restaurantName, setRestaurantName] = useState('Your Restaurant');
   const [apiAvailable, setApiAvailable] = useState(true);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
   const getGreeting = () => {
     const hour = new Date().getHours();

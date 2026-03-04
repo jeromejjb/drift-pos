@@ -32,11 +32,24 @@ This creates:
 - **Tables**: 8 tables (1–8)
 - **Menu**: 4 categories, 12 items (Appetizers, Mains, Drinks, Desserts)
 
-### 2. Generate QR codes (optional)
+### 2. Production: ensure seed has run
+
+The demo account must exist in your production database. Either:
+
+- **Deploy** — The API's `preDeployCommand` runs the seed on each deploy (Render).
+- **Manual** — Run against production DB:
+  ```bash
+  cd apps/api && DATABASE_URL="your-production-database-url" npx prisma db seed
+  ```
+  Get `DATABASE_URL` from your Render dashboard (drift-db → Connect).
+
+### 3. Generate QR codes (optional)
 
 After signing in, go to **Tables** and click **Generate QR codes** to create QR codes for the demo tables. This enables the full diner flow (scan → order → pay).
 
 ## Sign In
+
+**If login fails:** The seed may not have run on production yet. Trigger a redeploy of the API on Render, or run the seed manually against the production database (see step 2 above).
 
 1. Go to the landing page: **https://driftpos.com/login** (or your landing URL)
 2. Enter:

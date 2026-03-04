@@ -202,7 +202,7 @@ export function SignupPage() {
     return 'Strong';
   };
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
   const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://restaurant.driftpos.com';
 
   // Step validation
@@ -494,8 +494,8 @@ export function SignupPage() {
               />
             </div>
             <div className="flex gap-6 text-white/20 text-xs mt-2 justify-center">
-              <span>SOC 2 Type II</span>
-              <span>PCI DSS Level 1</span>
+              <a href="/security" className="hover:text-white/40 transition-colors">SOC 2 Type II</a>
+              <a href="/security" className="hover:text-white/40 transition-colors">PCI DSS Level 1</a>
               <span>GDPR Compliant</span>
             </div>
           </motion.div>
@@ -997,8 +997,8 @@ export function SignupPage() {
             className="mt-8 flex items-center justify-center gap-4 text-xs text-gray-300"
           >
             <span>🔒 256-bit SSL</span>
-            <span>✓ PCI Compliant</span>
-            <span>🛡️ SOC 2</span>
+            <a href="/security" className="hover:text-gray-500">✓ PCI Compliant</a>
+            <a href="/security" className="hover:text-gray-500">🛡️ SOC 2</a>
           </motion.div>
         </motion.div>
       </div>
@@ -1055,7 +1055,7 @@ export function SignupPage() {
                     <h4>How We Use It</h4>
                     <p>To provide services, improve our platform, and communicate important updates.</p>
                     <h4>Security</h4>
-                    <p>256-bit encryption, PCI compliant, SOC 2 certified.</p>
+                    <p>256-bit encryption, PCI compliant, SOC 2 Type II report on request.</p>
                     <h4>Your Rights</h4>
                     <p>You can export or delete your data anytime.</p>
                   </>

@@ -11,7 +11,7 @@ export function LoginPage() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Use environment variable for API URL
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
   const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com';
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -134,8 +134,8 @@ export function LoginPage() {
               />
             </div>
             <div className="flex gap-6 text-white/20 text-xs mt-2 justify-center">
-              <span>SOC 2 Type II</span>
-              <span>PCI DSS Level 1</span>
+              <a href="/security" className="hover:text-white/40 transition-colors">SOC 2 Type II</a>
+              <a href="/security" className="hover:text-white/40 transition-colors">PCI DSS Level 1</a>
             </div>
           </motion.div>
         </div>
@@ -251,8 +251,8 @@ export function LoginPage() {
               <span className="flex items-center gap-1">
                 <Shield className="w-3 h-3" /> 256-bit SSL
               </span>
-              <span>✓ PCI Compliant</span>
-              <span>🔒 SOC 2</span>
+              <a href="/security" className="hover:text-gray-500">✓ PCI Compliant</a>
+              <a href="/security" className="hover:text-gray-500">🔒 SOC 2</a>
             </div>
           </motion.div>
         </motion.div>

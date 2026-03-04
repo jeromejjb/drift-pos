@@ -33,7 +33,7 @@ export function ScheduleDemoModal({ isOpen, onClose }: ScheduleDemoModalProps) {
     try {
       console.log('📅 Submitting demo request:', formData);
       
-      const response = await fetch('https://drift-api-7vs7.onrender.com/api/demo/schedule', {
+      const response = await fetch('https://api.driftpos.com/api/demo/schedule', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

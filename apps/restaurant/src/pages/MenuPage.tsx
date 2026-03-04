@@ -61,7 +61,7 @@ export function MenuPage() {
     isAvailable: true
   });
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
   useEffect(() => {
     fetchMenu();

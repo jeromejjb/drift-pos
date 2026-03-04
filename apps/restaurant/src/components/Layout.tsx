@@ -33,7 +33,7 @@ export function Layout({ children, title }: LayoutProps) {
   const [restaurantName, setRestaurantName] = useState('Your Restaurant');
   const [loading, setLoading] = useState(true);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
   // Extract restaurantId from current path
   const restaurantId = location.pathname.split('/')[2] || '';

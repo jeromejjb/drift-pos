@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
       }
     ],
     define: {
-      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://drift-api-7vs7.onrender.com'),
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.driftpos.com'),
       'import.meta.env.VITE_RESTAURANT_URL': JSON.stringify(env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com')
     },
     server: {
