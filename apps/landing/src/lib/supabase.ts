@@ -12,12 +12,6 @@ if (supabaseAnonKey && !supabaseAnonKey.startsWith('eyJ')) {
   )
 }
 
-console.log('🔧 Supabase config:', {
-  url: supabaseUrl ? '✅' : '❌',
-  key: supabaseAnonKey ? '✅' : '❌',
-  keyPrefix: supabaseAnonKey?.substring(0, 10)
-})
-
 export const supabase = supabaseUrl && supabaseAnonKey?.startsWith('eyJ')
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null

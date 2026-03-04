@@ -19,8 +19,6 @@ export function LoginPage() {
     setLoading(true);
     
     try {
-      console.log('🔐 Login attempt:', { email });
-      
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -30,14 +28,13 @@ export function LoginPage() {
       const data = await response.json();
       
       if (response.ok) {
-        // Save auth token and restaurant ID
+        // Save to landing's localStorage (in case same origin)
         localStorage.setItem('drift-token', data.token);
         localStorage.setItem('drift-restaurant-id', data.restaurantId);
         
-        console.log('✅ Login successful, redirecting to dashboard');
-        
-        // Direct to restaurant dashboard with restaurant ID
-        window.location.href = `${RESTAURANT_URL}/dashboard/${data.restaurantId}`;
+        // Pass token in URL — restaurant app is on a different origin, so localStorage doesn't persist
+        const params = new URLSearchParams({ token: data.token, restaurantId: data.restaurantId });
+        window.location.href = `${RESTAURANT_URL}/dashboard/${data.restaurantId}?${params}`;
       } else {
         alert(data.error || 'Login failed');
         setLoading(false);

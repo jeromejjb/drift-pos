@@ -32,9 +32,17 @@ function RedirectToLandingPath() {
 }
 
 function App() {
-  // Check if user is authenticated
-  const token = localStorage.getItem('drift-token');
-  const restaurantId = localStorage.getItem('drift-restaurant-id');
+  // Read token from localStorage or URL (cross-origin login passes token in URL)
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('token');
+  const urlRestaurantId = params.get('restaurantId');
+  if (urlToken && urlRestaurantId) {
+    localStorage.setItem('drift-token', urlToken);
+    localStorage.setItem('drift-restaurant-id', urlRestaurantId);
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  const token = localStorage.getItem('drift-token') || urlToken;
+  const restaurantId = localStorage.getItem('drift-restaurant-id') || urlRestaurantId;
 
   // All marketing paths that should redirect to landing
   const marketingPaths = [

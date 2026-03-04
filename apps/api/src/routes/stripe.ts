@@ -5,10 +5,7 @@ import express from 'express';
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// Platform fee rates: 2.5% base, 1.5% at volume ($50k+/month)
-const BASE_RATE = 0.025;
-const VOLUME_RATE = 0.015;
-const VOLUME_THRESHOLD_MONTHLY = 50_000;
+import { BASE_RATE, getRateForVolume } from '../lib/rates';
 
 /** Returns the platform fee rate for a restaurant (volume discount if over threshold). */
 async function getFeeRateForRestaurant(restaurantId: string): Promise<number> {
@@ -24,7 +21,7 @@ async function getFeeRateForRestaurant(restaurantId: string): Promise<number> {
     _sum: { total: true }
   });
   const monthlyTotal = result._sum.total ?? 0;
-  return monthlyTotal >= VOLUME_THRESHOLD_MONTHLY ? VOLUME_RATE : BASE_RATE;
+  return getRateForVolume(monthlyTotal);
 }
 
 // Helper function to safely parse strings

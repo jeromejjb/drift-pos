@@ -39,9 +39,13 @@ The demo account must exist in your production database. Either:
 - **Deploy** — The API's `preDeployCommand` runs the seed on each deploy (Render).
 - **Manual** — Run against production DB:
   ```bash
-  cd apps/api && DATABASE_URL="your-production-database-url" npx prisma db seed
+  # Get Internal Database URL from Render: drift-db → Connect
+  DATABASE_URL="postgresql://..." ./scripts/seed-production.sh
   ```
-  Get `DATABASE_URL` from your Render dashboard (drift-db → Connect).
+  Or with PROD_DATABASE_URL in root `.env`:
+  ```bash
+  source .env && DATABASE_URL="$PROD_DATABASE_URL" ./scripts/seed-production.sh
+  ```
 
 ### 3. Generate QR codes (optional)
 

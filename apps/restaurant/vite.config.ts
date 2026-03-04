@@ -72,7 +72,7 @@ export default defineConfig(({ mode }) => {
     },
     
     define: {
-      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.driftpos.com')
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.driftpos.com'),
       'import.meta.env.VITE_APP_URL': JSON.stringify(env.VITE_APP_URL || 'https://restaurant.driftpos.com'),
       'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || '')
     },
@@ -80,6 +80,12 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5174,
       host: true,
+    },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./src/test/setup.ts'],
+      include: ['src/**/*.test.{ts,tsx}'],
     }
   }
 })

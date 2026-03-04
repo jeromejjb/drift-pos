@@ -14,9 +14,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 
+const connStr = process.env.DATABASE_URL!;
+const isExternal = connStr.includes('render.com') || connStr.includes('amazonaws.com');
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString: connStr,
+  ssl: isExternal ? { rejectUnauthorized: false } : false,
 });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
