@@ -991,7 +991,12 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
 
     const toDateKey = (d: Date) => d.toISOString().slice(0, 10);
     const byDate = new Map<string, { date: string; revenue: number; orders: number }>();
-    for (let d = 0; d < days; d++) {
+    // Include every UTC day from start through today (orders use lte: now, so today can have data)
+    const endOfRange = new Date(now);
+    endOfRange.setUTCHours(0, 0, 0, 0);
+    const startOfRange = new Date(start);
+    const numDays = Math.round((endOfRange.getTime() - startOfRange.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    for (let d = 0; d < numDays; d++) {
       const date = new Date(start);
       date.setUTCDate(date.getUTCDate() + d);
       const key = toDateKey(date);
