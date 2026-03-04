@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { CheckCircle, QrCode } from 'lucide-react';
+import { CheckCircle, QrCode, Gift } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { API_URL } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface OrderSummary {
   id: string;
@@ -16,6 +17,7 @@ interface OrderSummary {
 export function ConfirmationPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { accessToken } = useAuth();
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -74,6 +76,16 @@ export function ConfirmationPage() {
           </div>
         )}
 
+        {accessToken && order && (
+          <div className="bg-[var(--drift-accent-muted)] border border-[var(--drift-accent)]/20 rounded-[var(--drift-radius-xl)] p-4 mb-4 flex items-center gap-3">
+            <Gift className="w-8 h-8 text-[var(--drift-accent)] shrink-0" />
+            <div>
+              <p className="font-medium text-[var(--drift-ink)]">You earned ~{Math.floor(order.total + (order.tipAmount ?? 0))} points!</p>
+              <p className="text-xs text-[var(--drift-ink-muted)]">Points are added to your account automatically</p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-[var(--drift-accent-muted)]/50 border border-[var(--drift-accent)]/20 rounded-[var(--drift-radius-xl)] p-4 mb-8 text-left">
           <p className="text-sm text-[var(--drift-ink-muted)] mb-1">Estimated wait</p>
           <p className="text-xl font-semibold text-[var(--drift-ink)]">15–20 min</p>
@@ -82,15 +94,17 @@ export function ConfirmationPage() {
         <Button fullWidth onClick={() => navigate('/')} icon={<QrCode className="w-4 h-4" />}>
           Back to Dine
         </Button>
-        <p className="mt-6 text-sm text-[var(--drift-ink-subtle)]">
-          <button
-            type="button"
-            onClick={() => navigate('/signin?return=/pay')}
-            className="underline hover:text-[var(--drift-ink-muted)] transition-colors"
-          >
-            Sign in to earn points & save receipts
-          </button>
-        </p>
+        {!accessToken && (
+          <p className="mt-6 text-sm text-[var(--drift-ink-subtle)]">
+            <button
+              type="button"
+              onClick={() => navigate('/signin?return=/pay')}
+              className="underline hover:text-[var(--drift-ink-muted)] transition-colors"
+            >
+              Sign in to earn points on your next order
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

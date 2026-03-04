@@ -16,6 +16,7 @@ export function PaymentPage() {
   const { accessToken, refreshSession } = useAuth();
   const isGuest = !accessToken;
   const [dinerProfile, setDinerProfile] = useState<{ id: string; stripeCustomerId?: string } | null>(null);
+  const [loyalty, setLoyalty] = useState<{ points: number; tier: string } | null>(null);
   const [tipPercent, setTipPercent] = useState(18);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [restaurantId, setRestaurantId] = useState('');
@@ -52,6 +53,16 @@ export function PaymentPage() {
       }
     }).catch(() => {});
   }, [accessToken, refreshSession]);
+
+  useEffect(() => {
+    if (!accessToken || !restaurantId) return;
+    fetch(`${API_URL}/api/diner/loyalty?restaurantId=${restaurantId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setLoyalty({ points: data.points, tier: data.tier }))
+      .catch(() => {});
+  }, [accessToken, restaurantId]);
 
   if (loading) {
     return (
@@ -226,7 +237,7 @@ export function PaymentPage() {
           </div>
         </div>
 
-        {isGuest && (
+        {isGuest ? (
           <div className="mb-4 p-4 bg-[var(--drift-accent-muted)] border border-[var(--drift-accent)]/20 rounded-[var(--drift-radius-xl)] flex items-center gap-3">
             <Gift className="w-5 h-5 text-[var(--drift-accent)] shrink-0" />
             <div>
@@ -239,6 +250,18 @@ export function PaymentPage() {
             >
               Sign in
             </button>
+          </div>
+        ) : (
+          <div className="mb-4 p-4 bg-[var(--drift-accent-muted)] border border-[var(--drift-accent)]/20 rounded-[var(--drift-radius-xl)] flex items-center gap-3">
+            <Gift className="w-5 h-5 text-[var(--drift-accent)] shrink-0" />
+            <div>
+              <p className="font-medium text-[var(--drift-ink)] text-sm">
+                Earn ~{Math.floor(total)} pts on this order
+              </p>
+              <p className="text-xs text-[var(--drift-ink-muted)]">
+                {loyalty ? `${loyalty.points} pts total · ${loyalty.tier}` : '1 pt per $1 · Points save automatically'}
+              </p>
+            </div>
           </div>
         )}
 

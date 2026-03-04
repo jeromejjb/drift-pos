@@ -982,7 +982,7 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
     const prevStart = new Date(start);
     prevStart.setUTCDate(prevStart.getUTCDate() - days);
 
-    const [orders, prevOrders, loyaltyCountResult] = await Promise.all([
+    const [orders, prevOrders, loyaltyCountResult, loyaltyByTierResult] = await Promise.all([
       prisma.order.findMany({
         where: { restaurantId, createdAt: { gte: start, lte: now }, status: { not: 'CANCELLED' } },
         include: { items: { include: { menuItem: true } } },
@@ -991,8 +991,16 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
         where: { restaurantId, createdAt: { gte: prevStart, lt: start }, status: { not: 'CANCELLED' } },
       }),
       prisma.dinerLoyalty.count({ where: { restaurantId } }).catch(() => 0),
+      prisma.dinerLoyalty.groupBy({
+        by: ['tier'],
+        where: { restaurantId },
+        _count: true,
+      }).catch(() => []),
     ]);
     const loyaltyCount = typeof loyaltyCountResult === 'number' ? loyaltyCountResult : 0;
+    const loyaltyByTier = Array.isArray(loyaltyByTierResult)
+      ? loyaltyByTierResult.reduce((acc, r) => ({ ...acc, [r.tier]: r._count }), {} as Record<string, number>)
+      : {};
 
     const revenue = orders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
     const prevRevenue = prevOrders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
@@ -1056,6 +1064,7 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
       byDay: byDaySorted,
       topItems: topItemsFormatted,
       loyaltyMembers: loyaltyCount,
+      loyaltyByTier: { BRONZE: loyaltyByTier.BRONZE ?? 0, SILVER: loyaltyByTier.SILVER ?? 0, GOLD: loyaltyByTier.GOLD ?? 0 },
     });
   } catch (error) {
     console.error('Analytics error:', error);

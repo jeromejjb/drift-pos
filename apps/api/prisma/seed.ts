@@ -298,38 +298,36 @@ async function main() {
   }
 
   // Always ensure demo loyalty data exists (for analytics demo)
-  const dinerUser = await prisma.user.upsert({
-    where: { id: 'demo-diner' },
-    update: {},
-    create: { id: 'demo-diner', name: 'Demo Diner', email: 'diner@demo.driftpos.com' },
-  });
-  const guestUser = await prisma.user.findUnique({ where: { id: 'demo-guest' } });
-  if (guestUser) {
-    await prisma.dinerLoyalty.upsert({
-      where: { restaurantId_userId: { restaurantId: restaurant.id, userId: dinerUser.id } },
-      create: {
-        restaurantId: restaurant.id,
-        userId: dinerUser.id,
-        email: dinerUser.email ?? undefined,
-        points: 142,
-        tier: 'SILVER',
-        lastOrderAt: new Date(),
-      },
-      update: { points: 142, tier: 'SILVER', lastOrderAt: new Date() },
+  const loyaltyMembers = [
+    { id: 'demo-diner', email: 'diner@demo.driftpos.com', points: 142, tier: 'SILVER' as const },
+    { id: 'demo-guest', email: null, points: 68, tier: 'BRONZE' as const },
+    { id: 'demo-loyalty-1', email: 'loyalty1@demo.driftpos.com', points: 320, tier: 'GOLD' as const },
+    { id: 'demo-loyalty-2', email: 'loyalty2@demo.driftpos.com', points: 185, tier: 'SILVER' as const },
+    { id: 'demo-loyalty-3', email: 'loyalty3@demo.driftpos.com', points: 92, tier: 'BRONZE' as const },
+    { id: 'demo-loyalty-4', email: 'loyalty4@demo.driftpos.com', points: 45, tier: 'BRONZE' as const },
+    { id: 'demo-loyalty-5', email: 'loyalty5@demo.driftpos.com', points: 210, tier: 'SILVER' as const },
+    { id: 'demo-loyalty-6', email: 'loyalty6@demo.driftpos.com', points: 550, tier: 'GOLD' as const },
+  ];
+  for (const m of loyaltyMembers) {
+    const u = await prisma.user.upsert({
+      where: { id: m.id },
+      update: {},
+      create: { id: m.id, name: m.email?.split('@')[0] ?? m.id, email: m.email ?? undefined },
     });
     await prisma.dinerLoyalty.upsert({
-      where: { restaurantId_userId: { restaurantId: restaurant.id, userId: guestUser.id } },
+      where: { restaurantId_userId: { restaurantId: restaurant.id, userId: u.id } },
       create: {
         restaurantId: restaurant.id,
-        userId: guestUser.id,
-        points: 68,
-        tier: 'BRONZE',
+        userId: u.id,
+        email: m.email ?? undefined,
+        points: m.points,
+        tier: m.tier,
         lastOrderAt: new Date(),
       },
-      update: { points: 68, tier: 'BRONZE', lastOrderAt: new Date() },
+      update: { points: m.points, tier: m.tier, lastOrderAt: new Date() },
     });
-    console.log('  ✓ Demo loyalty: 2 members');
   }
+  console.log('  ✓ Demo loyalty: ' + loyaltyMembers.length + ' members');
 
   console.log('');
   console.log('✅ Demo restaurant ready!');

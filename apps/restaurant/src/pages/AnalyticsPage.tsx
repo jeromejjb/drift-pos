@@ -33,6 +33,7 @@ interface AnalyticsData {
   byDay: { date: string; revenue: number; orders: number }[];
   topItems: { name: string; revenue: number; orders: number }[];
   loyaltyMembers: number;
+  loyaltyByTier?: { BRONZE: number; SILVER: number; GOLD: number };
 }
 
 type Period = '7d' | '14d' | '30d' | '90d';
@@ -168,7 +169,9 @@ export function AnalyticsPage() {
     {
       label: 'Loyalty Members',
       value: data.loyaltyMembers.toString(),
-      sub: 'Signed-in diners',
+      sub: data.loyaltyByTier
+        ? `Bronze ${data.loyaltyByTier.BRONZE} · Silver ${data.loyaltyByTier.SILVER} · Gold ${data.loyaltyByTier.GOLD}`
+        : 'Signed-in diners',
       change: null,
       icon: Users,
       color: 'amber',
