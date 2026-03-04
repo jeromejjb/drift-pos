@@ -29,8 +29,9 @@ This creates:
 
 - **User**: Demo Owner (`demo@driftpos.com`)
 - **Restaurant**: Drift Demo Kitchen (with address, phone)
-- **Tables**: 8 tables (1–8)
+- **Tables**: 9 tables (Walk-in + 1–8)
 - **Menu**: 4 categories, 12 items (Appetizers, Mains, Drinks, Desserts)
+- **Orders**: 7 demo orders (varied statuses: PENDING, PREPARING, READY, SERVED)
 
 ### 2. Production: ensure seed has run
 
@@ -67,10 +68,17 @@ After signing in, go to **Tables** and click **Generate QR codes** to create QR 
 |---------|----------|------|
 | **Dashboard** | `/dashboard/:restaurantId` | Stats, recent orders, Quick Order modal |
 | **Tables** | `/tables/:restaurantId` | Table list, QR code generation & PDF download |
-| **Orders** | `/orders/:restaurantId` | Active and past orders |
+| **Orders** | `/orders/:restaurantId` | Active and past orders, status updates |
 | **Menu** | `/menu/:restaurantId` | Edit categories and items |
-| **Quick Order** | Dashboard → Quick Order button | Manual order entry |
+| **Quick Order** | Dashboard → Quick Order button | Manual order entry (Walk-in or Table 1–8) |
 | **Settings** | `/settings/:restaurantId` | Profile, restaurant details, billing |
+
+## Payments (Demo)
+
+The demo restaurant is seeded **without** a connected Stripe account. Orders work, but **diner card payments** (QR checkout) require completing the Bank Account step first.
+
+- **To demo full payments:** Complete onboarding Bank Account step with Stripe test values (routing `110000000`, account `000123456789`, SSN `0000`), then use diner app with test card `4242 4242 4242 4242`.
+- **See:** [docs/PAYMENTS.md](./PAYMENTS.md) for full payments layer overview.
 
 ## Environment
 

@@ -17,11 +17,18 @@ interface MenuItem {
   category: string;
 }
 
+interface Table {
+  id: string;
+  number: number;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
 
 export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete }: QuickOrderModalProps) {
   const [search, setSearch] = useState('');
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [tables, setTables] = useState<Table[]>([]);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
@@ -29,8 +36,21 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
   useEffect(() => {
     if (isOpen) {
       fetchMenu();
+      fetchTables();
     }
-  }, [isOpen]);
+  }, [isOpen, restaurantId]);
+
+  const fetchTables = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/restaurant/${restaurantId}/tables`);
+      if (res.ok) {
+        const data = await res.json();
+        setTables(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      setTables([]);
+    }
+  };
 
   const fetchMenu = async () => {
     setLoading(true);
@@ -92,7 +112,7 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           restaurantId,
-          tableId: null, // Walk-in / Quick Order
+          tableId: selectedTableId || null,
           userId: 'staff-order',
           items,
           total: calculateTotal(),
@@ -172,6 +192,20 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
               <ShoppingCart className="w-4 h-4" />
               Current Order
             </h3>
+
+            <div className="mb-3">
+              <label className="text-xs text-gray-500 block mb-1">Table</label>
+              <select
+                value={selectedTableId ?? ''}
+                onChange={(e) => setSelectedTableId(e.target.value || null)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-black text-sm"
+              >
+                <option value="">Walk-in</option>
+                {tables.map((t) => (
+                  <option key={t.id} value={t.id}>Table {t.number}</option>
+                ))}
+              </select>
+            </div>
 
             <div className="flex-1 overflow-y-auto space-y-2">
               {Object.entries(cart).length === 0 ? (

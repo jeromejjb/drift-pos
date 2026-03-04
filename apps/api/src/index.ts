@@ -384,7 +384,7 @@ app.get('/api/restaurants/:restaurantId', async (req, res) => {
     const { restaurantId } = req.params;
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
-      select: { id: true, name: true, email: true, phone: true, address: true, logo: true, timezone: true }
+      select: { id: true, name: true, email: true, phone: true, address: true, logo: true, timezone: true, stripeAccount: true }
     });
     if (!restaurant) return res.status(404).json({ error: 'Restaurant not found', code: 'NOT_FOUND' });
     res.json(restaurant);
@@ -851,7 +851,7 @@ app.patch('/api/order/:orderId/status', async (req, res) => {
     const { orderId } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status.toUpperCase())) {
       return res.status(400).json({ error: 'Invalid status', code: 'INVALID_STATUS' });
     }

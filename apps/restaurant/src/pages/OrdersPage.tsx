@@ -120,9 +120,13 @@ export function OrdersPage() {
       return;
     }
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('drift-token') : null;
       const res = await fetch(`${API_URL}/api/order/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error('Update failed');

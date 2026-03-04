@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { User, Store, CreditCard, Bell, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { User, Store, CreditCard, Bell, Save, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import { PlanBadge } from '../components/ui/PlanBadge';
 import { isOrderSoundEnabled, setOrderSoundEnabled } from '../lib/orderSound';
@@ -27,7 +27,8 @@ export function SettingsPage() {
     name: '',
     address: '',
     phone: '',
-    cuisine: ''
+    cuisine: '',
+    stripeAccount: null as string | null,
   });
 
   const [orderSoundEnabled, setOrderSoundEnabledState] = useState(isOrderSoundEnabled);
@@ -307,7 +308,24 @@ export function SettingsPage() {
           {activeTab === 'billing' && (
             <div>
               <h3 className="text-lg font-light mb-4">Billing & Plan</h3>
-              
+
+              {/* Payments info for demo / understanding */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+                <div className="flex gap-3">
+                  <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900 mb-1">
+                      {restaurant.stripeAccount ? 'Payments connected' : 'Accept card payments from diners'}
+                    </p>
+                    <p className="text-sm text-blue-800">
+                      {restaurant.stripeAccount
+                        ? 'Your Stripe account is connected. Diners can pay at the table via QR checkout.'
+                        : 'Complete the Bank Account step during onboarding to receive payouts. Until then, orders appear but diner card payments are not processed. Use Stripe test values for demo: routing 110000000, account 000123456789, SSN 0000.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-gray-50 rounded-xl p-6 mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>

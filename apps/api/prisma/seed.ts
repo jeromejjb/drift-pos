@@ -75,15 +75,18 @@ async function main() {
   }
   console.log('  ✓ Restaurant:', restaurant.name);
 
-  // Create tables (1-8) if they don't exist
+  // Create tables (0 = Walk-in, 1-8) if they don't exist
   const existingTables = await prisma.table.count({ where: { restaurantId: restaurant.id } });
   if (existingTables === 0) {
+    await prisma.table.create({
+      data: { restaurantId: restaurant.id, number: 0, section: 'Walk-in' },
+    });
     for (let n = 1; n <= 8; n++) {
       await prisma.table.create({
         data: { restaurantId: restaurant.id, number: n },
       });
     }
-    console.log('  ✓ Tables: 8 created');
+    console.log('  ✓ Tables: 9 created (Walk-in + 1-8)');
   } else {
     console.log('  ✓ Tables: already exist');
   }
@@ -135,22 +138,26 @@ async function main() {
     console.log('  ✓ Menu: already exists (' + existingMenuItems + ' items)');
   }
 
-  // Create 3 demo orders for an incredible first impression
+  // Create demo orders for an incredible first impression
   const existingOrders = await prisma.order.count({ where: { restaurantId: restaurant.id } });
   if (existingOrders === 0) {
-    const tables = await prisma.table.findMany({ where: { restaurantId: restaurant.id }, take: 4 });
-    const menuItems = await prisma.menuItem.findMany({ where: { restaurantId: restaurant.id }, take: 6 });
-    if (tables.length > 0 && menuItems.length >= 2) {
+    const allTables = await prisma.table.findMany({ where: { restaurantId: restaurant.id } });
+    const menuItems = await prisma.menuItem.findMany({ where: { restaurantId: restaurant.id } });
+    if (allTables.length > 0 && menuItems.length >= 2) {
       const guestUser = await prisma.user.upsert({
         where: { id: 'demo-guest' },
         update: {},
         create: { id: 'demo-guest', name: 'Demo Guest' },
       });
+      const walkIn = allTables.find((t) => t.number === 0) || allTables[0];
       const orders = [
-        { table: tables[0], items: [menuItems[0], menuItems[1]], status: 'PENDING' as const },
-        { table: tables[1], items: [menuItems[2], menuItems[3], menuItems[4]], status: 'PREPARING' as const },
-        { table: tables[2], items: [menuItems[1], menuItems[5]], status: 'READY' as const },
-        { table: tables[3] || tables[0], items: [menuItems[0], menuItems[3]], status: 'SERVED' as const },
+        { table: walkIn, items: [menuItems[0], menuItems[1]], status: 'PENDING' as const },
+        { table: allTables[1] || allTables[0], items: [menuItems[2], menuItems[3], menuItems[4]], status: 'PREPARING' as const },
+        { table: allTables[2] || allTables[0], items: [menuItems[1], menuItems[5]], status: 'READY' as const },
+        { table: allTables[3] || allTables[0], items: [menuItems[0], menuItems[3]], status: 'SERVED' as const },
+        { table: allTables[4] || allTables[0], items: [menuItems[6], menuItems[7]], status: 'PENDING' as const },
+        { table: allTables[5] || allTables[0], items: [menuItems[8], menuItems[9]], status: 'PREPARING' as const },
+        { table: walkIn, items: [menuItems[10], menuItems[11]], status: 'READY' as const },
       ];
       for (const o of orders) {
         const total = o.items.reduce((sum, i) => sum + i.price, 0);
@@ -173,7 +180,7 @@ async function main() {
           },
         });
       }
-      console.log('  ✓ Demo orders: 4 created (3 active + 1 completed)');
+      console.log('  ✓ Demo orders: 7 created (varied statuses)');
     }
   } else {
     console.log('  ✓ Demo orders: already exist');
