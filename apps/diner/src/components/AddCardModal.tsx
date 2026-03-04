@@ -3,6 +3,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { X, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { sessionExpiredMessage } from '../lib/userErrors';
 import { Button } from './ui/Button';
 import { API_URL, STRIPE_PUBLISHABLE_KEY } from '../lib/api';
 import { InlineError } from './ui/InlineError';
@@ -22,7 +23,7 @@ interface AddCardModalProps {
  * Uses shared AuthForm for sign-in/sign-up.
  */
 export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardModalProps) {
-  const { user, accessToken, isAuthConfigured } = useAuth();
+  const { user, accessToken, isAuthConfigured, refreshSession, signOut } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -39,16 +40,33 @@ export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardMo
   useEffect(() => {
     if (!isOpen || needsAuth || !accessToken) return;
     let cancelled = false;
+    const fetchSetupIntent = async (token: string) => {
+      const res = await fetch(`${API_URL}/api/diner/setup-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    };
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/api/diner/setup-intent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        });
-        const data = await res.json().catch(() => ({}));
+        let { res, data } = await fetchSetupIntent(accessToken);
         if (cancelled) return;
+        if (res.status === 401 && data?.code === 'INVALID_TOKEN') {
+          const newToken = await refreshSession();
+          if (cancelled) return;
+          if (newToken) {
+            const retry = await fetchSetupIntent(newToken);
+            if (cancelled) return;
+            ({ res, data } = retry);
+          } else {
+            await signOut();
+            setError(sessionExpiredMessage());
+            return;
+          }
+        }
         if (!res.ok) {
-          setError(data.error || 'Failed to load');
+          setError(data?.code === 'INVALID_TOKEN' ? sessionExpiredMessage() : (data.error || 'Failed to load'));
           return;
         }
         if (data.clientSecret) setClientSecret(data.clientSecret);
@@ -57,7 +75,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardMo
       }
     })();
     return () => { cancelled = true; };
-  }, [isOpen, needsAuth, accessToken]);
+  }, [isOpen, needsAuth, accessToken, refreshSession, signOut]);
 
   const handleCardSuccess = () => {
     setClientSecret(null);

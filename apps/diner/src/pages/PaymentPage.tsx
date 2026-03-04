@@ -13,7 +13,7 @@ const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY
 export function PaymentPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const { accessToken } = useAuth();
+  const { accessToken, refreshSession } = useAuth();
   const isGuest = !accessToken;
   const [dinerProfile, setDinerProfile] = useState<{ id: string; stripeCustomerId?: string } | null>(null);
   const [tipPercent, setTipPercent] = useState(18);
@@ -38,13 +38,20 @@ export function PaymentPage() {
   }, [tableId]);
 
   useEffect(() => {
-    if (accessToken) {
-      fetch(`${API_URL}/api/diner/me`, { headers: { Authorization: `Bearer ${accessToken}` } })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => data && setDinerProfile({ id: data.id, stripeCustomerId: data.stripeCustomerId }))
-        .catch(() => {});
-    }
-  }, [accessToken]);
+    if (!accessToken) return;
+    const fetchMe = async (token: string) => {
+      const r = await fetch(`${API_URL}/api/diner/me`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data?.id) setDinerProfile({ id: data.id, stripeCustomerId: data.stripeCustomerId });
+      return { status: r.status, data };
+    };
+    fetchMe(accessToken).then(async (result) => {
+      if (result.status === 401 && result.data?.code === 'INVALID_TOKEN') {
+        const newToken = await refreshSession();
+        if (newToken) fetchMe(newToken);
+      }
+    }).catch(() => {});
+  }, [accessToken, refreshSession]);
 
   if (loading) {
     return (

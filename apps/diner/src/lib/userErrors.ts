@@ -46,6 +46,7 @@ const P2P_MESSAGE_CODES = [
  */
 export function toP2PError(data: { error?: string; code?: string }, status: number): string {
   const code = data?.code;
+  if (code === 'INVALID_TOKEN') return sessionExpiredMessage();
   const msg = (data?.error || '').trim();
   if (code && P2P_MESSAGE_CODES.includes(code) && msg && !isTechnical(msg)) return msg;
   return toPaymentError(msg, status);
@@ -54,6 +55,9 @@ export function toP2PError(data: { error?: string; code?: string }, status: numb
 /** User-facing message for payment flows (P2P, checkout). */
 export function toPaymentError(raw: string | undefined, status?: number): string {
   const msg = (raw || '').trim();
+  if (status === 401 && (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('session'))) {
+    return sessionExpiredMessage();
+  }
   if (status === 404 && !msg.toLowerCase().includes('recipient')) return PAYMENT_UNAVAILABLE;
   if (status && status >= 500) return PAYMENT_UNAVAILABLE;
   if (isTechnical(msg)) return PAYMENT_UNAVAILABLE;

@@ -15,7 +15,7 @@ const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY
 const AMOUNT_CHIPS = [5, 10, 20, 50, 100];
 
 export function PayPage() {
-  const { user, accessToken, loading: authLoading } = useAuth();
+  const { user, accessToken, loading: authLoading, refreshSession, signOut } = useAuth();
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [showHowToTest, setShowHowToTest] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -30,13 +30,19 @@ export function PayPage() {
 
   useEffect(() => {
     if (!accessToken || !API_URL) return;
-    fetch(`${API_URL}/api/p2p/transfers`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => data && setTransfers(data))
-      .catch(() => {});
-  }, [accessToken]);
+    const fetchTransfers = async (token: string) => {
+      const r = await fetch(`${API_URL}/api/p2p/transfers`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = r.ok ? await r.json().catch(() => null) : null;
+      if (data) setTransfers(data);
+      return { status: r.status };
+    };
+    fetchTransfers(accessToken).then(async (result) => {
+      if (result.status === 401) {
+        const newToken = await refreshSession();
+        if (newToken) fetchTransfers(newToken);
+      }
+    }).catch(() => {});
+  }, [accessToken, refreshSession]);
 
   // Focus amount field when Pay screen opens so numeric keyboard shows on mobile
   useEffect(() => {
@@ -123,16 +129,17 @@ export function PayPage() {
       setError('Enter at least $0.50');
       return;
     }
-    if (!accessToken || !API_URL) {
+    let token = accessToken;
+    if (!token || !API_URL) {
       setError(sessionExpiredMessage());
       return;
     }
-    try {
+    const doRequest = async (t: string) => {
       const res = await fetch(`${API_URL}/api/p2p/create-intent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${t}`,
         },
         body: JSON.stringify({
           recipientEmail: recipientEmail.trim().toLowerCase(),
@@ -140,7 +147,21 @@ export function PayPage() {
           note: note.trim() || undefined,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      return { res, data: await res.json().catch(() => ({})) };
+    };
+    try {
+      let { res, data } = await doRequest(token);
+      if (res.status === 401 && data?.code === 'INVALID_TOKEN') {
+        const newToken = await refreshSession();
+        if (newToken) {
+          const retry = await doRequest(newToken);
+          ({ res, data } = retry);
+        } else {
+          await signOut();
+          setError(sessionExpiredMessage());
+          return;
+        }
+      }
       if (!res.ok) {
         setError(toP2PError(data, res.status));
         return;
@@ -314,7 +335,22 @@ export function PayPage() {
             />
           </div>
 
-          {error && <InlineError message={error} onRetry={() => setError('')} className="mb-4" />}
+          {error && (
+            <InlineError
+              message={error}
+              onRetry={error.includes('Session expired') ? undefined : startPayment}
+              action={error.includes('Session expired') ? (
+                <button
+                  type="button"
+                  onClick={() => { setError(''); setShowAuthGate(true); }}
+                  className="text-sm font-medium text-[var(--drift-accent)] hover:underline underline-offset-2"
+                >
+                  Sign in again
+                </button>
+              ) : undefined}
+              className="mb-4"
+            />
+          )}
 
           {!clientSecret && (
             <>
@@ -394,6 +430,14 @@ export function PayPage() {
           )}
         </section>
       </div>
+
+      {showAuthGate && (
+        <AuthGate
+          reason="to continue"
+          onSuccess={() => setShowAuthGate(false)}
+          onDismiss={() => setShowAuthGate(false)}
+        />
+      )}
     </PageShell>
   );
 }

@@ -41,6 +41,8 @@ type AuthState = {
   signInWithEmailOtp: (email: string) => Promise<{ error: Error | null }>;
   verifyEmailOtp: (email: string, token: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  /** Refresh session; returns new access_token or null if refresh failed. Use when API returns 401 INVALID_TOKEN. */
+  refreshSession: () => Promise<string | null>;
   accessToken: string | null;
 };
 
@@ -57,11 +59,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const client = supabase;
-    client.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
+    client.auth.getSession().then(async ({ data: { session: s } }) => {
+      if (s) {
+        try {
+          const { data: refreshed } = await client.auth.refreshSession();
+          if (refreshed?.session) {
+            setSession(refreshed.session);
+            setUser(refreshed.session.user);
+            syncProfileToSupabase(client, refreshed.session.user);
+          } else {
+            setSession(s);
+            setUser(s.user);
+            syncProfileToSupabase(client, s.user);
+          }
+        } catch {
+          setSession(s);
+          setUser(s.user);
+          if (s.user) syncProfileToSupabase(client, s.user);
+        }
+      } else {
+        setSession(null);
+        setUser(null);
+      }
       setLoading(false);
-      if (s?.user) syncProfileToSupabase(client, s.user);
     });
     const { data: { subscription } } = client.auth.onAuthStateChange((_event, s) => {
       setSession(s);
@@ -178,6 +198,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshSession = useCallback(async (): Promise<string | null> => {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data?.session) return null;
+      setSession(data.session);
+      setUser(data.session.user);
+      return data.session.access_token;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const value: AuthState = {
     session,
     user,
@@ -190,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithEmailOtp,
     verifyEmailOtp,
     signOut,
+    refreshSession,
     accessToken: session?.access_token ?? null,
   };
 
