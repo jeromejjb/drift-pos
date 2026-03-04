@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { config } from '../lib/config';
 
 interface Table {
   id: string;
@@ -38,8 +39,7 @@ export function TablesPage() {
   const getToken = () => {
     const token = localStorage.getItem('drift-token');
     if (!token) {
-      // Redirect to landing login if no token
-      window.location.href = 'https://drift-landing.onrender.com/login';
+      window.location.href = `${config.landingUrl}/login`;
       return null;
     }
     return token;
@@ -61,10 +61,9 @@ export function TablesPage() {
       });
 
       if (response.status === 401) {
-        // Token expired or invalid
         localStorage.removeItem('drift-token');
         localStorage.removeItem('drift-restaurant-id');
-        window.location.href = 'https://drift-landing.onrender.com/login';
+        window.location.href = `${config.landingUrl}/login`;
         return;
       }
 
@@ -98,7 +97,7 @@ export function TablesPage() {
       if (response.status === 401) {
         localStorage.removeItem('drift-token');
         localStorage.removeItem('drift-restaurant-id');
-        window.location.href = 'https://drift-landing.onrender.com/login';
+        window.location.href = `${config.landingUrl}/login`;
         return;
       }
 
@@ -127,7 +126,7 @@ export function TablesPage() {
       if (response.status === 401) {
         localStorage.removeItem('drift-token');
         localStorage.removeItem('drift-restaurant-id');
-        window.location.href = 'https://drift-landing.onrender.com/login';
+        window.location.href = `${config.landingUrl}/login`;
         return;
       }
 

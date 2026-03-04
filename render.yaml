@@ -41,7 +41,10 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://api.driftpos.com
+        fromService:
+          name: drift-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: VITE_SUPABASE_URL
         value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
@@ -59,7 +62,12 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://api.driftpos.com
+        fromService:
+          name: drift-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: VITE_LANDING_URL
+        value: https://driftpos.com
       - key: VITE_SUPABASE_URL
         value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
@@ -75,7 +83,12 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://api.driftpos.com
+        fromService:
+          name: drift-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: VITE_RESTAURANT_URL
+        value: https://drift-restaurant.onrender.com
       - key: VITE_SUPABASE_URL
         value: https://kywpomnuqfypfgxagnib.supabase.co
       - key: VITE_SUPABASE_ANON_KEY

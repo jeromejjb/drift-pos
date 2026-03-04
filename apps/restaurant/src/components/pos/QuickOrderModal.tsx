@@ -78,18 +78,21 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
   const placeOrder = async () => {
     setPlacing(true);
     try {
-      // Create order items array
-      const items = Object.entries(cart).map(([itemId, quantity]) => ({
-        menuItemId: itemId,
-        quantity
-      }));
+      const items = Object.entries(cart).map(([itemId, quantity]) => {
+        const item = menu.find(i => i.id === itemId);
+        return {
+          menuItemId: itemId,
+          quantity,
+          price: item?.price ?? 0
+        };
+      });
 
       const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           restaurantId,
-          tableId: null, // Walk-in order
+          tableId: null, // Walk-in / Quick Order
           userId: 'staff-order',
           items,
           total: calculateTotal(),

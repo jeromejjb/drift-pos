@@ -88,9 +88,11 @@ async function main() {
     console.log('  ✓ Tables: already exist');
   }
 
-  // Create menu categories and items if none exist
-  const existingCategories = await prisma.menuCategory.count({ where: { restaurantId: restaurant.id } });
-  if (existingCategories === 0) {
+  // Create menu categories and items if none exist (demo must always have a menu)
+  const existingMenuItems = await prisma.menuItem.count({ where: { restaurantId: restaurant.id } });
+  if (existingMenuItems === 0) {
+    // Remove any orphaned categories first (e.g. from partial setup)
+    await prisma.menuCategory.deleteMany({ where: { restaurantId: restaurant.id } });
     const appetizers = await prisma.menuCategory.create({
       data: { name: 'Appetizers', restaurantId: restaurant.id, sortOrder: 0 },
     });
@@ -130,7 +132,51 @@ async function main() {
     }
     console.log('  ✓ Menu: 4 categories, 12 items');
   } else {
-    console.log('  ✓ Menu: already exists');
+    console.log('  ✓ Menu: already exists (' + existingMenuItems + ' items)');
+  }
+
+  // Create 3 demo orders for an incredible first impression
+  const existingOrders = await prisma.order.count({ where: { restaurantId: restaurant.id } });
+  if (existingOrders === 0) {
+    const tables = await prisma.table.findMany({ where: { restaurantId: restaurant.id }, take: 4 });
+    const menuItems = await prisma.menuItem.findMany({ where: { restaurantId: restaurant.id }, take: 6 });
+    if (tables.length > 0 && menuItems.length >= 2) {
+      const guestUser = await prisma.user.upsert({
+        where: { id: 'demo-guest' },
+        update: {},
+        create: { id: 'demo-guest', name: 'Demo Guest' },
+      });
+      const orders = [
+        { table: tables[0], items: [menuItems[0], menuItems[1]], status: 'PENDING' as const },
+        { table: tables[1], items: [menuItems[2], menuItems[3], menuItems[4]], status: 'PREPARING' as const },
+        { table: tables[2], items: [menuItems[1], menuItems[5]], status: 'READY' as const },
+        { table: tables[3] || tables[0], items: [menuItems[0], menuItems[3]], status: 'SERVED' as const },
+      ];
+      for (const o of orders) {
+        const total = o.items.reduce((sum, i) => sum + i.price, 0);
+        await prisma.order.create({
+          data: {
+            restaurantId: restaurant.id,
+            tableId: o.table.id,
+            userId: guestUser.id,
+            total,
+            tipAmount: 2,
+            status: o.status,
+            items: {
+              create: o.items.map((item) => ({
+                menuItemId: item.id,
+                quantity: 1,
+                price: item.price,
+                userId: guestUser.id,
+              })),
+            },
+          },
+        });
+      }
+      console.log('  ✓ Demo orders: 4 created (3 active + 1 completed)');
+    }
+  } else {
+    console.log('  ✓ Demo orders: already exist');
   }
 
   console.log('');

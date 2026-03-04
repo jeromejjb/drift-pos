@@ -1,23 +1,27 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DashboardPage } from './pages/DashboardPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { TablesPage } from './pages/TablesPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { MenuPage } from './pages/MenuPage';
+import { PosPage } from './pages/PosPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useEffect } from 'react';
+import { config } from './lib/config';
+
+const LANDING = config.landingUrl;
 
 // Component to handle external redirect
 function RedirectToLanding() {
   useEffect(() => {
-    window.location.href = 'https://driftpos.com';
+    window.location.href = LANDING;
   }, []);
   return null;
 }
 
 function RedirectToLandingLogin() {
   useEffect(() => {
-    window.location.href = 'https://driftpos.com/login';
+    window.location.href = `${LANDING}/login`;
   }, []);
   return null;
 }
@@ -26,7 +30,7 @@ function RedirectToLandingLogin() {
 function RedirectToLandingPath() {
   useEffect(() => {
     const path = window.location.pathname;
-    window.location.href = `https://driftpos.com${path}`;
+    window.location.href = `${LANDING}${path}`;
   }, []);
   return null;
 }
@@ -90,6 +94,12 @@ function App() {
           path="/menu/:restaurantId" 
           element={
             token ? <MenuPage /> : <RedirectToLandingLogin />
+          } 
+        />
+        <Route 
+          path="/pos/:restaurantId" 
+          element={
+            token ? <PosPage /> : <RedirectToLandingLogin />
           } 
         />
         <Route 

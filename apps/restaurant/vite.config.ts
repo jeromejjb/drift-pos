@@ -74,6 +74,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.driftpos.com'),
       'import.meta.env.VITE_APP_URL': JSON.stringify(env.VITE_APP_URL || 'https://restaurant.driftpos.com'),
+      'import.meta.env.VITE_LANDING_URL': JSON.stringify(env.VITE_LANDING_URL || 'https://driftpos.com'),
       'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY || '')
     },
     

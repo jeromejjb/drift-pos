@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { SignupPage } from './pages/SignupPage';
 import { LoginPage } from './pages/LoginPage';
@@ -11,10 +12,29 @@ import { Terms } from './pages/Terms';
 import { Security } from './pages/Security';
 import { DriftShowcase } from './components/DriftShowcase';
 
+const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://drift-restaurant.onrender.com';
+
+// Redirect app paths to restaurant — prevents "double auth" when user bookmarks driftpos.com/dashboard/xyz
+function RedirectToRestaurant() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.location.href = `${RESTAURANT_URL}${pathname}${window.location.search}`;
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* App paths — redirect to restaurant so user doesn't land on wrong domain */}
+        <Route path="/dashboard/*" element={<RedirectToRestaurant />} />
+        <Route path="/tables/*" element={<RedirectToRestaurant />} />
+        <Route path="/orders/*" element={<RedirectToRestaurant />} />
+        <Route path="/menu/*" element={<RedirectToRestaurant />} />
+        <Route path="/pos/*" element={<RedirectToRestaurant />} />
+        <Route path="/settings/*" element={<RedirectToRestaurant />} />
+        <Route path="/onboarding" element={<RedirectToRestaurant />} />
         {/* Main pages */}
         <Route path="/" element={<HomePage />} />
         <Route path="/signup" element={<SignupPage />} />

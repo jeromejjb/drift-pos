@@ -65,7 +65,14 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// CORS
+// CORS — allow all Render deployments and driftpos domains
+const allowedOriginPatterns = [
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https:\/\/drift-[a-z0-9-]+\.onrender\.com$/,
+  /^https:\/\/[a-z0-9-]+\.driftpos\.com$/,
+  /^https:\/\/driftpos\.com$/,
+  /^https:\/\/www\.driftpos\.com$/,
+];
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -79,10 +86,15 @@ const allowedOrigins = [
   'https://restaurant.driftpos.com',
   'https://app.driftpos.com',
 ];
+const isOriginAllowed = (origin: string | undefined) => {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  return allowedOriginPatterns.some(p => p.test(origin));
+};
 
 // Socket.io
 const io = new Server(httpServer, {
-  cors: { origin: allowedOrigins, credentials: true, methods: ['GET', 'POST'] },
+  cors: { origin: (o) => !o || isOriginAllowed(o), credentials: true, methods: ['GET', 'POST'] },
   pingTimeout: 60000,
 });
 
@@ -94,10 +106,10 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://*.stripe.com"],
       scriptSrc: ["'self'", "https://*.stripe.com", "https://js.stripe.com"],
       imgSrc: ["'self'", "data:", "https:", "https://*.stripe.com"],
-      connectSrc: ["'self'", ...allowedOrigins, "https://*.stripe.com"],
+      connectSrc: ["'self'", "https://*.onrender.com", "https://*.driftpos.com", "https://driftpos.com", "https://*.stripe.com"],
       fontSrc: ["'self'", "https:", "data:"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'none'"],
+      mediaSrc: ["'self'", "https:", "blob:"],
       frameSrc: ["'self'", "https://*.stripe.com", "https://js.stripe.com"],
       childSrc: ["'self'", "https://*.stripe.com"],
     },
@@ -107,7 +119,7 @@ app.use(helmet({
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost'))) {
+  if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -119,8 +131,7 @@ app.use((req, res, next) => {
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || origin.includes('localhost')) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       callback(new Error('CORS not allowed'));
@@ -718,7 +729,7 @@ app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
   try {
     const { restaurantId } = req.params;
     const orders = await prisma.order.findMany({
-      where: { restaurantId, status: { in: ['PENDING', 'PREPARING', 'READY'] } },
+      where: { restaurantId },
       include: { items: { include: { menuItem: true } }, table: true },
       orderBy: { createdAt: 'desc' },
       take: 50
@@ -774,15 +785,26 @@ app.post('/api/orders', async (req, res) => {
   try {
     const { restaurantId, tableId, userId, items, total, tip } = req.body;
 
-    if (!restaurantId || !tableId || !userId || !items || !total) {
+    if (!restaurantId || !userId || !items || !total) {
       return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
     const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
     if (!restaurant) return res.status(404).json({ error: 'Restaurant not found', code: 'NOT_FOUND' });
 
-    const table = await prisma.table.findUnique({ where: { id: tableId } });
-    if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+    let table;
+    if (tableId) {
+      table = await prisma.table.findUnique({ where: { id: tableId } });
+      if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+    } else {
+      // Walk-in / Quick Order: use table 0 (create if needed)
+      table = await prisma.table.findFirst({ where: { restaurantId, number: 0 } });
+      if (!table) {
+        table = await prisma.table.create({
+          data: { restaurantId, number: 0, section: 'Walk-in' }
+        });
+      }
+    }
 
     const user = await prisma.user.upsert({
       where: { id: userId },
@@ -790,20 +812,26 @@ app.post('/api/orders', async (req, res) => {
       create: { id: userId, name: 'Guest User' }
     });
 
+    const orderItemsWithPrice: Array<{ menuItemId: string; quantity: number; price: number }> = [];
     for (const item of items) {
       const menuItem = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
       if (!menuItem) return res.status(404).json({ error: `Menu item not found: ${item.menuItemId}`, code: 'NOT_FOUND' });
+      orderItemsWithPrice.push({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        price: item.price ?? menuItem.price
+      });
     }
 
     const order = await prisma.order.create({
       data: {
         restaurantId,
-        tableId,
+        tableId: table.id,
         userId: user.id,
         total,
         tipAmount: tip || 0,
         status: 'PENDING',
-        items: { create: items.map((item: any) => ({ menuItemId: item.menuItemId, quantity: item.quantity, price: item.price, userId: user.id })) }
+        items: { create: orderItemsWithPrice.map((item: any) => ({ menuItemId: item.menuItemId, quantity: item.quantity, price: item.price, userId: user.id })) }
       },
       include: { items: { include: { menuItem: true } }, table: true }
     });
