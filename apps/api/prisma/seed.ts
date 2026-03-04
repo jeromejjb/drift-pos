@@ -244,6 +244,57 @@ async function main() {
     }
   } else {
     console.log('  ✓ Demo orders: already exist');
+    // Ensure we have some completed orders for analytics demo (past 7 days)
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const completedCount = await prisma.order.count({
+      where: { restaurantId: restaurant.id, status: 'COMPLETED', createdAt: { gte: weekAgo } },
+    });
+    if (completedCount < 5) {
+      const allTables = await prisma.table.findMany({ where: { restaurantId: restaurant.id } });
+      const menuItems = await prisma.menuItem.findMany({ where: { restaurantId: restaurant.id } });
+      if (allTables.length > 0 && menuItems.length >= 2) {
+        const guestUser = await prisma.user.upsert({
+        where: { id: 'demo-guest' },
+        update: {},
+        create: { id: 'demo-guest', name: 'Demo Guest' },
+      });
+      const dinerUser = await prisma.user.upsert({
+        where: { id: 'demo-diner' },
+        update: {},
+        create: { id: 'demo-diner', name: 'Demo Diner', email: 'diner@demo.driftpos.com' },
+      });
+      const now = new Date();
+      for (let d = 0; d < 5; d++) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - d);
+        date.setHours(12 + (d % 3), 30, 0, 0);
+        const orderUser = d % 2 === 0 ? guestUser : dinerUser;
+        const m1 = menuItems[d % menuItems.length];
+        const m2 = menuItems[(d + 1) % menuItems.length];
+        const total = (m1?.price ?? 10) + (m2?.price ?? 8);
+        await prisma.order.create({
+          data: {
+            restaurantId: restaurant.id,
+            tableId: allTables[d % allTables.length].id,
+            userId: orderUser.id,
+            total,
+            tipAmount: Math.round(total * 0.18),
+            status: 'COMPLETED',
+            completedAt: date,
+            createdAt: date,
+            items: {
+              create: [
+                { menuItemId: m1.id, quantity: 1, price: m1.price, userId: orderUser.id },
+                { menuItemId: m2.id, quantity: 1, price: m2.price, userId: orderUser.id },
+              ],
+            },
+          },
+        });
+      }
+        console.log('  ✓ Added 5 completed orders for analytics demo');
+      }
+    }
   }
 
   // Always ensure demo loyalty data exists (for analytics demo)

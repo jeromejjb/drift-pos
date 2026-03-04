@@ -35,6 +35,7 @@ export function AnalyticsPage() {
   const { restaurantId } = useParams();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<'auth' | 'server' | null>(null);
   const [period, setPeriod] = useState<'7d' | '30d'>('7d');
   const [periodOpen, setPeriodOpen] = useState(false);
 
@@ -42,14 +43,36 @@ export function AnalyticsPage() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('drift-token') : null;
 
   useEffect(() => {
-    if (!restaurantId || !token) return;
+    if (!restaurantId) {
+      setLoading(false);
+      return;
+    }
+    if (!token) {
+      setError('auth');
+      setLoading(false);
+      return;
+    }
+    setError(null);
     setLoading(true);
     fetch(`${API_URL}/api/restaurant/${restaurantId}/analytics?period=${period}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 401 || r.status === 403) {
+          setError('auth');
+          return null;
+        }
+        if (!r.ok) {
+          setError('server');
+          return null;
+        }
+        return r.json();
+      })
       .then(setData)
-      .catch(() => setData(null))
+      .catch(() => {
+        setError('server');
+        setData(null);
+      })
       .finally(() => setLoading(false));
   }, [restaurantId, period, token]);
 
@@ -71,14 +94,37 @@ export function AnalyticsPage() {
     );
   }
 
+  if (error === 'auth') {
+    return (
+      <Layout title="Analytics">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Sign in required</h3>
+          <p className="text-gray-600 text-sm mb-4">
+            Please sign in to view analytics.
+          </p>
+          <a
+            href={`${import.meta.env.VITE_LANDING_URL || 'https://driftpos.com'}/login`}
+            className="inline-block px-6 py-2.5 bg-black text-white font-medium rounded-xl hover:bg-gray-800"
+          >
+            Sign in
+          </a>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!data) {
     return (
       <Layout title="Analytics">
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
           <BarChart3 className="w-12 h-12 text-amber-600 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No data yet</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {error === 'server' ? 'Could not load analytics' : 'No data yet'}
+          </h3>
           <p className="text-gray-600 text-sm">
-            Analytics will appear once you have orders. Place some orders or run the seed to see insights.
+            {error === 'server'
+              ? 'The server may be updating. Try again in a moment.'
+              : 'Analytics will appear once you have orders. Run the seed for demo data: cd apps/api && npx prisma db seed'}
           </p>
         </div>
       </Layout>

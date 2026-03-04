@@ -964,7 +964,7 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
     const prevStart = new Date(start);
     prevStart.setDate(prevStart.getDate() - days);
 
-    const [orders, prevOrders, loyaltyCount] = await Promise.all([
+    const [orders, prevOrders, loyaltyCountResult] = await Promise.all([
       prisma.order.findMany({
         where: { restaurantId, createdAt: { gte: start }, status: { not: 'CANCELLED' } },
         include: { items: { include: { menuItem: true } } },
@@ -972,8 +972,9 @@ app.get('/api/restaurant/:restaurantId/analytics', authenticateToken, async (req
       prisma.order.findMany({
         where: { restaurantId, createdAt: { gte: prevStart, lt: start }, status: { not: 'CANCELLED' } },
       }),
-      prisma.dinerLoyalty.count({ where: { restaurantId } }),
+      prisma.dinerLoyalty.count({ where: { restaurantId } }).catch(() => 0),
     ]);
+    const loyaltyCount = typeof loyaltyCountResult === 'number' ? loyaltyCountResult : 0;
 
     const revenue = orders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
     const prevRevenue = prevOrders.reduce((s, o) => s + o.total + (o.tipAmount ?? 0), 0);
