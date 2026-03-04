@@ -1,5 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { Layout } from '../components/Layout';
 import {
   CheckCircle,
@@ -10,16 +22,19 @@ import {
   ChefHat,
   UtensilsCrossed,
   Receipt,
+  GripVertical,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { playOrderNotificationSound } from '../lib/orderSound';
 import io from 'socket.io-client';
 
+type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled';
+
 interface Order {
   id: string;
   tableNumber: number;
   items: { name: string; quantity: number; price: number }[];
-  status: 'pending' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled';
+  status: OrderStatus;
   total: number;
   createdAt: string;
 }
@@ -53,6 +68,173 @@ function getTableLabel(tableNumber: number): string {
   return tableNumber === 0 ? 'Walk-in' : `Table ${tableNumber}`;
 }
 
+const STATUS_COLUMNS: { id: OrderStatus; label: string; icon: typeof Timer }[] = [
+  { id: 'pending', label: 'Pending', icon: Timer },
+  { id: 'preparing', label: 'Preparing', icon: ChefHat },
+  { id: 'ready', label: 'Ready', icon: UtensilsCrossed },
+  { id: 'served', label: 'Served', icon: CheckCircle },
+  { id: 'completed', label: 'Completed', icon: CheckCircle },
+  { id: 'cancelled', label: 'Cancelled', icon: AlertCircle },
+];
+
+const statusConfig: Record<OrderStatus, { icon: typeof Timer; label: string; color: string; iconColor: string }> = {
+  pending: { icon: Timer, label: 'Pending', color: 'bg-amber-50 text-amber-700', iconColor: 'text-amber-600' },
+  preparing: { icon: ChefHat, label: 'Preparing', color: 'bg-blue-50 text-blue-700', iconColor: 'text-blue-600' },
+  ready: { icon: UtensilsCrossed, label: 'Ready', color: 'bg-emerald-50 text-emerald-700', iconColor: 'text-emerald-600' },
+  served: { icon: CheckCircle, label: 'Served', color: 'bg-gray-100 text-gray-600', iconColor: 'text-gray-500' },
+  completed: { icon: CheckCircle, label: 'Completed', color: 'bg-gray-100 text-gray-600', iconColor: 'text-gray-500' },
+  cancelled: { icon: AlertCircle, label: 'Cancelled', color: 'bg-red-50 text-red-600', iconColor: 'text-red-500' },
+};
+
+function OrderCard({
+  order,
+  isDragging,
+  isOverlay,
+}: {
+  order: Order;
+  isDragging?: boolean;
+  isOverlay?: boolean;
+}) {
+  const config = statusConfig[order.status] ?? statusConfig.pending;
+  const StatusIcon = config.icon;
+
+  return (
+    <div
+      className={`
+        bg-white rounded-xl border border-gray-100 shadow-sm p-4 transition-all
+        ${isDragging ? 'opacity-90 shadow-lg ring-2 ring-black/10' : ''}
+        ${isOverlay ? 'cursor-grabbing shadow-xl rotate-1' : ''}
+      `}
+    >
+      <div className="flex justify-between items-start gap-3 mb-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="font-semibold text-gray-900">{getTableLabel(order.tableNumber)}</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium ${config.color}`}>
+              <StatusIcon className="w-3 h-3" />
+              {config.label}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400">
+            {formatRelativeTime(order.createdAt)} · #{order.id.slice(-6)}
+          </p>
+        </div>
+        <span className="text-lg font-semibold text-gray-900 shrink-0">${order.total.toFixed(2)}</span>
+      </div>
+      <div className="border-t border-gray-100 pt-3 space-y-1.5">
+        {order.items.map((item, i) => (
+          <div key={i} className="flex justify-between text-sm">
+            <span className="text-gray-700">
+              {item.quantity}× {item.name}
+            </span>
+            <span className="text-gray-500">${(item.price * item.quantity).toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DraggableOrderCard({
+  order,
+  onStatusChange,
+  updatingId,
+}: {
+  order: Order;
+  onStatusChange: (orderId: string, newStatus: OrderStatus) => void;
+  updatingId: string | null;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: order.id,
+    data: { order },
+  });
+
+  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+
+  return (
+    <div ref={setNodeRef} style={style} className="mb-3">
+      <div
+        {...listeners}
+        {...attributes}
+        className="cursor-grab active:cursor-grabbing touch-none"
+      >
+        <div className="flex items-start gap-2">
+          <div className="mt-4 p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <GripVertical className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <OrderCard order={order} isDragging={isDragging} />
+            {!['served', 'completed', 'cancelled'].includes(order.status) && (
+              <div className="mt-2">
+                <select
+                  value={order.status}
+                  onChange={(e) => onStatusChange(order.id, e.target.value as OrderStatus)}
+                  disabled={updatingId === order.id}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="preparing">Preparing</option>
+                  <option value="ready">Ready</option>
+                  <option value="served">Served</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusColumn({
+  statusId,
+  label,
+  icon: Icon,
+  orders,
+  onStatusChange,
+  updatingId,
+}: {
+  statusId: OrderStatus;
+  label: string;
+  icon: typeof Timer;
+  orders: Order[];
+  onStatusChange: (orderId: string, newStatus: OrderStatus) => void;
+  updatingId: string | null;
+}) {
+  const { isOver, setNodeRef } = useDroppable({ id: statusId });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`
+        flex-shrink-0 w-72 rounded-2xl border-2 border-dashed p-4 min-h-[200px] transition-colors
+        ${isOver ? 'border-black/30 bg-gray-50/80' : 'border-gray-200 bg-gray-50/30'}
+      `}
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+          <Icon className="w-4 h-4 text-gray-600" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-gray-900">{label}</h3>
+          <p className="text-xs text-gray-500">{orders.length} order{orders.length !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
+      <div className="space-y-0">
+        {orders.map((order) => (
+          <DraggableOrderCard
+            key={order.id}
+            order={order}
+            onStatusChange={onStatusChange}
+            updatingId={updatingId}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function OrdersPage() {
   const { restaurantId } = useParams();
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active');
@@ -61,9 +243,16 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
   const prevOrderCountRef = useRef(0);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
 
   const fetchOrders = async () => {
     setError(null);
@@ -109,9 +298,8 @@ export function OrdersPage() {
     return () => socket.disconnect();
   }, [restaurantId]);
 
-  const updateStatus = async (orderId: string, newStatus: Order['status']) => {
+  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     setUpdatingId(orderId);
-    // Mock orders: update local state only
     if (orderId.startsWith('fall-')) {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
@@ -155,20 +343,35 @@ export function OrdersPage() {
     return true;
   });
 
+  const getVisibleColumns = () => {
+    if (filter === 'active') return STATUS_COLUMNS.slice(0, 4); // Pending, Preparing, Ready, Served
+    if (filter === 'completed') return STATUS_COLUMNS.slice(3, 5); // Served, Completed
+    return STATUS_COLUMNS;
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const order = orders.find((o) => o.id === active.id);
+    if (order) setActiveOrder(order);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveOrder(null);
+    if (!over) return;
+    const orderId = String(active.id);
+    const newStatus = over.id as OrderStatus;
+    const order = orders.find((o) => o.id === orderId);
+    if (!order || order.status === newStatus) return;
+    if (!STATUS_COLUMNS.some((c) => c.id === newStatus)) return;
+    updateStatus(orderId, newStatus);
+  };
+
   const summary = {
     pending: orders.filter((o) => o.status === 'pending').length,
     preparing: orders.filter((o) => o.status === 'preparing').length,
     ready: orders.filter((o) => o.status === 'ready').length,
     total: orders.reduce((s, o) => s + o.total, 0),
-  };
-
-  const statusConfig = {
-    pending: { icon: Timer, label: 'Pending', color: 'bg-amber-50 text-amber-700', iconColor: 'text-amber-600' },
-    preparing: { icon: ChefHat, label: 'Preparing', color: 'bg-blue-50 text-blue-700', iconColor: 'text-blue-600' },
-    ready: { icon: UtensilsCrossed, label: 'Ready', color: 'bg-emerald-50 text-emerald-700', iconColor: 'text-emerald-600' },
-    served: { icon: CheckCircle, label: 'Served', color: 'bg-gray-100 text-gray-600', iconColor: 'text-gray-500' },
-    completed: { icon: CheckCircle, label: 'Completed', color: 'bg-gray-100 text-gray-600', iconColor: 'text-gray-500' },
-    cancelled: { icon: AlertCircle, label: 'Cancelled', color: 'bg-red-50 text-red-600', iconColor: 'text-red-500' },
   };
 
   if (loading) {
@@ -184,7 +387,6 @@ export function OrdersPage() {
 
   return (
     <Layout title="Orders">
-      {/* Error banner */}
       {error && (
         <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-amber-800">
@@ -201,7 +403,6 @@ export function OrdersPage() {
         </div>
       )}
 
-      {/* Summary bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="bg-amber-50 rounded-xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
@@ -241,7 +442,6 @@ export function OrdersPage() {
         </div>
       </div>
 
-      {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {(['active', 'all', 'completed'] as const).map((f) => (
@@ -249,9 +449,7 @@ export function OrdersPage() {
               key={f}
               onClick={() => setFilter(f)}
               className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                filter === f
-                  ? 'bg-black text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                filter === f ? 'bg-black text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -270,92 +468,51 @@ export function OrdersPage() {
         </div>
       </div>
 
-      {/* Orders list */}
-      <div className="space-y-4">
-        {filteredOrders.length === 0 ? (
-          <Card padding="xl" className="text-center py-16">
-            <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Receipt className="w-10 h-10 text-gray-300" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-700 mb-2">
-              {filter === 'active' ? 'No active orders' : filter === 'completed' ? 'No completed orders' : 'No orders found'}
-            </h3>
-            <p className="text-gray-400 text-sm max-w-sm mx-auto">
-              {filter === 'active'
-                ? 'New orders will appear here as they come in. Try the Quick Order button to add one.'
-                : search
-                  ? 'Try a different search or filter.'
-                  : 'Orders you mark as served will show up here.'}
-            </p>
-          </Card>
-        ) : (
-          filteredOrders.map((order) => {
-            const config = statusConfig[order.status] ?? statusConfig.pending;
-            const StatusIcon = config.icon;
+      {filteredOrders.length === 0 ? (
+        <Card padding="xl" className="text-center py-16">
+          <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Receipt className="w-10 h-10 text-gray-300" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-700 mb-2">
+            {filter === 'active' ? 'No active orders' : filter === 'completed' ? 'No completed orders' : 'No orders found'}
+          </h3>
+          <p className="text-gray-400 text-sm max-w-sm mx-auto">
+            {filter === 'active'
+              ? 'New orders will appear here as they come in. Try the Quick Order button to add one.'
+              : search
+                ? 'Try a different search or filter.'
+                : 'Orders you mark as served will show up here.'}
+          </p>
+        </Card>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {getVisibleColumns().map((col) => (
+              <StatusColumn
+                key={col.id}
+                statusId={col.id}
+                label={col.label}
+                icon={col.icon}
+                orders={filteredOrders.filter((o) => o.status === col.id)}
+                onStatusChange={updateStatus}
+                updatingId={updatingId}
+              />
+            ))}
+          </div>
 
-            return (
-              <Card key={order.id} padding="lg" className="hover:border-gray-200 transition-all">
-                <div className="flex justify-between items-start gap-4 mb-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-semibold text-gray-900">
-                        {getTableLabel(order.tableNumber)}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${config.color}`}
-                      >
-                        <StatusIcon className="w-3.5 h-3.5" />
-                        {config.label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      {formatRelativeTime(order.createdAt)} · #{order.id.slice(-6)}
-                    </p>
-                  </div>
-                  <span className="text-xl font-semibold text-gray-900 shrink-0">
-                    ${order.total.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="border-t border-gray-100 pt-4 mt-4 space-y-2">
-                  {order.items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-gray-700">
-                        {item.quantity}× {item.name}
-                      </span>
-                      <span className="text-gray-500">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {!['served', 'completed', 'cancelled'].includes(order.status) && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <label className="block text-xs font-medium text-gray-500 mb-2">
-                      Update status
-                    </label>
-                    <select
-                      value={order.status}
-                      onChange={(e) => updateStatus(order.id, e.target.value as Order['status'])}
-                      disabled={updatingId === order.id}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black disabled:opacity-50"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="preparing">Preparing</option>
-                      <option value="ready">Ready</option>
-                      <option value="served">Served</option>
-                    </select>
-                    {updatingId === order.id && (
-                      <p className="text-xs text-gray-400 mt-1">Updating...</p>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })
-        )}
-      </div>
+          <DragOverlay>
+            {activeOrder ? (
+              <div className="w-72">
+                <OrderCard order={activeOrder} isOverlay />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
     </Layout>
   );
 }
