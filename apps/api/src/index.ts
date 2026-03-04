@@ -33,6 +33,9 @@ if (missingEnvVars.length > 0) {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET!;
+if (process.env.NODE_ENV === 'production' && JWT_SECRET.length < 32) {
+  console.warn('SECURITY: JWT_SECRET should be at least 32 characters in production. Use: openssl rand -base64 32');
+}
 
 // Rate limiting
 const globalLimiter = rateLimit({
@@ -724,10 +727,13 @@ app.post('/api/menu/categories', authenticateToken, async (req: any, res) => {
   }
 });
 
-// Order endpoints
-app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
+// Order endpoints (require auth; restaurant staff only)
+app.get('/api/restaurant/:restaurantId/orders', authenticateToken, async (req: any, res) => {
   try {
     const { restaurantId } = req.params;
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
     const orders = await prisma.order.findMany({
       where: { restaurantId },
       include: { items: { include: { menuItem: true } }, table: true },
@@ -750,9 +756,12 @@ app.get('/api/restaurant/:restaurantId/orders', async (req, res) => {
   }
 });
 
-app.get('/api/restaurant/:restaurantId/stats', async (req, res) => {
+app.get('/api/restaurant/:restaurantId/stats', authenticateToken, async (req: any, res) => {
   try {
     const { restaurantId } = req.params;
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -873,14 +882,20 @@ app.get('/api/order/:orderId', async (req, res) => {
   }
 });
 
-app.patch('/api/order/:orderId/status', async (req, res) => {
+app.patch('/api/order/:orderId/status', authenticateToken, async (req: any, res) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
 
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'];
-    if (!validStatuses.includes(status.toUpperCase())) {
+    if (!validStatuses.includes(status?.toUpperCase())) {
       return res.status(400).json({ error: 'Invalid status', code: 'INVALID_STATUS' });
+    }
+
+    const existing = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!existing) return res.status(404).json({ error: 'Order not found', code: 'NOT_FOUND' });
+    if (existing.restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
     }
 
     const order = await prisma.order.update({

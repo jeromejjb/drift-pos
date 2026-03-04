@@ -254,10 +254,14 @@ export function OrdersPage() {
     })
   );
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('drift-token') : null;
+
   const fetchOrders = async () => {
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`);
+      const response = await fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!response.ok) throw new Error('Failed to load orders');
       const data = await response.json();
       const normalized = data.map((o: any) => ({

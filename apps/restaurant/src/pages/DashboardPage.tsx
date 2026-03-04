@@ -66,6 +66,8 @@ export function DashboardPage() {
   const [apiAvailable, setApiAvailable] = useState(true);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
+  const token = typeof window !== 'undefined' ? localStorage.getItem('drift-token') : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -105,7 +107,9 @@ export function DashboardPage() {
 
   const fetchRestaurantDetails = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
+        headers: authHeaders,
+      });
       if (response.ok) {
         const data = await response.json();
         setRestaurantName(data.name);
@@ -123,8 +127,8 @@ export function DashboardPage() {
       setRefreshing(true);
       
       const [statsRes, ordersRes] = await Promise.all([
-        fetch(`${API_URL}/api/restaurant/${restaurantId}/stats`),
-        fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`)
+        fetch(`${API_URL}/api/restaurant/${restaurantId}/stats`, { headers: authHeaders }),
+        fetch(`${API_URL}/api/restaurant/${restaurantId}/orders`, { headers: authHeaders })
       ]);
       
       if (!statsRes.ok || !ordersRes.ok) {
