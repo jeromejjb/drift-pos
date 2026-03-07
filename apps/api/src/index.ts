@@ -76,6 +76,10 @@ const allowedOriginPatterns = [
   /^https:\/\/driftpos\.com$/,
   /^https:\/\/www\.driftpos\.com$/,
 ];
+const extraOrigins = (process.env.CORS_EXTRA_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -88,6 +92,7 @@ const allowedOrigins = [
   'https://driftpos.com',
   'https://restaurant.driftpos.com',
   'https://app.driftpos.com',
+  ...extraOrigins,
 ];
 const isOriginAllowed = (origin: string | undefined) => {
   if (!origin) return true;
@@ -177,6 +182,36 @@ app.get('/', (req, res) => {
 // Test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Drift API operational', timestamp: new Date().toISOString() });
+});
+
+// Integration info for external apps (beer app, etc.)
+app.get('/api/integration/p2p', (req, res) => {
+  res.json({
+    version: '1',
+    endpoints: {
+      createIntent: 'POST /api/p2p/create-intent',
+      recipientInfo: 'GET /api/p2p/recipient-info?recipient_id=<uuid>',
+      merchantPayment: 'POST /api/p2p/merchant-payment',
+      transfers: 'GET /api/p2p/transfers',
+    },
+    auth: 'Bearer <supabase_access_token>',
+    createIntentBody: {
+      recipientEmail: 'string (or recipientId)',
+      recipientId: 'string (Supabase user UUID, same project)',
+      amount: 'number (min 0.5, required)',
+      note: 'string (optional)',
+    },
+    merchantPaymentBody: {
+      amount: 'number (min 0.5, required)',
+      destination: 'string (Stripe Connect account ID, acct_xxx, required)',
+      metadata: 'object (optional, for tracking)',
+      currency: 'string (optional, default usd)',
+    },
+    redirectUrl: 'DINER_URL/pay?amount=5&recipient=user@example.com',
+    redirectUrlWithRecipientId: 'DINER_URL/pay?amount=5&recipient_id=<supabase_uuid>',
+    settingsUrl: 'DINER_URL/settings',
+    withdrawUrl: 'DINER_URL/withdraw',
+  });
 });
 
 // Supabase Auth Send SMS Hook — receives { user: { phone }, sms: { otp } } and sends via Twilio
@@ -1227,12 +1262,14 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).json({ error: 'Internal server error', code: 'INTERNAL_ERROR' });
 });
 
-// Start server
-const PORT = process.env.PORT || 3001;
-httpServer.listen(parseInt(PORT.toString()), '0.0.0.0', () => {
-  console.log(`Drift API running on port ${PORT}`);
-  console.log(`📍 Serving landing app from: ${landingBuildPath}`);
-});
+// Start server (skip in test to allow supertest)
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 3001;
+  httpServer.listen(parseInt(PORT.toString()), '0.0.0.0', () => {
+    console.log(`Drift API running on port ${PORT}`);
+    console.log(`📍 Serving landing app from: ${landingBuildPath}`);
+  });
+}
 
 // Graceful shutdown
 const shutdown = async () => {

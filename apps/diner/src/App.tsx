@@ -13,7 +13,9 @@ import { ConfirmationPage } from './pages/ConfirmationPage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { PayPage } from './pages/PayPage';
+import { SettingsRedirect } from './pages/SettingsRedirect';
 import { MoneyPage } from './pages/MoneyPage';
+import { WithdrawPage } from './pages/WithdrawPage';
 import { MePage } from './pages/MePage';
 import './index.css';
 
@@ -31,6 +33,8 @@ function AppRoutes() {
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/pay" element={<PayPage />} />
       <Route path="/pay/return" element={<P2PReturnPage />} />
+      <Route path="/settings" element={<SettingsRedirect />} />
+      <Route path="/withdraw" element={<WithdrawPage />} />
       <Route path="/money" element={<MoneyPage />} />
       <Route path="/me" element={<MePage />} />
     </Routes>

@@ -39,7 +39,22 @@ Supabase sends the email using its built-in provider — no Twilio, Resend, or o
 
 ## Phone / SMS sign-in (optional, requires Twilio)
 
-For phone-based OTP, configure the Send SMS hook and Twilio. See the API `send-sms` endpoint and add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` to your API `.env`. The app defaults to **Email code** for launch.
+For phone-based OTP in the diner app (Pay, Send money):
+
+1. **Enable Phone provider** in [Supabase Dashboard](https://supabase.com/dashboard) → **Authentication → Providers → Phone** → enable.
+
+2. **Configure Send SMS hook** in Supabase → **Authentication → Providers → Phone** → **Customize SMS provider** → set the HTTP URL to your API's send-sms endpoint, e.g.:
+   - Local: `http://localhost:3001/api/auth/send-sms`
+   - Production: `https://your-api.example.com/api/auth/send-sms`
+
+3. **Add Twilio env vars** to your API `.env`:
+   ```
+   TWILIO_ACCOUNT_SID=...
+   TWILIO_AUTH_TOKEN=...
+   TWILIO_PHONE_NUMBER=+1234567890
+   ```
+
+4. In the diner app, choose **Phone** in the auth form, enter your number, tap **Send code**, then enter the 6-digit code from the SMS.
 
 ## Quick copy-paste (email)
 

@@ -32,6 +32,7 @@ function isTechnical(msg: string): boolean {
 /** Known API error codes where we show the API message (user-friendly). */
 const P2P_MESSAGE_CODES = [
   'RECIPIENT_NOT_FOUND',
+  'RECIPIENT_NO_PAYOUT_ACCOUNT',
   'SELF_TRANSFER',
   'MISSING_FIELDS',
   'P2P_DISABLED',

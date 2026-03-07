@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Send, ArrowDownLeft, ArrowUpRight, Check } from 'lucide-react';
@@ -13,12 +14,17 @@ import { toP2PError, toPaymentError, toConnectionError, sessionExpiredMessage } 
 const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
 
 const AMOUNT_CHIPS = [5, 10, 20, 50, 100];
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function PayPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, accessToken, loading: authLoading, refreshSession, signOut } = useAuth();
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [showHowToTest, setShowHowToTest] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientId, setRecipientId] = useState<string | null>(null);
+  const [recipientIdResolved, setRecipientIdResolved] = useState(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [customAmount, setCustomAmount] = useState('');
   const [note, setNote] = useState('');
@@ -43,6 +49,58 @@ export function PayPage() {
       }
     }).catch(() => {});
   }, [accessToken, refreshSession]);
+
+  // Pre-fill from query params (e.g. /pay?amount=5&recipient=user@email.com or recipient_id=UUID for Taproom/partner apps)
+  useEffect(() => {
+    const amt = searchParams.get('amount');
+    const recipient = searchParams.get('recipient');
+    const rid = searchParams.get('recipient_id');
+    const rt = searchParams.get('return_to');
+    const hasParams = amt || recipient || rid || rt;
+    if (!hasParams) return;
+    if (amt && !isNaN(parseFloat(amt)) && parseFloat(amt) >= 0.5) {
+      setAmount(amt);
+      setCustomAmount('');
+    }
+    if (recipient && recipient.includes('@')) {
+      setRecipientEmail(recipient);
+    }
+    if (rid && typeof rid === 'string' && UUID_REGEX.test(rid.trim())) {
+      setRecipientId(rid.trim());
+    }
+    if (rt && typeof rt === 'string' && rt.startsWith('http')) {
+      setReturnTo(rt);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('amount');
+    next.delete('recipient');
+    next.delete('recipient_id');
+    next.delete('return_to');
+    if (next.toString()) setSearchParams(next, { replace: true });
+    else setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Resolve recipient_id via API when signed in (partner apps use recipient_id instead of email)
+  useEffect(() => {
+    if (!accessToken || !API_URL || !recipientId || recipientIdResolved) return;
+    const fetchRecipient = async (token: string) => {
+      const r = await fetch(`${API_URL}/api/p2p/recipient-info?recipient_id=${encodeURIComponent(recipientId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) {
+        setRecipientId(null);
+        return;
+      }
+      const data = await r.json().catch(() => null);
+      if (data?.email || data?.name) {
+        setRecipientEmail(data.email || data.name || '');
+        setRecipientIdResolved(true);
+      } else {
+        setRecipientId(null);
+      }
+    };
+    fetchRecipient(accessToken).catch(() => setRecipientId(null));
+  }, [accessToken, API_URL, recipientId, recipientIdResolved]);
 
   // Focus amount field when Pay screen opens so numeric keyboard shows on mobile
   useEffect(() => {
@@ -117,11 +175,13 @@ export function PayPage() {
   const displayAmount = customAmount ? customAmount : amount;
   const amountNum = parseFloat(displayAmount || '0');
   const isValidAmount = !isNaN(amountNum) && amountNum >= 0.5;
+  const hasRecipient = recipientId || recipientEmail.trim();
 
   const startPayment = async () => {
     setError('');
     const amt = customAmount ? parseFloat(customAmount) : parseFloat(amount);
-    if (!recipientEmail.trim()) {
+    const hasRecipient = recipientId || recipientEmail.trim();
+    if (!hasRecipient) {
       setError('Enter recipient email');
       return;
     }
@@ -142,7 +202,9 @@ export function PayPage() {
           Authorization: `Bearer ${t}`,
         },
         body: JSON.stringify({
-          recipientEmail: recipientEmail.trim().toLowerCase(),
+          ...(recipientId
+            ? { recipientId }
+            : { recipientEmail: recipientEmail.trim().toLowerCase() }),
           amount: amt,
           note: note.trim() || undefined,
         }),
@@ -166,6 +228,10 @@ export function PayPage() {
         setError(toP2PError(data, res.status));
         return;
       }
+      if (data.usedBalance) {
+        onPaymentSuccess();
+        return;
+      }
       if (data.clientSecret) setClientSecret(data.clientSecret);
     } catch (err) {
       if (import.meta.env.DEV) console.error('Pay API error:', err);
@@ -175,12 +241,14 @@ export function PayPage() {
 
   const onPaymentSuccess = () => {
     const amt = customAmount || amount;
-    const to = recipientEmail.trim();
+    const to = recipientEmail.trim() || (recipientId ? 'recipient' : '');
     setClientSecret(null);
     setAmount('');
     setCustomAmount('');
     setNote('');
     setRecipientEmail('');
+    setRecipientId(null);
+    setRecipientIdResolved(false);
     setSuccessSent({ amount: amt, to });
     if (accessToken && API_URL) {
       fetch(`${API_URL}/api/p2p/transfers`, { headers: { Authorization: `Bearer ${accessToken}` } })
@@ -222,14 +290,24 @@ export function PayPage() {
               ${Number(successSent.amount).toFixed(2)}
             </p>
             <p className="mt-1 text-sm text-[var(--drift-ink-muted)]">to {successSent.to}</p>
-            <Button
-              className="mt-10 min-w-[220px]"
-              variant="primary"
-              onClick={() => setSuccessSent(null)}
-              icon={<Send className="w-5 h-5" />}
-            >
-              Send another
-            </Button>
+            <div className="mt-10 flex flex-col gap-3 items-center">
+              {returnTo && (
+                <a
+                  href={returnTo}
+                  className="text-sm font-medium text-[var(--drift-accent)] hover:underline underline-offset-2"
+                >
+                  Back to Taproom
+                </a>
+              )}
+              <Button
+                className="min-w-[220px]"
+                variant="primary"
+                onClick={() => setSuccessSent(null)}
+                icon={<Send className="w-5 h-5" />}
+              >
+                Send another
+              </Button>
+            </div>
           </div>
         </div>
       </PageShell>
@@ -242,11 +320,21 @@ export function PayPage() {
       <header className="px-5 pt-5 pb-4 border-b border-[var(--drift-border)] bg-[var(--drift-surface-elevated)]">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-[var(--drift-ink)] tracking-tight">Pay</h1>
-          {isStripeTestMode && (
-            <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-amber-100 text-amber-800">
-              Test
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {returnTo && (
+              <a
+                href={returnTo}
+                className="text-sm font-medium text-[var(--drift-accent)] hover:underline underline-offset-2"
+              >
+                Back to Taproom
+              </a>
+            )}
+            {isStripeTestMode && (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                Test
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
@@ -300,9 +388,11 @@ export function PayPage() {
             <input
               type="email"
               value={recipientEmail}
-              onChange={(e) => setRecipientEmail(e.target.value)}
-              placeholder="Who? (email)"
-              disabled={!!clientSecret}
+              onChange={(e) => {
+                if (!recipientId) setRecipientEmail(e.target.value);
+              }}
+              placeholder={recipientId ? 'Resolving…' : 'Who? (email)'}
+              disabled={!!clientSecret || !!recipientId}
               className="w-full px-4 py-3.5 rounded-[var(--drift-radius-lg)] border border-[var(--drift-border)] bg-[var(--drift-surface)] text-[var(--drift-ink)] placeholder:text-[var(--drift-ink-subtle)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--drift-accent)]/30 focus:border-[var(--drift-accent)]"
               aria-label="Recipient email"
             />
@@ -357,7 +447,7 @@ export function PayPage() {
               <Button
                 fullWidth
                 onClick={startPayment}
-                disabled={!recipientEmail.trim() || !isValidAmount}
+                disabled={!hasRecipient || !isValidAmount}
                 icon={<Send className="w-5 h-5" />}
                 className="py-4 text-base"
               >
@@ -371,6 +461,7 @@ export function PayPage() {
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <P2PConfirmForm
                 amount={displayAmount}
+                returnTo={returnTo}
                 onSuccess={onPaymentSuccess}
                 onCancel={() => setClientSecret(null)}
               />
@@ -444,10 +535,12 @@ export function PayPage() {
 
 function P2PConfirmForm({
   amount,
+  returnTo,
   onSuccess,
   onCancel,
 }: {
   amount: string;
+  returnTo: string | null;
   onSuccess: () => void;
   onCancel?: () => void;
 }) {
@@ -456,6 +549,10 @@ function P2PConfirmForm({
   const [processing, setProcessing] = useState(false);
   const [err, setErr] = useState('');
 
+  const returnUrl = returnTo
+    ? `${window.location.origin}/pay/return?return_to=${encodeURIComponent(returnTo)}`
+    : `${window.location.origin}/pay/return`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
@@ -463,7 +560,7 @@ function P2PConfirmForm({
     setErr('');
     const { error } = await stripe.confirmPayment({
       elements,
-      confirmParams: { return_url: `${window.location.origin}/pay/return` },
+      confirmParams: { return_url: returnUrl },
     });
     setProcessing(false);
     if (error) {

@@ -24,6 +24,7 @@ import { MenuReviewStep } from './onboarding/MenuReviewStep';
 import { QRStep } from './onboarding/QRStep';
 import { StripeStep } from './onboarding/StripeStep'; // We'll keep the filename but change the display name
 import { CompleteStep } from './onboarding/CompleteStep';
+import { config } from '../lib/config';
 
 const steps = [
   { 
@@ -100,7 +101,7 @@ export function OnboardingPage() {
 
   // Load ALL data from URL params and localStorage on mount
   useEffect(() => {
-    const id = searchParams.get('restaurantId');
+    const id = searchParams.get('restaurantId') || localStorage.getItem('drift-restaurant-id');
     const businessName = searchParams.get('businessName');
     const businessType = searchParams.get('businessType');
     const email = searchParams.get('email');
@@ -253,7 +254,7 @@ export function OnboardingPage() {
           <h2 className="text-2xl font-light mb-2">Something went wrong</h2>
           <p className="text-gray-400 mb-4">No restaurant ID provided. Please complete signup first.</p>
           <Button
-            onClick={() => { window.location.href = 'https://driftpos.com/signup'; }}
+            onClick={() => { window.location.href = `${config.landingUrl}/signup`; }}
           >
             Back to Signup
           </Button>

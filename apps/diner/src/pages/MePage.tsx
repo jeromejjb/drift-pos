@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAddCard } from '../contexts/AddCardContext';
-import { User, LogOut, QrCode, Send, Wallet, CreditCard } from 'lucide-react';
+import { User, LogOut, QrCode, Send, Wallet, CreditCard, Landmark } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_URL } from '../lib/api';
 import { AuthGate } from '../components/auth/AuthGate';
 import { Button } from '../components/ui/Button';
 import { PageShell } from '../components/layout/PageShell';
@@ -10,8 +11,38 @@ import { PageShell } from '../components/layout/PageShell';
 export function MePage() {
   const navigate = useNavigate();
   const { openAddCard } = useAddCard();
-  const { user, signOut, loading } = useAuth();
+  const { user, accessToken, signOut, loading } = useAuth();
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [hasPayoutAccount, setHasPayoutAccount] = useState<boolean | null>(null);
+
+  const addPayoutAccount = async () => {
+    if (!accessToken || !API_URL) return;
+    setPayoutLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/p2p/onboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          returnUrl: `${window.location.origin}/pay`,
+          refreshUrl: `${window.location.origin}/pay`,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.url) window.location.href = data.url;
+      else if (data.alreadyOnboarded) setHasPayoutAccount(true);
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !accessToken || !API_URL) return;
+    fetch(`${API_URL}/api/p2p/has-payout-account`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setHasPayoutAccount(d.hasPayoutAccount))
+      .catch(() => {});
+  }, [user, accessToken]);
 
   if (loading) {
     return (
@@ -118,6 +149,31 @@ export function MePage() {
             <span className="text-[var(--drift-ink)] font-medium">Payment method</span>
             <span className="text-sm text-[var(--drift-ink-muted)] ml-auto">Add or update card</span>
           </button>
+          {hasPayoutAccount === false && (
+            <button
+              type="button"
+              onClick={addPayoutAccount}
+              disabled={payoutLoading}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-[var(--drift-radius-lg)] hover:bg-[var(--drift-surface-overlay)] transition-colors text-left border border-[var(--drift-accent)]/30 bg-[var(--drift-accent)]/5"
+            >
+              <Landmark className="w-5 h-5 text-[var(--drift-accent)]" />
+              <span className="text-[var(--drift-ink)] font-medium">Add bank account</span>
+              <span className="text-sm text-[var(--drift-ink-muted)] ml-auto">
+                {payoutLoading ? '…' : 'Receive money'}
+              </span>
+            </button>
+          )}
+          {hasPayoutAccount === true && (
+            <button
+              type="button"
+              onClick={() => navigate('/withdraw')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-[var(--drift-radius-lg)] hover:bg-[var(--drift-surface-overlay)] transition-colors text-left"
+            >
+              <Landmark className="w-5 h-5 text-green-500" />
+              <span className="text-[var(--drift-ink)] font-medium">Withdraw</span>
+              <span className="text-sm text-[var(--drift-ink-muted)] ml-auto">To bank</span>
+            </button>
+          )}
         </nav>
 
         <div className="mt-8 pt-8 border-t border-[var(--drift-border)]">

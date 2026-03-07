@@ -190,6 +190,8 @@ model User {
   phone            String?       @unique(map: "users_phone_unique")
   passwordHash     String?       // For authentication
   stripeCustomerId String?       @unique(map: "users_stripe_customer_unique")
+  stripeAccountId  String?       @unique(map: "users_stripe_account_unique")  // Connect account for withdraw
+  balanceCents     Int           @default(0)  // In-app wallet for P2P
   supabaseId       String?       @unique
   
   orders           Order[]

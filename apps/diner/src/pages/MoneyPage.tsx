@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Send, UtensilsCrossed } from 'lucide-react';
+import { TrendingUp, Send, UtensilsCrossed, ArrowDownToLine } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_URL } from '../lib/api';
 import { PageShell } from '../components/layout/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -13,8 +14,19 @@ import { AuthGate } from '../components/auth/AuthGate';
  */
 export function MoneyPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [balanceCents, setBalanceCents] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user || !accessToken || !API_URL) return;
+    fetch(`${API_URL}/api/p2p/balance`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d != null && setBalanceCents(d.balanceCents ?? 0))
+      .catch(() => {});
+  }, [user, accessToken]);
+
+  const balance = balanceCents !== null ? (balanceCents / 100).toFixed(2) : null;
 
   return (
     <PageShell>
@@ -27,6 +39,19 @@ export function MoneyPage() {
       </header>
 
       <div className="px-5 py-6 max-w-md mx-auto">
+        {user && balance !== null && (
+          <Card padding="lg" className="mb-6 bg-[var(--drift-surface)] border-[var(--drift-border)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-[var(--drift-ink-subtle)]">Balance</p>
+                <p className="text-2xl font-bold text-[var(--drift-ink)]">${balance}</p>
+              </div>
+              <Button variant="secondary" onClick={() => navigate('/withdraw')} icon={<ArrowDownToLine className="w-4 h-4" />}>
+                Withdraw
+              </Button>
+            </div>
+          </Card>
+        )}
         <Card padding="lg" className="mb-6 bg-[var(--drift-accent-muted)]/50 border-[var(--drift-accent)]/20">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-[var(--drift-radius)] bg-[var(--drift-accent)]/20 flex items-center justify-center flex-shrink-0">

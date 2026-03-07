@@ -513,9 +513,25 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
     const event = stripe.webhooks.constructEvent(req.body, sig!, webhookSecret);
     
     switch (event.type) {
-      case 'account.updated':
-        console.log('🔄 Account updated:', event.data.object.id);
+      case 'account.updated': {
+        const account = event.data.object as { id: string; metadata?: { driftUserId?: string }; payouts_enabled?: boolean };
+        const userId = account.metadata?.driftUserId;
+        if (userId && account.payouts_enabled) {
+          try {
+            const { prisma } = await import('../index');
+            await prisma.user.update({
+              where: { id: userId },
+              data: { stripeAccountId: account.id },
+            });
+            console.log('✅ P2P payout account linked:', userId, '->', account.id);
+          } catch (dbErr: any) {
+            console.error('❌ P2P account link failed:', dbErr.message);
+          }
+        } else {
+          console.log('🔄 Account updated:', account.id);
+        }
         break;
+      }
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object as {
           id: string;
@@ -526,18 +542,27 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
         if (meta.p2p === '1' && meta.senderId && meta.recipientId) {
           try {
             const { prisma } = await import('../index');
-            await prisma.p2PTransfer.create({
-              data: {
-                senderId: meta.senderId,
-                recipientId: meta.recipientId,
-                amountCents: parseInt(meta.amountCents || '0', 10),
-                feeCents: parseInt(meta.feeCents || '0', 10),
-                note: meta.note || null,
-                stripePaymentIntentId: paymentIntent.id,
-                status: 'SUCCEEDED',
-              },
-            });
-            console.log('💰 P2P transfer recorded:', meta.senderId, '->', meta.recipientId);
+            const amountCents = parseInt(meta.amountCents || '0', 10);
+            if (amountCents > 0) {
+              await prisma.$transaction([
+                prisma.p2PTransfer.create({
+                  data: {
+                    senderId: meta.senderId,
+                    recipientId: meta.recipientId,
+                    amountCents,
+                    feeCents: parseInt(meta.feeCents || '0', 10),
+                    note: meta.note || null,
+                    stripePaymentIntentId: paymentIntent.id,
+                    status: 'SUCCEEDED',
+                  },
+                }),
+                prisma.user.update({
+                  where: { id: meta.recipientId },
+                  data: { balanceCents: { increment: amountCents } },
+                }),
+              ]);
+            }
+            console.log('💰 P2P transfer recorded + balance credited:', meta.senderId, '->', meta.recipientId);
           } catch (dbErr: any) {
             console.error('❌ P2P webhook DB failed:', dbErr.message);
           }
