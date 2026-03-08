@@ -8,6 +8,8 @@ interface AuthGateProps {
   reason?: string;
   onSuccess: () => void;
   onDismiss: () => void;
+  /** Default to Create account for new users (e.g. Pay, Me) */
+  defaultSignUp?: boolean;
 }
 
 const AUTH_UNAVAILABLE = "Sign-in isn't configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.";
@@ -16,8 +18,11 @@ const AUTH_UNAVAILABLE = "Sign-in isn't configured. Add VITE_SUPABASE_URL and VI
  * Cash App–style auth gate: modal sign-in/sign-up so users stay in context.
  * Use when gating Pay (send), Money (activity), or Me (profile).
  */
-export function AuthGate({ reason = 'to continue', onSuccess, onDismiss }: AuthGateProps) {
+export function AuthGate({ reason = 'to continue', onSuccess, onDismiss, defaultSignUp = false }: AuthGateProps) {
   const { isAuthConfigured } = useAuth();
+  const title = isAuthConfigured
+    ? (defaultSignUp ? `Create account or sign in ${reason}` : `Sign in or create account ${reason}`)
+    : 'Sign-in unavailable';
 
   return (
     <div
@@ -37,7 +42,7 @@ export function AuthGate({ reason = 'to continue', onSuccess, onDismiss }: AuthG
       >
         <div className="sticky top-0 bg-[var(--drift-surface)] border-b border-[var(--drift-border)] px-5 py-4 flex items-center justify-between rounded-t-[var(--drift-radius-2xl)]">
           <h2 id="auth-gate-title" className="text-lg font-semibold text-[var(--drift-ink)]">
-            {isAuthConfigured ? `Sign in ${reason}` : 'Sign-in unavailable'}
+            {title}
           </h2>
           <button
             type="button"
@@ -58,7 +63,7 @@ export function AuthGate({ reason = 'to continue', onSuccess, onDismiss }: AuthG
               <Button fullWidth onClick={onDismiss}>OK</Button>
             </>
           ) : (
-            <AuthForm onSuccess={onSuccess} />
+            <AuthForm onSuccess={onSuccess} defaultSignUp={defaultSignUp} />
           )}
         </div>
       </div>

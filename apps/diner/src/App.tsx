@@ -9,6 +9,7 @@ import { CartPage } from './pages/CartPage';
 import { PaymentPage } from './pages/PaymentPage';
 import { PaymentReturnPage } from './pages/PaymentReturnPage';
 import { P2PReturnPage } from './pages/P2PReturnPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { ConfirmationPage } from './pages/ConfirmationPage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
@@ -30,6 +31,7 @@ function AppRoutes() {
       <Route path="/payment/return" element={<PaymentReturnPage />} />
       <Route path="/confirmation/:orderId" element={<ConfirmationPage />} />
       <Route path="/signin" element={<SignInPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/pay" element={<PayPage />} />
       <Route path="/pay/return" element={<P2PReturnPage />} />

@@ -109,7 +109,7 @@ export function MoneyPage() {
           ) : (
             <div className="py-6 px-4 rounded-[var(--drift-radius-lg)] bg-[var(--drift-surface)] border border-[var(--drift-border)] text-center">
               <p className="text-sm text-[var(--drift-ink-muted)] mb-4">Sign in to see your activity</p>
-              <Button onClick={() => setShowAuthGate(true)}>Sign in</Button>
+              <Button onClick={() => setShowAuthGate(true)}>Sign in or create account</Button>
             </div>
           )}
         </section>
@@ -118,6 +118,7 @@ export function MoneyPage() {
       {showAuthGate && (
         <AuthGate
           reason="to see your activity"
+          defaultSignUp
           onSuccess={() => setShowAuthGate(false)}
           onDismiss={() => setShowAuthGate(false)}
         />

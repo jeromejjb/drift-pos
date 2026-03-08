@@ -37,12 +37,13 @@ type AuthState = {
   signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
   signInWithPhone: (phone: string) => Promise<{ error: Error | null }>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
-  /** Passwordless: send 6-digit code to email. Uses Supabase built-in email — no API key. */
-  signInWithEmailOtp: (email: string) => Promise<{ error: Error | null }>;
-  verifyEmailOtp: (email: string, token: string) => Promise<{ error: Error | null }>;
+  /** One-tap Google OAuth — fast, no password. Optional returnTo path after sign-in. */
+  signInWithGoogle: (returnTo?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   /** Refresh session; returns new access_token or null if refresh failed. Use when API returns 401 INVALID_TOKEN. */
   refreshSession: () => Promise<string | null>;
+  /** Get token, refreshing if expired or about to expire (within 5 min). Use before API calls. */
+  getValidToken: () => Promise<string | null>;
   accessToken: string | null;
 };
 
@@ -159,36 +160,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /** Passwordless email OTP — Supabase built-in, no external API. */
-  const signInWithEmailOtp = useCallback(async (email: string) => {
+  /** One-tap Google OAuth — redirects to Google, then back to /auth/callback. */
+  const signInWithGoogle = useCallback(async (returnTo?: string) => {
     if (!supabase) return { error: new Error('Auth not configured') };
     try {
-      const e = email.trim().toLowerCase();
-      if (!e || !e.includes('@')) return { error: new Error('Enter a valid email') };
-      const { error } = await supabase.auth.signInWithOtp({ email: e });
-      return { error: toFriendlyAuthError(error) };
-    } catch (e: any) {
-      const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Failed to send code') };
-    }
-  }, []);
-
-  const verifyEmailOtp = useCallback(async (email: string, token: string) => {
-    if (!supabase) return { error: new Error('Auth not configured') };
-    try {
-      const e = email.trim().toLowerCase();
-      const otp = token.replace(/\D/g, '').slice(0, 6);
-      if (otp.length !== 6) return { error: new Error('Enter the 6-digit code') };
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: e,
-        token: otp,
-        type: 'email',
+      const next = returnTo || window.location.pathname || '/';
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
       });
-      if (!error && data?.user) syncProfileToSupabase(supabase, data.user);
       return { error: toFriendlyAuthError(error) };
     } catch (e: any) {
       const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Invalid code') };
+      return { error: toFriendlyAuthError(err) ?? new Error('Sign in failed') };
     }
   }, []);
 
@@ -211,6 +196,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Get token, refreshing proactively if expired or expiring within 5 minutes. */
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (!supabase || !session) return session?.access_token ?? null;
+    const expiresAt = session.expires_at;
+    if (expiresAt) {
+      const now = Math.floor(Date.now() / 1000);
+      if (expiresAt - now < 300) {
+        const fresh = await refreshSession();
+        return fresh ?? session.access_token;
+      }
+    }
+    return session.access_token;
+  }, [session, refreshSession]);
+
   const value: AuthState = {
     session,
     user,
@@ -220,10 +219,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signInWithPhone,
     verifyPhoneOtp,
-    signInWithEmailOtp,
-    verifyEmailOtp,
+    signInWithGoogle,
     signOut,
     refreshSession,
+    getValidToken,
     accessToken: session?.access_token ?? null,
   };
 
