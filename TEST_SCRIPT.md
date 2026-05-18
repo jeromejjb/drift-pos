@@ -46,7 +46,7 @@
 | Review cart | `/cart/:tableId` | Edit quantities, remove items |
 | Check out | `/payment/:tableId` | Order + Stripe payment |
 | View confirmation | `/confirmation/:orderId` | Order success |
-| Sign in (optional) | AuthGate, AddCardModal | Email code or password |
+| Sign in (optional) | AuthGate, AddCardModal | Email + password |
 | Add card (optional) | AddCardModal | For faster checkout |
 
 ---
@@ -55,8 +55,8 @@
 
 - **API** — `cd apps/api && npm run dev` (port 3001)
 - **Diner app** — `cd apps/diner && npm run dev` (port 5173)
-- **Restaurant app** — `cd apps/restaurant && npm run dev` (port 5174)
-- **Landing app** — `cd apps/landing && npm run dev` (port 5175)
+- **Restaurant app** — `cd apps/restaurant && npm run dev` (port 5175)
+- **Landing app** — `cd apps/landing && npm run dev` (port 5174)
 - **Root `.env`** — `VITE_API_URL`, `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_SUPABASE_*`, etc.
 
 ---
@@ -67,7 +67,7 @@
 
 | # | Step | Action | Expected | ✓ |
 |---|------|--------|----------|---|
-| A1 | Sign up | Go to `http://localhost:5175/signup`. Fill: Test Owner, test-restaurant@example.com, Test Pizza Co, TestPass123! | Redirects to `/onboarding?restaurantId=...&token=...` | |
+| A1 | Sign up | Go to `http://localhost:5174/signup`. Fill: Test Owner, test-restaurant@example.com, Test Pizza Co, TestPass123! | Redirects to `/onboarding?restaurantId=...&token=...` | |
 | A2 | Restaurant info | Fill address (street, city, state, ZIP). Click Continue | Proceeds to Tables. No error | |
 | A3 | Tables | Keep 5 tables (or change). Click Continue | Proceeds to Import Menu | |
 | A4 | Import menu | Choose Manual or Template. Add 1+ category, 1+ item with price > 0. Continue | Proceeds to Review | |
@@ -110,7 +110,7 @@
 
 | # | Step | Action | Expected | ✓ |
 |---|------|--------|----------|---|
-| D1 | Add card | From Scan, click "Add card for faster checkout". Sign in (email code or password) if prompted. Add card | Card saved. Stripe test card works | |
+| D1 | Add card | From Scan, click "Add card for faster checkout". Sign in (email + password) if prompted. Add card | Card saved. Stripe test card works | |
 | D2 | Pay (P2P) | Go to Pay tab. Tap "Send money". Sign in. Enter amount, recipient. Pay | P2P flow completes | |
 
 ---
@@ -135,7 +135,7 @@ DINER
 ☐ Can browse menu and add items to cart
 ☐ Can place order and pay with card
 ☐ Can see order confirmation
-☐ (Optional) Can sign in with email code or password
+☐ (Optional) Can sign in with email + password
 ☐ (Optional) Can add card for faster checkout
 ☐ (Optional) Can send P2P payments
 ```
@@ -160,6 +160,6 @@ DINER
 | App | URL |
 |-----|-----|
 | Diner | http://localhost:5173 |
-| Restaurant | http://localhost:5174 |
-| Landing | http://localhost:5175 |
+| Restaurant | http://localhost:5175 |
+| Landing | http://localhost:5174 |
 | API | http://localhost:3001 |

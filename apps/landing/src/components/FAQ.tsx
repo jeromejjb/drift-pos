@@ -12,7 +12,7 @@ const faqs = [
   },
   {
     question: 'How do restaurants get paid?',
-    answer: 'Payments are processed securely through our payment infrastructure. Funds are deposited directly into your bank account on a daily or weekly basis.'
+    answer: 'Restaurants set up a payment account in minutes during onboarding—one Bank Account step connects your business to receive diner payments. Funds are deposited directly into your bank account. No complex setup.'
   },
   {
     question: 'What about splitting bills?',

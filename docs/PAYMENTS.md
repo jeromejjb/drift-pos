@@ -6,7 +6,11 @@ How payments work in Drift and what the demo shows.
 
 Drift uses **Stripe Connect** so restaurants receive payouts directly. When a diner pays, funds go to the restaurant's connected Stripe account; Drift takes a platform fee.
 
-## Two Payment Flows
+**Easy setup for everyone:**
+- **Restaurants** — Set up a payment account in minutes during onboarding. One Bank Account step connects your business to receive diner payments.
+- **Diners** — Add a card to pay at the table via QR. Person-to-person (P2P) send/withdraw is not available with Stripe and is currently disabled on the platform.
+
+## Payment Flows
 
 ### 1. Restaurant onboarding (Bank Account)
 
@@ -19,7 +23,7 @@ During onboarding, restaurants connect a **Stripe Connected Account** via the Ba
 
 Until this step is complete, the restaurant **cannot accept card payments** from diners.
 
-### 2. Diner checkout (Order payment)
+### Diner checkout (Order payment)
 
 When a diner pays at the table (via QR → menu → checkout):
 
@@ -53,14 +57,14 @@ When `STRIPE_SECRET_KEY` starts with `sk_test_`, all operations use Stripe test 
 - Test cards: `4242 4242 4242 4242` (success), `4000 0000 0000 0002` (decline)
 - Test bank: routing `110000000`, account `000123456789`
 
-## API Endpoints Summary
+## API Endpoints Summary (Stripe)
 
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/stripe/create-account` | Create Connected Account (onboarding) |
 | `POST /api/stripe/connect` | Create account + embedded onboarding session |
 | `POST /api/stripe/order/:orderId/create-payment-intent` | Create PaymentIntent for diner checkout |
-| `POST /api/stripe/payment` | Generic payment (amount + destination) |
+| `POST /api/stripe/payment` | Generic payment (amount + destination, platform fee to Drift) |
 | `POST /api/stripe/webhook` | Stripe webhooks (payment confirmation, etc.) |
 
 ## Platform Fee

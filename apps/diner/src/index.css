@@ -1,44 +1,51 @@
 @import "tailwindcss";
 
-/* Drift design system — Cash App–inspired, modern fintech */
+/* Drift design system — Premium fintech: trust, clarity, calm */
 :root {
   /* Ink */
   --drift-ink: #0a0a0a;
   --drift-ink-muted: #404040;
   --drift-ink-subtle: #737373;
-  /* Surfaces — warmer, softer */
+  /* Surfaces — warm, soft, trustworthy */
   --drift-surface: #ffffff;
-  --drift-surface-elevated: #fafaf9;
-  --drift-surface-overlay: #f4f4f3;
+  --drift-surface-elevated: #f8f8f6;
+  --drift-surface-overlay: #f0efec;
   /* Borders */
   --drift-border: #e5e5e4;
   --drift-border-strong: #d4d4d3;
-  /* Accent — Cash App green, bold and recognizable */
+  /* Accent — bold green, high recognition */
   --drift-accent: #00c853;
   --drift-accent-hover: #00a843;
   --drift-accent-muted: #e8f8ee;
-  --drift-accent-glow: rgba(0, 200, 83, 0.25);
+  --drift-accent-glow: rgba(0, 200, 83, 0.2);
+  --drift-accent-soft: rgba(0, 200, 83, 0.08);
+  /* Balance/hero gradient — premium feel */
+  --drift-gradient-hero: linear-gradient(135deg, #e8f8ee 0%, #f0fdf4 50%, #ecfdf5 100%);
+  --drift-gradient-hero-border: linear-gradient(135deg, rgba(0, 200, 83, 0.35) 0%, rgba(0, 200, 83, 0.15) 100%);
   /* Semantic */
   --drift-success-bg: #ecfdf5;
   --drift-success-text: #059669;
   --drift-error-bg: #fef2f2;
   --drift-error-text: #dc2626;
-  /* Radius — pill-friendly */
+  /* Radius — consistent, pill-friendly */
   --drift-radius-sm: 0.5rem;
   --drift-radius: 0.75rem;
   --drift-radius-lg: 1rem;
   --drift-radius-xl: 1.25rem;
   --drift-radius-2xl: 1.5rem;
   --drift-radius-pill: 9999px;
-  /* Shadows — subtle depth */
+  /* Shadows — depth and trust */
   --drift-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --drift-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   --drift-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
   --drift-shadow-up: 0 -4px 12px rgba(0, 0, 0, 0.05);
-  /* Motion */
+  --drift-shadow-glow: 0 0 0 1px rgba(0, 200, 83, 0.15), 0 8px 24px rgba(0, 200, 83, 0.12);
+  /* Motion — purposeful, not flashy */
   --drift-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --drift-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --drift-duration: 200ms;
-  /* Spacing scale (4px base) */
+  --drift-duration-slow: 350ms;
+  /* Spacing */
   --drift-space-1: 0.25rem;
   --drift-space-2: 0.5rem;
   --drift-space-3: 0.75rem;
@@ -126,6 +133,27 @@
 .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
 .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
 .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+
+/* Fintech utilities — balance hero, amount display, trust */
+.drift-balance-hero {
+  background: var(--drift-gradient-hero);
+  border: 1px solid transparent;
+  border-radius: var(--drift-radius-xl);
+  box-shadow: var(--drift-shadow), 0 0 0 1px rgba(0, 200, 83, 0.12);
+}
+.drift-amount-display {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.drift-security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--drift-ink-subtle);
+  font-weight: 500;
+}
 
 .scrollbar-hide {
   -ms-overflow-style: none;

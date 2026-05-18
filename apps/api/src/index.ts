@@ -7,19 +7,20 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { createPoolFromDatabaseUrl, databaseHostIsLocal } from './lib/pgPool';
 import QRCode from 'qrcode';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { randomBytes } from 'crypto';
-import twilio from 'twilio';
 import stripeRouter from './routes/stripe';
 import p2pRouter from './routes/p2p';
+import createAuthRouter from './routes/auth';
+import { createAuthMiddleware } from './routes/middleware';
 import path from 'path';
 import fs from 'fs';
 
 
+
+console.log('API DATABASE_URL (startup):', process.env.DATABASE_URL);
 
 const app = express();
 const httpServer = createServer(app);
@@ -37,38 +38,7 @@ if (process.env.NODE_ENV === 'production' && JWT_SECRET.length < 32) {
   console.warn('SECURITY: JWT_SECRET should be at least 32 characters in production. Use: openssl rand -base64 32');
 }
 
-// Rate limiting
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Too many requests', code: 'RATE_LIMITED' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
-  skipSuccessfulRequests: true,
-  message: { error: 'Too many failed attempts', code: 'AUTH_RATE_LIMITED' },
-});
-
-app.use('/api', globalLimiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/change-password', authLimiter);
-
-// Database
-const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
-});
-
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-// CORS — allow all Render deployments and driftpos domains
+// CORS must run before rate limiter so 429 responses include CORS headers (browser would otherwise block them)
 const allowedOriginPatterns = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https:\/\/drift-[a-z0-9-]+\.onrender\.com$/,
@@ -78,7 +48,7 @@ const allowedOriginPatterns = [
 ];
 const extraOrigins = (process.env.CORS_EXTRA_ORIGINS || '')
   .split(',')
-  .map((o) => o.trim())
+  .map((o: string) => o.trim())
   .filter(Boolean);
 const allowedOrigins = [
   'http://localhost:5173',
@@ -99,6 +69,51 @@ const isOriginAllowed = (origin: string | undefined) => {
   if (allowedOrigins.includes(origin)) return true;
   return allowedOriginPatterns.some(p => p.test(origin));
 };
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+// Rate limiting (after CORS so 429 still has CORS headers)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 100 : 500,
+  message: { error: 'Too many requests', code: 'RATE_LIMITED' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  message: { error: 'Too many failed attempts', code: 'AUTH_RATE_LIMITED' },
+});
+
+app.use('/api', globalLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
+
+// Database — TLS + sslmode for any remote host; keepAlive/timeouts for hosted Postgres (Render, etc.)
+const pool = createPoolFromDatabaseUrl();
+console.log(
+  '[db]',
+  databaseHostIsLocal(process.env.DATABASE_URL)
+    ? 'Using local Postgres (no TLS to pool).'
+    : 'Using remote Postgres (TLS + sslmode=require on connection string).'
+);
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 // Socket.io
 const io = new Server(httpServer, {
@@ -125,18 +140,6 @@ app.use(helmet({
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
 }));
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && isOriginAllowed(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  }
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
-
 app.use(cors({
   origin: (origin, callback) => {
     if (isOriginAllowed(origin)) {
@@ -148,9 +151,14 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Stripe webhook MUST get raw body for signature verification
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+// Skip express.json for webhook so it doesn't overwrite raw body
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/stripe/webhook') return next();
+  express.json({ limit: '10mb' })(req, res, next);
+});
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Minimal logging
 morgan.token('body', (req: any) => {
@@ -184,227 +192,48 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Drift API operational', timestamp: new Date().toISOString() });
 });
 
-// Integration info for external apps (beer app, etc.)
-app.get('/api/integration/p2p', (req, res) => {
+app.get('/api/integration/p2p', (_req, res) => {
+  res.status(410).json({
+    error: 'This integration path is no longer used.',
+    code: 'GONE',
+    see: 'GET /api/integration',
+  });
+});
+
+// Public integration metadata (no secrets).
+app.get('/api/integration', (_req, res) => {
   res.json({
     version: '1',
+    product: 'Drift POS',
+    flows: {
+      restaurantOnboarding:
+        'Landing signup → Restaurant onboarding → Stripe Connect until charges and payouts are enabled',
+      dinerTableCheckout:
+        'Table QR → order → card checkout with PaymentIntent to the restaurant connected account',
+    },
     endpoints: {
-      createIntent: 'POST /api/p2p/create-intent',
-      recipientInfo: 'GET /api/p2p/recipient-info?recipient_id=<uuid>',
-      merchantPayment: 'POST /api/p2p/merchant-payment',
-      transfers: 'GET /api/p2p/transfers',
+      health: 'GET /api/test',
+      register: 'POST /api/auth/register',
+      stripeCreateConnectedAccount: 'POST /api/stripe/create-account',
+      orderPaymentIntent: 'POST /api/stripe/order/:orderId/create-payment-intent',
     },
-    auth: 'Bearer <supabase_access_token>',
-    createIntentBody: {
-      recipientEmail: 'string (or recipientId)',
-      recipientId: 'string (Supabase user UUID, same project)',
-      amount: 'number (min 0.5, required)',
-      note: 'string (optional)',
+    notes: {
+      cors: 'Optional comma-separated browser origins in CORS_EXTRA_ORIGINS on the API.',
+      stripeReturn:
+        'Set RESTAURANT_URL or RESTAURANT_ONBOARDING_BASE_URL on the API so Stripe hosted onboarding refresh/return URLs open the restaurant app.',
     },
-    merchantPaymentBody: {
-      amount: 'number (min 0.5, required)',
-      destination: 'string (Stripe Connect account ID, acct_xxx, required)',
-      metadata: 'object (optional, for tracking)',
-      currency: 'string (optional, default usd)',
-    },
-    redirectUrl: 'DINER_URL/pay?amount=5&recipient=user@example.com',
-    redirectUrlWithRecipientId: 'DINER_URL/pay?amount=5&recipient_id=<supabase_uuid>',
-    settingsUrl: 'DINER_URL/settings',
-    withdrawUrl: 'DINER_URL/withdraw',
   });
 });
 
-// Supabase Auth Send SMS Hook — receives { user: { phone }, sms: { otp } } and sends via Twilio
-app.post('/api/auth/send-sms', async (req, res) => {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_PHONE_NUMBER;
-  if (!sid || !token || !from) {
-    console.warn('Send SMS hook: Twilio not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)');
-    return res.status(503).json({ error: 'SMS provider not configured' });
-  }
-  const phone = req.body?.user?.phone;
-  const otp = req.body?.sms?.otp;
-  if (!phone || !otp) {
-    return res.status(400).json({ error: 'Missing phone or otp' });
-  }
-  try {
-    const client = twilio(sid, token);
-    await client.messages.create({
-      body: `Your Drift code is ${otp}`,
-      from,
-      to: phone,
-    });
-    res.status(200).send();
-  } catch (err: any) {
-    console.error('Send SMS hook error:', err?.message || err);
-    res.status(500).json({ error: err?.message || 'Failed to send SMS' });
-  }
-});
-
-// Stripe routes
+// Stripe + diner routes
 app.use('/api', stripeRouter);
-// P2P routes (Supabase auth)
+// P2P + diner routes (Supabase auth).
+// P2P endpoints inside this router now return P2P_DISABLED; diner endpoints remain active.
 app.use('/api', p2pRouter);
 
-// Auth middleware
-const authenticateToken = (req: any, res: any, next: any) => {
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Authentication required', code: 'UNAUTHORIZED' });
-
-  jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }, (err: any, user: any) => {
-    if (err) {
-      if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
-      }
-      return res.status(403).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
-    }
-    req.user = user;
-    next();
-  });
-};
-
-// Auth endpoints
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password, name, restaurantName, tableCount = 1 } = req.body;
-
-    if (!email || !password || !name || !restaurantName) {
-      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format', code: 'INVALID_EMAIL' });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters', code: 'WEAK_PASSWORD' });
-    }
-
-    if (await prisma.user.findUnique({ where: { email } })) {
-      return res.status(409).json({ error: 'User already exists', code: 'USER_EXISTS' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({ data: { email, name, passwordHash: hashedPassword } });
-      
-      const restaurant = await tx.restaurant.create({
-        data: {
-          name: restaurantName,
-          email,
-          supabaseUserId: user.id,
-          tables: {
-            create: Array.from({ length: tableCount }, (_, i) => ({ 
-              number: i + 1 
-            }))
-          }
-        },
-        include: { tables: true }
-      });
-      
-      return { user, restaurant };
-    });
-
-    const token = jwt.sign(
-      { userId: result.user.id, email: result.user.email, restaurantId: result.restaurant.id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      success: true,
-      token,
-      userId: result.user.id,
-      restaurantId: result.restaurant.id,
-      tableCount: result.restaurant.tables.length,
-      user: { id: result.user.id, email: result.user.email, name: result.user.name }
-    });
-  } catch (error: any) {
-    console.error('Registration error:', error?.message || error);
-    const message = error?.message && typeof error.message === 'string' ? error.message : 'Registration failed';
-    res.status(500).json({
-      error: message.includes('Unique constraint') ? 'An account with this email already exists.' : message,
-      code: 'SERVER_ERROR'
-    });
-  }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
-    }
-
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.passwordHash || !await bcrypt.compare(password, user.passwordHash)) {
-      return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-    }
-
-    const restaurant = await prisma.restaurant.findFirst({
-      where: { OR: [{ email: user.email }, { supabaseUserId: user.id }] }
-    });
-
-    if (!restaurant) {
-      return res.status(404).json({ error: 'No restaurant found', code: 'NO_RESTAURANT' });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, restaurantId: restaurant.id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-
-    res.json({ success: true, token, restaurantId: restaurant.id, user: { id: user.id, email: user.email, name: user.name } });
-  } catch (error) {
-    res.status(500).json({ error: 'Login failed', code: 'SERVER_ERROR' });
-  }
-});
-
-app.get('/api/auth/verify', authenticateToken, async (req: any, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { id: true, name: true, email: true, phone: true }
-    });
-    const restaurant = await prisma.restaurant.findFirst({
-      where: { OR: [{ email: user?.email }, { supabaseUserId: user?.id }] },
-      select: { id: true, name: true }
-    });
-    res.json({ valid: true, user, restaurant });
-  } catch (error) {
-    res.status(500).json({ error: 'Verification failed', code: 'SERVER_ERROR' });
-  }
-});
-
-app.post('/api/auth/change-password', authenticateToken, async (req: any, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
-    }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters', code: 'WEAK_PASSWORD' });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-    if (!user || !user.passwordHash || !await bcrypt.compare(currentPassword, user.passwordHash)) {
-      return res.status(401).json({ error: 'Current password incorrect', code: 'INVALID_PASSWORD' });
-    }
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await bcrypt.hash(newPassword, 10) }
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to change password', code: 'SERVER_ERROR' });
-  }
-});
+// Auth (JWT for restaurant/landing): register, login, verify, change-password, send-sms
+const authenticateToken = createAuthMiddleware(JWT_SECRET);
+app.use('/api', createAuthRouter(authenticateToken));
 
 // Health check
 app.get('/health', async (req, res) => {

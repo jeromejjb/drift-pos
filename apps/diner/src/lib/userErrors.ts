@@ -47,7 +47,7 @@ const P2P_MESSAGE_CODES = [
  */
 export function toP2PError(data: { error?: string; code?: string }, status: number): string {
   const code = data?.code;
-  if (code === 'INVALID_TOKEN') return sessionExpiredMessage();
+  if (code === 'INVALID_TOKEN' || code === 'AUTH_FAILED') return sessionExpiredMessage();
   const msg = (data?.error || '').trim();
   if (code && P2P_MESSAGE_CODES.includes(code) && msg && !isTechnical(msg)) return msg;
   return toPaymentError(msg, status);
@@ -70,14 +70,24 @@ export function toPaymentError(raw: string | undefined, status?: number): string
 /** User-facing message for auth (sign in / sign up). */
 export function toAuthError(raw: string | undefined): string {
   const msg = (raw || '').trim();
+  const lower = msg.toLowerCase();
+  if (lower.includes('invalid') && lower.includes('api key')) return 'Auth not configured';
   if (isTechnical(msg)) return CONNECTION_ERROR;
   if (msg.includes('Invalid login')) return "Email or password doesn't match. Try again.";
   if (msg.includes('already registered')) return "An account with this email already exists. Sign in instead.";
-  if (msg.toLowerCase().includes('unsupported phone provider') || msg.toLowerCase().includes('sms provider')) {
-    return "Phone sign-in isn't set up yet. Use Email instead.";
+  if (lower.includes('unsupported phone provider') || lower.includes('sms provider')) {
+    return "Phone sign-in isn't set up yet. Use Password instead.";
   }
   if (msg.length > 120) return SOMETHING_WRONG;
   return msg || SOMETHING_WRONG;
+}
+
+/** Map auth error (Supabase/API) to a friendly Error for context. Single place for auth error normalization. */
+export function toAuthErrorObject(error: { message?: string } | Error | null): Error | null {
+  if (!error) return null;
+  const raw = (error as Error).message ?? (error as { message?: string }).message ?? '';
+  const friendly = toAuthError(raw);
+  return new Error(friendly);
 }
 
 /** Generic API/network → friendly. Use for menus, table, scan, etc. */
@@ -92,10 +102,31 @@ export function sessionExpiredMessage(): string {
   return SIGN_IN_AGAIN;
 }
 
+/** True if error indicates user should sign in again (expired/invalid session). */
+export function isSessionExpiredError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes('session expired') || m.includes('invalid') && m.includes('session') || m.includes('expired session');
+}
+
 /** Message when fetch fails (network/connection). Use when API URL is known. */
 export function toConnectionError(apiUrl?: string): string {
-  if (apiUrl && (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1'))) {
-    return "Couldn't reach the server. Is the API running? Run: npm run dev:pay from the repo root.";
+  const isLocal = typeof apiUrl === 'string' && apiUrl.includes('localhost');
+  if (isLocal) {
+    return "Couldn't reach the payment server. Make sure the API is running (npm run dev:pay from repo root).";
   }
-  return CONNECTION_ERROR;
+  return "Payments can't connect right now. The server may be starting up — try again in a moment.";
+}
+
+/** User-facing message for withdraw API. Maps known codes to friendly copy. */
+const WITHDRAW_MESSAGE_CODES = ['NO_PAYOUT_ACCOUNT', 'INSUFFICIENT_BALANCE', 'MIN_AMOUNT', 'NOT_FOUND'];
+export function toWithdrawError(data: { error?: string; code?: string }, status: number): string {
+  if (status === 401) return sessionExpiredMessage();
+  const code = data?.code;
+  const msg = (data?.error || '').trim();
+  if (code === 'NO_PAYOUT_ACCOUNT') return "Add a bank account in Me to withdraw.";
+  if (code === 'INSUFFICIENT_BALANCE') return "Insufficient balance.";
+  if (code === 'MIN_AMOUNT') return "Minimum withdraw is $1.";
+  if (code && WITHDRAW_MESSAGE_CODES.includes(code) && msg && !isTechnical(msg)) return msg;
+  if (status && status >= 500) return PAYMENT_UNAVAILABLE;
+  return msg || 'Withdrawal failed. Try again.';
 }

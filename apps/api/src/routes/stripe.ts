@@ -111,7 +111,7 @@ router.post('/stripe/create-account', async (req, res) => {
       bankAccount,
       dob,
       ssnLast4,
-      tosAcceptance
+      tosAcceptance // kept for our own records if we want, but NOT sent to Stripe for Express accounts
     } = req.body;
 
     console.log('📝 Received account creation request:', { 
@@ -123,7 +123,8 @@ router.post('/stripe/create-account', async (req, res) => {
       hasSsn: !!ssnLast4
     });
 
-    // Validate required fields
+    // Required fields for API contract & tests. Frontend should already validate,
+    // but we also enforce on the server so behavior is consistent everywhere.
     const missingFields = [];
     if (!restaurantId) missingFields.push('restaurantId');
     if (!email) missingFields.push('email');
@@ -132,96 +133,80 @@ router.post('/stripe/create-account', async (req, res) => {
     if (!bankAccount) missingFields.push('bankAccount');
     if (!dob) missingFields.push('dob');
     if (!ssnLast4) missingFields.push('ssnLast4');
-    
     if (missingFields.length > 0) {
-      return res.status(400).json({ 
-        error: 'Missing required fields', 
+      return res.status(400).json({
+        error: 'Missing required fields',
         code: 'MISSING_FIELDS',
-        missing: missingFields
+        missing: missingFields,
       });
     }
 
-    // Validate date of birth
-    const dobDate = new Date(
-      parseInt(dob.year),
-      parseInt(dob.month) - 1,
-      parseInt(dob.day)
-    );
-    
-    if (isNaN(dobDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date of birth', code: 'INVALID_DOB' });
-    }
-    
-    const age = new Date().getFullYear() - parseInt(dob.year);
-    if (age < 18) {
-      return res.status(400).json({ error: 'Account holder must be at least 18 years old', code: 'AGE_RESTRICTION' });
-    }
-
-    // Validate SSN last 4
-    const ssnDigits = safeString(ssnLast4).replace(/\D/g, '');
-    if (ssnDigits.length !== 4) {
-      return res.status(400).json({ error: 'Last 4 of SSN must be exactly 4 digits', code: 'INVALID_SSN' });
-    }
-
-    const rawTaxId = taxId?.replace(/\D/g, '');
-    let idNumber = rawTaxId && rawTaxId.length >= 4 ? rawTaxId.slice(-9) : `0000${ssnDigits}`;
-    if (idNumber.length === 8) idNumber = `0${idNumber}`;
-
-    const isTestMode = (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_test_');
-    const allSameDigit = /^(\d)\1+$/.test(idNumber);
-    const sequential = /^123456789$/.test(idNumber) || /^987654321$/.test(idNumber);
-
-    if (allSameDigit || sequential) {
-      if (isTestMode) {
-        idNumber = '000000000';
-      } else {
+    // Validate DOB shape and reasonable range before touching Stripe.
+    if (dob) {
+      const monthNum = parseInt(String(dob.month), 10);
+      const dayNum = parseInt(String(dob.day), 10);
+      const yearNum = parseInt(String(dob.year), 10);
+      const currentYear = new Date().getFullYear();
+      const minYear = currentYear - 120;
+      const maxYear = currentYear - 18;
+      const invalidDob =
+        Number.isNaN(monthNum) ||
+        monthNum < 1 ||
+        monthNum > 12 ||
+        Number.isNaN(dayNum) ||
+        dayNum < 1 ||
+        dayNum > 31 ||
+        Number.isNaN(yearNum) ||
+        yearNum < minYear ||
+        yearNum > maxYear;
+      if (invalidDob) {
         return res.status(400).json({
-          error: 'That SSN or Tax ID is not accepted. Please use your real last 4 digits of SSN.',
-          code: 'INVALID_TAX_ID',
+          error: 'Invalid date of birth',
+          code: 'INVALID_DOB',
         });
       }
     }
 
-    if (isTestMode && (allSameDigit || sequential || idNumber === '000022222' || idNumber === '222222222')) {
-      idNumber = '000000000';
+    // Validate SSN last 4 (must be exactly 4 digits).
+    if (ssnLast4) {
+      const ssnDigits = String(ssnLast4).replace(/\D/g, '');
+      if (ssnDigits.length !== 4) {
+        return res.status(400).json({
+          error: 'Invalid SSN last 4',
+          code: 'INVALID_SSN',
+        });
+      }
     }
 
-    // Parse name
-    const { firstName, lastName } = extractNameParts(fullName);
-
-    // Handle address (now expecting an object from frontend)
-    const addressData = address || {};
-    const individualAddress = {
-      line1: safeString(addressData.line1) || '123 Main St',
-      city: safeString(addressData.city) || 'Chicago',
-      state: safeString(addressData.state) || 'IL',
-      postal_code: safeString(addressData.postal_code) || '60654',
-      country: 'US',
-    };
+    // Validate payout address basics; zip must be 5 or 9 digits.
+    if (address) {
+      const line1 = String(address.line1 || '').trim();
+      const city = String(address.city || '').trim();
+      const state = String(address.state || '').trim();
+      const postal = String(address.postal_code || '');
+      const zipDigits = postal.replace(/\D/g, '');
+      const invalidAddress =
+        !line1 ||
+        !city ||
+        !state ||
+        (zipDigits.length !== 5 && zipDigits.length !== 9);
+      if (invalidAddress) {
+        return res.status(400).json({
+          error: 'Invalid payout address',
+          code: 'INVALID_ADDRESS',
+        });
+      }
+    }
 
     // Create Stripe connected account
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'US',
       email: safeString(email),
-      business_type: 'individual',
       business_profile: {
         name: safeString(businessName),
         url: website || `https://driftpos.com/restaurant/${safeString(restaurantId)}`,
         mcc: '5812',
-      },
-      individual: {
-        first_name: firstName,
-        last_name: lastName,
-        email: safeString(email),
-        phone: safeString(phone),
-        address: individualAddress,
-        dob: {
-          day: parseInt(dob.day),
-          month: parseInt(dob.month),
-          year: parseInt(dob.year)
-        },
-        id_number: idNumber,
       },
       capabilities: {
         card_payments: { requested: true },
@@ -230,60 +215,67 @@ router.post('/stripe/create-account', async (req, res) => {
       metadata: {
         restaurantId: safeString(restaurantId),
         platform: 'Drift POS',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       },
-      tos_acceptance: tosAcceptance ? {
-        date: tosAcceptance.date || Math.floor(Date.now() / 1000),
-        ip: tosAcceptance.ip || req.ip || req.connection.remoteAddress || '0.0.0.0'
-      } : undefined,
+      // For Express accounts, Stripe must collect and record TOS acceptance itself.
+      // We do NOT send tos_acceptance here, or Stripe will reject the request when
+      // controller[requirement_collection] is "stripe".
+      tos_acceptance: undefined,
     });
 
     console.log(`✅ Stripe account created: ${account.id}`);
 
-    // Add bank account to the Stripe account
-    if (bankAccount) {
-      try {
-        const routingDigits = safeString(bankAccount.routingNumber).replace(/\D/g, '');
-        if (routingDigits.length !== 9) {
-          throw new Error('Routing number must be 9 digits');
-        }
+    // Create a one-time onboarding link so the restaurant can finish any remaining requirements.
+    let onboardingUrl: string | undefined;
+    let embeddedClientSecret: string | undefined;
+    try {
+      // Must match the restaurant web app (Stripe sends the user here after hosted onboarding).
+      const restaurantBaseUrl =
+        process.env.RESTAURANT_ONBOARDING_BASE_URL ||
+        process.env.RESTAURANT_URL ||
+        process.env.RESTAURANT_WEB_URL ||
+        'http://localhost:5175';
+      const link = await stripe.accountLinks.create({
+        account: account.id,
+        type: 'account_onboarding',
+        refresh_url: `${restaurantBaseUrl}/onboarding?restaurantId=${encodeURIComponent(
+          safeString(restaurantId)
+        )}&step=bank`,
+        return_url: `${restaurantBaseUrl}/onboarding?restaurantId=${encodeURIComponent(
+          safeString(restaurantId)
+        )}&step=complete`,
+      });
+      onboardingUrl = link.url;
+      console.log('✅ Stripe onboarding link created for account', account.id);
+    } catch (linkError: any) {
+      console.error('⚠️ Stripe onboarding link error:', linkError?.message || linkError);
+    }
 
-        const accountDigits = safeString(bankAccount.accountNumber).replace(/\D/g, '');
-        if (accountDigits.length < 4 || accountDigits.length > 17) {
-          throw new Error('Account number must be between 4 and 17 digits');
-        }
-
-        const bankAccountToken = await stripe.tokens.create({
-          bank_account: {
-            country: 'US',
-            currency: 'usd',
-            account_holder_name: safeString(bankAccount.accountHolderName) || firstName + ' ' + lastName,
-            account_holder_type: 'individual',
-            routing_number: routingDigits,
-            account_number: accountDigits,
+    // Also create an embedded onboarding session so we can show Stripe onboarding
+    // in a popup/modal without navigating away from Drift.
+    try {
+      const session = await stripe.accountSessions.create({
+        account: account.id,
+        components: {
+          account_onboarding: {
+            enabled: true,
+            // Allow Stripe to collect external account (bank) details if needed.
+            features: { external_account_collection: true },
           },
-        });
-
-        await stripe.accounts.createExternalAccount(account.id, {
-          external_account: bankAccountToken.id,
-        });
-
-        console.log(`✅ Bank account added to Stripe account`);
-      } catch (bankError: any) {
-        console.error('⚠️ Bank account addition failed:', bankError.message);
-        await stripe.accounts.update(account.id, {
-          metadata: {
-            bank_account_error: bankError.message,
-            bank_account_error_time: new Date().toISOString()
-          }
-        });
-      }
+        },
+      });
+      embeddedClientSecret = session.client_secret ?? undefined;
+      console.log('✅ Stripe embedded onboarding session created for account', account.id);
+    } catch (sessionError: any) {
+      console.error('⚠️ Stripe embedded onboarding session error:', sessionError?.message || sessionError);
     }
 
     // Respond immediately so the client doesn't wait for DB
     res.json({
       success: true,
       accountId: account.id,
+      onboardingUrl,
+      embeddedClientSecret,
       message: 'Payment account created successfully'
     });
 
@@ -293,19 +285,30 @@ router.post('/stripe/create-account', async (req, res) => {
     setImmediate(async () => {
       try {
         const { prisma } = await import('../index');
-        await prisma.restaurant.update({
+        const result = await prisma.restaurant.updateMany({
           where: { id: rid },
-          data: { stripeAccount: aid }
+          data: { stripeAccount: aid },
         });
-        console.log(`✅ Restaurant updated with Stripe account ID`);
+        if (result.count === 0) {
+          console.warn(
+            `[stripe] No restaurant row for id "${rid}"; Connect account ${aid} was not linked in the database.`
+          );
+          try {
+            await stripe.accounts.update(aid, {
+              metadata: { db_link_missing: 'true', restaurantId: rid },
+            });
+          } catch (_) {}
+        } else {
+          console.log(`✅ Restaurant ${rid} updated with Stripe account ID`);
+        }
       } catch (dbError: any) {
         console.error('⚠️ Database update failed:', dbError.message);
         try {
           await stripe.accounts.update(aid, {
             metadata: {
               db_update_error: dbError.message,
-              restaurantId: rid
-            }
+              restaurantId: rid,
+            },
           });
         } catch (_) {}
       }
@@ -329,8 +332,11 @@ router.post('/stripe/create-account', async (req, res) => {
       const msg = String(error.message || '');
       if (msg.includes('Invalid Tax ID') || msg.includes('not an allowed value')) {
         return res.status(400).json({
-          error: 'That SSN or Tax ID is not accepted. Use your real last 4 digits of SSN, or in test mode use 0000.',
-          code: 'invalid_tax_id'
+          error:
+            process.env.NODE_ENV === 'production'
+              ? 'That SSN or Tax ID was not accepted. Use the value Stripe requests in the verification step.'
+              : 'That SSN or Tax ID is not accepted. Use your real last four digits, or in Stripe test mode try 0000 when Stripe allows it.',
+          code: 'invalid_tax_id',
         });
       }
       return res.status(400).json({
@@ -430,6 +436,37 @@ router.post('/stripe/payment', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
+    // Validate that the destination account can actually receive transfers.
+    // This avoids the opaque "insufficient_capabilities_for_transfer" Stripe errors.
+    let account: any;
+    try {
+      account = await stripe.accounts.retrieve(restaurantStripeId);
+    } catch (err: any) {
+      console.error('❌ Failed to retrieve destination Stripe account:', err);
+      return res.status(400).json({
+        error: 'Destination payment account not found or not accessible.',
+        code: 'INVALID_DESTINATION_ACCOUNT'
+      });
+    }
+
+    const caps = account.capabilities || {};
+    const hasTransferCapability =
+      caps.transfers === 'active' ||
+      caps.crypto_transfers === 'active' ||
+      caps.legacy_payments === 'active';
+
+    if (!hasTransferCapability) {
+      console.warn('⚠️ Destination account lacks required transfer capabilities:', {
+        accountId: account.id,
+        capabilities: caps
+      });
+      return res.status(400).json({
+        error:
+          'This payment account is not fully enabled to receive transfers yet. Finish Stripe onboarding and enable payouts, then try again.',
+        code: 'DESTINATION_INSUFFICIENT_CAPABILITIES'
+      });
+    }
+
     const amountInCents = Math.round(amount * 100);
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
@@ -469,6 +506,37 @@ router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => 
       return res.status(400).json({
         error: 'Restaurant is not set up for payments yet.',
         code: 'RESTAURANT_NO_STRIPE'
+      });
+    }
+
+    // Ensure the restaurant's connected account can actually receive transfers.
+    let account: any;
+    try {
+      account = await stripe.accounts.retrieve(stripeAccount);
+    } catch (err: any) {
+      console.error('❌ Failed to retrieve destination Stripe account for order:', orderId, err);
+      return res.status(400).json({
+        error: 'Restaurant payment account not found or not accessible.',
+        code: 'INVALID_DESTINATION_ACCOUNT'
+      });
+    }
+
+    const caps = account.capabilities || {};
+    const hasTransferCapability =
+      caps.transfers === 'active' ||
+      caps.crypto_transfers === 'active' ||
+      caps.legacy_payments === 'active';
+
+    if (!hasTransferCapability) {
+      console.warn('⚠️ Restaurant account lacks required transfer capabilities for order:', {
+        orderId,
+        accountId: account.id,
+        capabilities: caps
+      });
+      return res.status(400).json({
+        error:
+          'This restaurant payment account is not fully enabled to receive transfers yet. Finish Stripe onboarding and enable payouts, then try again.',
+        code: 'DESTINATION_INSUFFICIENT_CAPABILITIES'
       });
     }
 

@@ -3,22 +3,28 @@
 ## Prerequisites
 
 - **API** running (`cd apps/api && npm run dev`) — default port 3001
-- **Restaurant app** running (`cd apps/restaurant && npm run dev`) — default port 5174
+- **Restaurant app** running (`cd apps/restaurant && npm run dev`) — default port 5175
 - **Landing app** running (`cd apps/landing && npm run dev`) — for signup
 - **Root `.env`** with `VITE_API_URL`, `VITE_STRIPE_PUBLISHABLE_KEY`, etc.
+
+## Production / in-venue checklist
+
+- **API env:** Set `RESTAURANT_URL` or `RESTAURANT_ONBOARDING_BASE_URL` to the **public** restaurant app origin (same host users see after signup). Stripe hosted Connect onboarding uses this for `refresh_url` / `return_url`; a wrong value sends people to the wrong app or localhost.
+- **Landing:** Set `VITE_RESTAURANT_URL` to that same restaurant origin so signup redirects match the API.
+- **Stripe:** A new Connect account stays restricted until Stripe finishes KYC. Card payments to that restaurant fail until `charges_enabled` and transfer capability are active—plan onboarding time accordingly, even when your UI is ready.
 
 ## Test Flow 1: Full onboarding via signup
 
 ### Step 1: Sign up (landing)
 
-1. Go to `http://localhost:5175/signup` (or your landing URL)
+1. Go to `http://localhost:5174/signup` (or your landing URL)
 2. Fill in:
    - Full name: `Test Owner`
    - Email: `test-restaurant@example.com`
    - Business name: `Test Pizza Co`
    - Password: `TestPass123!`
    - Role, business type, team size (any)
-3. Submit → should redirect to `http://localhost:5174/onboarding?restaurantId=...&token=...`
+3. Submit → should redirect to `http://localhost:5175/onboarding?restaurantId=...&token=...`
 
 **Check:** URL has `restaurantId` and `token`. No "Something went wrong" screen.
 
@@ -88,7 +94,7 @@ Use when testing onboarding in isolation (e.g. restaurant already exists in DB).
 
 1. Get a valid `restaurantId` from DB or a previous signup
 2. Go to:  
-   `http://localhost:5174/onboarding?restaurantId=YOUR_RESTAURANT_ID&businessName=Test&email=test@example.com&fullName=Test&token=OPTIONAL_JWT`
+   `http://localhost:5175/onboarding?restaurantId=YOUR_RESTAURANT_ID&businessName=Test&email=test@example.com&fullName=Test&token=OPTIONAL_JWT`
 3. Run steps 2–8 above
 
 **Check:** Step 1 (Restaurant Info) loads. No "No restaurant ID provided".
@@ -109,4 +115,4 @@ Use when testing onboarding in isolation (e.g. restaurant already exists in DB).
 
 - **Routing number:** `110000000` (Stripe test)
 - **Account number:** `000123456789` (Stripe test)
-- **SSN last 4:** `0000` (test mode)
+- **SSN last 4:** any non-repeating 4-digit value such as `1234` (use your real last 4 in live mode)

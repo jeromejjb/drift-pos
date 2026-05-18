@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useParams } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { User, Store, CreditCard, Bell, Save, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
@@ -31,6 +31,17 @@ export function SettingsPage() {
     stripeAccount: null as string | null,
   });
 
+  const [accountStatus, setAccountStatus] = useState<{
+    details_submitted: boolean;
+    charges_enabled: boolean;
+    payouts_enabled: boolean;
+    isOnboardingComplete: boolean;
+  } | null>(null);
+  const [accountStatusLoading, setAccountStatusLoading] = useState(false);
+  const [accountStatusError, setAccountStatusError] = useState('');
+  const [loginLinkLoading, setLoginLinkLoading] = useState(false);
+  const [loginLinkError, setLoginLinkError] = useState('');
+
   const [orderSoundEnabled, setOrderSoundEnabledState] = useState(isOrderSoundEnabled);
 
   useEffect(() => {
@@ -52,14 +63,18 @@ export function SettingsPage() {
 
   const fetchRestaurantDetails = async (restaurantId: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`);
+      const token = localStorage.getItem('drift-token');
+      const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (response.ok) {
         const data = await response.json();
         setRestaurant({
           name: data.name || '',
           address: data.address || '',
           phone: data.phone || '',
-          cuisine: data.cuisine || ''
+          cuisine: data.cuisine || '',
+          stripeAccount: data.stripeAccount ?? null,
         });
       }
     } catch (error) {
@@ -129,6 +144,69 @@ export function SettingsPage() {
       setSaveError(error.message || 'Failed to save restaurant details.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Load Stripe Connect account status when we know the Stripe account ID
+  useEffect(() => {
+    const fetchStatus = async () => {
+      if (!restaurant.stripeAccount) {
+        setAccountStatus(null);
+        setAccountStatusError('');
+        return;
+      }
+      setAccountStatusLoading(true);
+      setAccountStatusError('');
+      try {
+        const token = localStorage.getItem('drift-token');
+        const res = await fetch(`${API_URL}/api/stripe/account-status/${restaurant.stripeAccount}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAccountStatus(null);
+          setAccountStatusError(data.error || 'Failed to load payment account status.');
+          return;
+        }
+        setAccountStatus({
+          details_submitted: !!data.details_submitted,
+          charges_enabled: !!data.charges_enabled,
+          payouts_enabled: !!data.payouts_enabled,
+          isOnboardingComplete: !!data.isOnboardingComplete,
+        });
+      } catch (err: any) {
+        setAccountStatus(null);
+        setAccountStatusError(err?.message || 'Failed to load payment account status.');
+      } finally {
+        setAccountStatusLoading(false);
+      }
+    };
+    fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant.stripeAccount]);
+
+  const handleOpenStripeDashboard = async () => {
+    if (!restaurant.stripeAccount || loginLinkLoading) return;
+    setLoginLinkLoading(true);
+    setLoginLinkError('');
+    try {
+      const token = localStorage.getItem('drift-token');
+      const res = await fetch(`${API_URL}/api/stripe/login-link/${restaurant.stripeAccount}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || 'Failed to open Stripe dashboard.');
+      }
+      window.location.href = data.url as string;
+    } catch (err: any) {
+      setLoginLinkError(err?.message || 'Failed to open Stripe dashboard.');
+    } finally {
+      setLoginLinkLoading(false);
     }
   };
 
@@ -309,19 +387,90 @@ export function SettingsPage() {
             <div>
               <h3 className="text-lg font-light mb-4">Billing & Plan</h3>
 
-              {/* Payments info for demo / understanding */}
+              {/* Payments info */}
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
                 <div className="flex gap-3">
                   <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium text-blue-900 mb-1">
-                      {restaurant.stripeAccount ? 'Payments connected' : 'Accept card payments from diners'}
+                      {restaurant.stripeAccount ? 'Payment account connected' : 'Set up your payment account'}
                     </p>
                     <p className="text-sm text-blue-800">
                       {restaurant.stripeAccount
-                        ? 'Your Stripe account is connected. Diners can pay at the table via QR checkout.'
-                        : 'Complete the Bank Account step during onboarding to receive payouts. Until then, orders appear but diner card payments are not processed. Use Stripe test values for demo: routing 110000000, account 000123456789, SSN 0000.'}
+                        ? 'Your payment account is connected. Diners can pay at the table via QR checkout.'
+                        : 'Add your bank account to accept card payments from diners. Setup takes a few minutes. Until then, orders appear but card payments are not processed.'}
                     </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      {!restaurant.stripeAccount && (
+                        <Link
+                          to={`/onboarding?restaurantId=${user?.restaurantId || urlRestaurantId || localStorage.getItem('drift-restaurant-id')}&step=bank`}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          Complete payment setup
+                        </Link>
+                      )}
+                      {restaurant.stripeAccount && (
+                        <>
+                          <span className="inline-flex items-center gap-2 text-xs font-medium text-blue-900 bg-blue-100 rounded-full px-3 py-1">
+                            {accountStatusLoading ? (
+                              <>
+                                <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                Checking status…
+                              </>
+                            ) : accountStatus ? (
+                              <>
+                                <span
+                                  className={`w-2 h-2 rounded-full ${
+                                    accountStatus.charges_enabled && accountStatus.payouts_enabled
+                                      ? 'bg-emerald-500'
+                                      : 'bg-amber-500'
+                                  }`}
+                                />
+                                {accountStatus.charges_enabled && accountStatus.payouts_enabled
+                                  ? 'Live: charges & payouts enabled'
+                                  : accountStatus.charges_enabled
+                                    ? 'Charges enabled, payouts pending'
+                                    : 'Verification in progress'}
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                                Status unavailable
+                              </>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleOpenStripeDashboard}
+                            disabled={loginLinkLoading}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-white text-blue-700 border border-blue-200 text-xs font-medium rounded-lg hover:bg-blue-50 disabled:opacity-60"
+                          >
+                            {loginLinkLoading ? (
+                              <>
+                                <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                Opening Stripe…
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="w-4 h-4" />
+                                Manage payouts in Stripe
+                              </>
+                            )}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {loginLinkError && (
+                      <p className="mt-2 text-xs text-red-700">
+                        {loginLinkError}
+                      </p>
+                    )}
+                    {accountStatusError && restaurant.stripeAccount && (
+                      <p className="mt-2 text-xs text-red-700">
+                        {accountStatusError}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

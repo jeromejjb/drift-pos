@@ -205,6 +205,25 @@ export function SignupPage() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.driftpos.com';
   const RESTAURANT_URL = import.meta.env.VITE_RESTAURANT_URL || 'https://restaurant.driftpos.com';
 
+  // Warm up API so first-time signup doesn't hit a cold-start timeout
+  useEffect(() => {
+    let cancelled = false;
+    const warmUp = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+        await fetch(`${API_URL}/api/test`, { signal: controller.signal }).catch(() => {});
+        if (!cancelled) window.clearTimeout(timeoutId);
+      } catch {
+        // ignore warmup errors – this is best-effort only
+      }
+    };
+    warmUp();
+    return () => {
+      cancelled = true;
+    };
+  }, [API_URL]);
+
   // Step validation
   const isStep1Valid = () => {
     return (
@@ -245,14 +264,15 @@ export function SignupPage() {
     setLoading(true);
     setLoadingSlow(false);
     setError('');
-    let slowTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => setLoadingSlow(true), 4000);
+    // Show \"this is taking a moment\" after 3s; hard timeout at 20s
+    let slowTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => setLoadingSlow(true), 3000);
     
     try {
       const phoneToStore = formData.phone || '';
       const phoneDigits = formData.phone ? formData.phone.replace(/\D/g, '') : '';
       
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+      const timeoutId = window.setTimeout(() => controller.abort(), 20000);
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

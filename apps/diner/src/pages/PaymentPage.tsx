@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { API_URL, STRIPE_PUBLISHABLE_KEY } from '../lib/api';
-import { toPaymentError } from '../lib/userErrors';
+import { toPaymentError, toConnectionError } from '../lib/userErrors';
 import { InlineError } from '../components/ui/InlineError';
 
 const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
@@ -90,9 +90,12 @@ export function PaymentPage() {
     }
     setPiLoading(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
       const userId = dinerProfile?.id ?? 'guest-' + Math.random().toString(36).slice(2, 11);
       const orderRes = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
         body: JSON.stringify({
           restaurantId,
@@ -107,6 +110,7 @@ export function PaymentPage() {
           tip,
         }),
       });
+      clearTimeout(timeoutId);
       const orderText = await orderRes.text();
       if (!orderRes.ok) {
         const errData = orderText ? (() => { try { return JSON.parse(orderText); } catch { return {}; } })() : {};
@@ -116,14 +120,18 @@ export function PaymentPage() {
       const order = JSON.parse(orderText);
       setOrderId(order.id);
 
+      const payController = new AbortController();
+      const payTimeoutId = setTimeout(() => payController.abort(), 60000);
       const payRes = await fetch(
         `${API_URL}/api/stripe/order/${order.id}/create-payment-intent`,
         {
           method: 'POST',
+          signal: payController.signal,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
         }
       );
+      clearTimeout(payTimeoutId);
       const payJson = await payRes.json().catch(() => ({}));
       if (!payRes.ok) {
         if (payJson.code === 'RESTAURANT_NO_STRIPE') {
@@ -141,7 +149,11 @@ export function PaymentPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      setError(toPaymentError(msg));
+      if (msg.includes('fetch') || msg.includes('network') || msg.includes('abort')) {
+        setError(toConnectionError(API_URL));
+      } else {
+        setError(toPaymentError(msg));
+      }
     } finally {
       setPiLoading(false);
     }

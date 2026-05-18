@@ -2,21 +2,18 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { AddCardProvider } from './contexts/AddCardContext';
 import { BottomNav } from './components/BottomNav';
+import { shouldShowNav } from './config/nav';
 import { ScanPage } from './pages/ScanPage';
 import { TablePage } from './pages/TablePage';
 import { MenuPage } from './pages/MenuPage';
 import { CartPage } from './pages/CartPage';
 import { PaymentPage } from './pages/PaymentPage';
 import { PaymentReturnPage } from './pages/PaymentReturnPage';
-import { P2PReturnPage } from './pages/P2PReturnPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { ConfirmationPage } from './pages/ConfirmationPage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
-import { PayPage } from './pages/PayPage';
 import { SettingsRedirect } from './pages/SettingsRedirect';
-import { MoneyPage } from './pages/MoneyPage';
-import { WithdrawPage } from './pages/WithdrawPage';
 import { MePage } from './pages/MePage';
 import './index.css';
 
@@ -33,11 +30,7 @@ function AppRoutes() {
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/signup" element={<SignUpPage />} />
-      <Route path="/pay" element={<PayPage />} />
-      <Route path="/pay/return" element={<P2PReturnPage />} />
       <Route path="/settings" element={<SettingsRedirect />} />
-      <Route path="/withdraw" element={<WithdrawPage />} />
-      <Route path="/money" element={<MoneyPage />} />
       <Route path="/me" element={<MePage />} />
     </Routes>
   );
@@ -45,14 +38,7 @@ function AppRoutes() {
 
 function AppLayout() {
   const { pathname } = useLocation();
-  const showNav =
-    pathname === '/' ||
-    pathname === '/pay' ||
-    pathname === '/money' ||
-    pathname === '/me' ||
-    pathname.startsWith('/table/') ||
-    pathname.startsWith('/menu/') ||
-    pathname.startsWith('/cart/');
+  const showNav = shouldShowNav(pathname);
   return (
     <div className="min-h-screen bg-[var(--drift-surface-elevated)] sm:min-h-0">
       <div className="app-shell min-h-screen bg-[var(--drift-surface-elevated)] relative">

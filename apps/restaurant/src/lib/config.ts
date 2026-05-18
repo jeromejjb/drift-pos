@@ -6,7 +6,7 @@ export const config = {
   landingUrl: import.meta.env.VITE_LANDING_URL || 'https://driftpos.com',
 
   // App URL - You'll need to add this to your .env and Vite config
-  appUrl: import.meta.env.VITE_APP_URL || 'http://localhost:5174',
+  appUrl: import.meta.env.VITE_APP_URL || 'http://localhost:5175',
 
   // Routes
   routes: {

@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-04-23T12:00:00.000Z",
+  "apiUrl": "http://localhost:3001",
+  "allStepsPass": false,
+  "sample": true,
+  "summary": { "pass": 13, "warn": 1, "fail": 0, "total": 14 },
+  "hint": "This file is a static sample. Run `npm run test:e2e:demo` with a healthy API and database to generate `e2e-results.json` (gitignored) next to this page.",
+  "steps": [
+    { "group": "API", "id": "health", "label": "GET /api/test", "status": "pass", "detail": "Drift API operational", "ms": 18 },
+    { "group": "API", "id": "integration", "label": "GET /api/integration", "status": "pass", "detail": "Drift POS", "ms": 4 },
+    { "group": "Landing", "id": "register", "label": "POST /api/auth/register (signup form)", "status": "pass", "detail": "restaurantId=clx…", "ms": 210 },
+    { "group": "Restaurant", "id": "verify", "label": "GET /api/auth/verify (session)", "status": "pass", "detail": "owner@example.com", "ms": 12 },
+    { "group": "Restaurant", "id": "profile", "label": "PATCH /api/restaurants/:id (profile)", "status": "pass", "detail": "address + phone saved", "ms": 45 },
+    { "group": "Restaurant", "id": "qrs", "label": "POST …/tables/generate-qrs", "status": "pass", "detail": "2 table QR payloads", "ms": 88 },
+    { "group": "Restaurant", "id": "menu-bulk", "label": "POST …/menu/bulk (menu editor)", "status": "pass", "detail": "2 categories saved", "ms": 62 },
+    { "group": "Diner", "id": "menu-read", "label": "GET /api/restaurant/:id/menu (diner menu)", "status": "pass", "detail": "Demo Burger $14.5", "ms": 28 },
+    { "group": "Diner", "id": "tables", "label": "GET /api/restaurant/:id/tables", "status": "pass", "detail": "table #1", "ms": 15 },
+    { "group": "Restaurant", "id": "login", "label": "POST /api/auth/login (sign-in form)", "status": "pass", "detail": "token issued", "ms": 190 },
+    { "group": "Diner", "id": "order", "label": "POST /api/orders (cart + tip)", "status": "pass", "detail": "order clx… subtotal $14.5 tip $4.25", "ms": 55 },
+    { "group": "Diner", "id": "order-get", "label": "GET /api/order/:id (checkout summary)", "status": "pass", "detail": "payable total $18.75", "ms": 11 },
+    { "group": "Diner", "id": "pi", "label": "POST …/stripe/order/:id/create-payment-intent", "status": "warn", "detail": "This restaurant payment account is not fully enabled… (DESTINATION_INSUFFICIENT_CAPABILITIES) — complete Stripe Connect in restaurant onboarding", "ms": 420 },
+    { "group": "Note", "id": "ui", "label": "Browser apps (manual)", "status": "pass", "detail": "Landing signup UI, restaurant onboarding forms, diner PaymentElement after clientSecret — exercise separately with dev servers", "ms": null }
+  ]
+}

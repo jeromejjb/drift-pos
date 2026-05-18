@@ -24,37 +24,9 @@ Create an account with:
 3. **Email confirmation**  
    If your Supabase project has **Confirm email** enabled, you must confirm the email (link in inbox) before signing in. For local testing you can turn this off in Supabase: **Authentication → Providers → Email → Confirm email** (disable).
 
-## Email code (passwordless) — free, no API key
+## Auth methods
 
-You can sign in with **email + 6-digit code** (no password). In AuthGate or AddCardModal, choose **Email code**, enter your email, tap **Send code**, then enter the code from your inbox.
-
-**Setup (one-time in Supabase):** [Supabase Dashboard](https://supabase.com/dashboard) → **Authentication → Email Templates** → **Magic Link**. Change the template to show the OTP code instead of a link:
-
-```html
-<h2>Your login code</h2>
-<p>Enter this code in the app: {{ .Token }}</p>
-```
-
-Supabase sends the email using its built-in provider — no Twilio, Resend, or other API keys needed.
-
-## Phone / SMS sign-in (optional, requires Twilio)
-
-For phone-based OTP in the diner app (Pay, Send money):
-
-1. **Enable Phone provider** in [Supabase Dashboard](https://supabase.com/dashboard) → **Authentication → Providers → Phone** → enable.
-
-2. **Configure Send SMS hook** in Supabase → **Authentication → Providers → Phone** → **Customize SMS provider** → set the HTTP URL to your API's send-sms endpoint, e.g.:
-   - Local: `http://localhost:3001/api/auth/send-sms`
-   - Production: `https://your-api.example.com/api/auth/send-sms`
-
-3. **Add Twilio env vars** to your API `.env`:
-   ```
-   TWILIO_ACCOUNT_SID=...
-   TWILIO_AUTH_TOKEN=...
-   TWILIO_PHONE_NUMBER=+1234567890
-   ```
-
-4. In the diner app, choose **Phone** in the auth form, enter your number, tap **Send code**, then enter the 6-digit code from the SMS.
+**Password** — Email + password. Create account or sign in.
 
 ## Quick copy-paste (email)
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { toAuthErrorObject } from '../lib/userErrors';
 import type { Session, User } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -92,23 +93,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  function toFriendlyAuthError(error: { message?: string } | Error | null): Error | null {
-    if (!error) return null;
-    const msg = (error?.message || '').toLowerCase();
-    if (msg.includes('invalid') && msg.includes('api key')) return new Error('Auth not configured');
-    if (msg.includes('fetch') || msg.includes('network')) return new Error('Connection error. Check your internet and try again.');
-    return error instanceof Error ? error : new Error((error as { message?: string }).message || 'Sign in failed');
-  }
-
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) return { error: new Error('Auth not configured') };
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error && data?.user) syncProfileToSupabase(supabase, data.user);
-      return { error: toFriendlyAuthError(error) };
+      return { error: toAuthErrorObject(error) };
     } catch (e: any) {
       const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Sign in failed') };
+      return { error: toAuthErrorObject(err) ?? new Error('Sign in failed') };
     }
   }, []);
 
@@ -121,10 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: name ? { data: { name } } : undefined,
       });
       if (!error && data?.user) syncProfileToSupabase(supabase, data.user);
-      return { error: toFriendlyAuthError(error) };
+      return { error: toAuthErrorObject(error) };
     } catch (e: any) {
       const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Sign up failed') };
+      return { error: toAuthErrorObject(err) ?? new Error('Sign up failed') };
     }
   }, []);
 
@@ -134,10 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const normalized = normalizePhoneForE164(phone.trim());
       if (normalized.length < 10) return { error: new Error('Enter a valid phone number') };
       const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
-      return { error: toFriendlyAuthError(error) };
+      return { error: toAuthErrorObject(error) };
     } catch (e: any) {
       const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Failed to send code') };
+      return { error: toAuthErrorObject(err) ?? new Error('Failed to send code') };
     }
   }, []);
 
@@ -153,10 +146,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         type: 'sms',
       });
       if (!error && data?.user) syncProfileToSupabase(supabase, data.user);
-      return { error: toFriendlyAuthError(error) };
+      return { error: toAuthErrorObject(error) };
     } catch (e: any) {
       const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Invalid code') };
+      return { error: toAuthErrorObject(err) ?? new Error('Invalid code') };
     }
   }, []);
 
@@ -170,10 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provider: 'google',
         options: { redirectTo },
       });
-      return { error: toFriendlyAuthError(error) };
+      return { error: toAuthErrorObject(error) };
     } catch (e: any) {
       const err = e?.message ? { message: e.message } : e;
-      return { error: toFriendlyAuthError(err) ?? new Error('Sign in failed') };
+      return { error: toAuthErrorObject(err) ?? new Error('Sign in failed') };
     }
   }, []);
 

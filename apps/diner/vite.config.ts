@@ -1,24 +1,30 @@
+import path from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// Load .env from repo root; process.env overrides (for Render, etc.)
+// Load .env from repo root, then apps/diner (diner overrides). process.env wins.
 export default defineConfig(({ mode }) => {
-  const loaded = loadEnv(mode, process.cwd(), '')
-  const env = { ...loaded, ...process.env }
+  const cwd = process.cwd()
+  const rootDir = cwd.endsWith('apps/diner') ? path.resolve(cwd, '../..') : cwd
+  const dinerDir = cwd.endsWith('apps/diner') ? cwd : path.resolve(cwd, 'apps/diner')
+  const rootEnv = loadEnv(mode, rootDir, '')
+  const dinerEnv = loadEnv(mode, dinerDir, '')
+  const env = { ...rootEnv, ...dinerEnv, ...process.env }
   return {
-  envDir: process.cwd(),
+  envDir: rootDir,
   plugins: [
     react(),
     tailwindcss(),
   ],
   server: {
     port: 5173,
-    strictPort: false, // Allow fallback to next available port
+    strictPort: true, // Do NOT fall back to another port; fail if 5173 is taken
     host: 'localhost', // Use localhost to avoid uv_interface_addresses errors in some environments
   },
   preview: {
     port: 5173,
+    strictPort: true,
     host: 'localhost',
   },
   build: {

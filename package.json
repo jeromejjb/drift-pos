@@ -10,6 +10,7 @@
     "test": "npm run test -w apps/api && npm run test -w apps/restaurant",
     "test:output": "./scripts/test-output.sh",
     "test:restaurant": "node scripts/restaurant-flow-test.mjs",
+    "test:e2e:demo": "node scripts/e2e-demo.mjs",
     "db:seed": "npm run db:seed -w apps/api",
     "dev": "npm run dev --workspace=apps/diner & npm run dev --workspace=apps/restaurant & npm run dev --workspace=apps/api",
     "dev:pay": "npm run dev --workspace=apps/api & npm run dev --workspace=apps/diner",

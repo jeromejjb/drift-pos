@@ -64,8 +64,17 @@ function App() {
           <Route key={path} path={`/${path}`} element={<RedirectToLanding />} />
         ))}
         
-        {/* Auth pages */}
-        <Route path="/" element={<RedirectToLanding />} />
+        {/* Root: in dev, show dashboard/onboarding instead of bouncing to external landing */}
+        <Route
+          path="/"
+          element={
+            token && restaurantId
+              ? <DashboardPage />
+              : <OnboardingPage />
+          }
+        />
+
+        {/* Auth pages that still go via landing */}
         <Route path="/login" element={<RedirectToLandingLogin />} />
         <Route path="/signup" element={<RedirectToLanding />} />
         

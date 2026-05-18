@@ -63,11 +63,11 @@ const steps = [
     description: 'Generate table codes'
   },
   { 
-    id: 'bank',  // Changed from 'stripe' to 'bank'
-    title: 'Bank Account',  // Changed from 'Payments' to 'Bank Account'
+    id: 'bank',
+    title: 'Payment account',
     icon: CreditCard, 
-    component: StripeStep,  // Keep the same component
-    description: 'Connect your bank'  // Changed description
+    component: StripeStep,
+    description: 'Easy setup — connect bank'
   },
   { 
     id: 'complete', 
@@ -102,6 +102,7 @@ export function OnboardingPage() {
   // Load ALL data from URL params and localStorage on mount
   useEffect(() => {
     const id = searchParams.get('restaurantId') || localStorage.getItem('drift-restaurant-id');
+    const stepParam = searchParams.get('step');
     const businessName = searchParams.get('businessName');
     const businessType = searchParams.get('businessType');
     const email = searchParams.get('email');
@@ -152,9 +153,52 @@ export function OnboardingPage() {
     // Save profile to localStorage for other steps to use
     localStorage.setItem('drift-user-profile', JSON.stringify(urlProfile));
 
-    // Load any saved onboarding progress
+    // Jump to specific step if step=bank in URL (e.g. from Settings "Complete payment setup")
+    const bankStepIndex = steps.findIndex(s => s.id === 'bank');
+    if (stepParam === 'bank' && bankStepIndex >= 0) {
+      setCurrentStep(bankStepIndex);
+      // Load profile so StripeStep can pre-fill email, address, etc.
+      const storedProfile = localStorage.getItem('drift-user-profile');
+      const saved = localStorage.getItem(`onboarding-${id}`);
+      let dataToUse = { ...urlProfile };
+      if (storedProfile) {
+        try {
+          const p = JSON.parse(storedProfile);
+          dataToUse = { ...dataToUse, ...p, restaurantName: p.businessName || p.restaurantName || dataToUse.restaurantName };
+        } catch (_) {}
+      }
+      if (saved) {
+        try {
+          const { data } = JSON.parse(saved);
+          dataToUse = { ...dataToUse, ...data };
+        } catch (_) {}
+      }
+      setOnboardingData(prev => ({ ...prev, ...dataToUse }));
+      console.log('📌 Starting at bank step from URL');
+
+      // Also fetch latest restaurant details so payout address/phone can prefill
+      const token = localStorage.getItem('drift-token');
+      fetch(`${config.apiUrl}/api/restaurants/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((restaurant) => {
+          if (!restaurant) return;
+          setOnboardingData(prev => ({
+            ...prev,
+            name: restaurant.name || prev.name,
+            restaurantName: restaurant.name || prev.restaurantName,
+            phone: restaurant.phone || prev.phone,
+            // address can be a string; later steps normalize it
+            address: restaurant.address || prev.address,
+          }));
+        })
+        .catch(() => {});
+    }
+
+    // Load any saved onboarding progress (unless step=bank overrides)
     const saved = localStorage.getItem(`onboarding-${id}`);
-    if (saved) {
+    if (saved && stepParam !== 'bank') {
       try {
         const { step, data } = JSON.parse(saved);
         setCurrentStep(step);
@@ -173,7 +217,7 @@ export function OnboardingPage() {
           ...urlProfile
         }));
       }
-    } else {
+    } else if (stepParam !== 'bank') {
       // No saved progress, just use URL data
       setOnboardingData(prev => ({
         ...prev,

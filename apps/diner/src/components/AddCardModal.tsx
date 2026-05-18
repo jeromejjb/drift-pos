@@ -3,7 +3,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { X, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { sessionExpiredMessage } from '../lib/userErrors';
+import { sessionExpiredMessage, isSessionExpiredError, toConnectionError } from '../lib/userErrors';
 import { Button } from './ui/Button';
 import { API_URL, STRIPE_PUBLISHABLE_KEY } from '../lib/api';
 import { InlineError } from './ui/InlineError';
@@ -41,18 +41,26 @@ export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardMo
     if (!isOpen || needsAuth || !accessToken) return;
     let cancelled = false;
     const fetchSetupIntent = async (token: string) => {
-      const res = await fetch(`${API_URL}/api/diner/setup-intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json().catch(() => ({}));
-      return { res, data };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      try {
+        const res = await fetch(`${API_URL}/api/diner/setup-intent`, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+      } finally {
+        clearTimeout(timeoutId);
+      }
     };
     (async () => {
       try {
-        let { res, data } = await fetchSetupIntent(accessToken);
+        let token = accessToken;
+        let { res, data } = await fetchSetupIntent(token);
         if (cancelled) return;
-        if (res.status === 401 && data?.code === 'INVALID_TOKEN') {
+        if (res.status === 401 && (data?.code === 'INVALID_TOKEN' || data?.code === 'AUTH_FAILED')) {
           const newToken = await refreshSession();
           if (cancelled) return;
           if (newToken) {
@@ -60,18 +68,17 @@ export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardMo
             if (cancelled) return;
             ({ res, data } = retry);
           } else {
-            await signOut();
             setError(sessionExpiredMessage());
             return;
           }
         }
         if (!res.ok) {
-          setError(data?.code === 'INVALID_TOKEN' ? sessionExpiredMessage() : (data.error || 'Failed to load'));
+          setError((data?.code === 'INVALID_TOKEN' || data?.code === 'AUTH_FAILED') ? sessionExpiredMessage() : (data.error || 'Failed to load'));
           return;
         }
         if (data.clientSecret) setClientSecret(data.clientSecret);
       } catch {
-        if (!cancelled) setError("Couldn't connect. Try again.");
+        if (!cancelled) setError(toConnectionError(API_URL));
       }
     })();
     return () => { cancelled = true; };
@@ -122,7 +129,24 @@ export function AddCardModal({ isOpen, onClose, onSuccess, showDone }: AddCardMo
             </Elements>
           ) : (
             <div className="py-8 text-center">
-              {error ? <InlineError message={error} onRetry={() => setError('')} /> : <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--drift-accent)] border-t-transparent mx-auto" />}
+              {error ? (
+                <div className="space-y-4">
+                  <InlineError
+                    message={error}
+                    onRetry={isSessionExpiredError(error) ? undefined : () => { setError(''); setClientSecret(null); }}
+                    action={isSessionExpiredError(error) ? (
+                      <Button
+                        fullWidth
+                        onClick={() => { setError(''); onClose(); window.dispatchEvent(new CustomEvent('drift:session-expired')); }}
+                      >
+                        Sign in again
+                      </Button>
+                    ) : undefined}
+                  />
+                </div>
+              ) : (
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--drift-accent)] border-t-transparent mx-auto" />
+              )}
             </div>
           )}
         </div>

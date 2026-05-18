@@ -32,52 +32,36 @@ export function ScanPage() {
     };
   }, []);
 
-const startCamera = async () => {
-  console.log('📸 startCamera called');
-  setError(null);
-  
-  // First set scanning to true (this triggers React to render the div)
-  setScanning(true);
-  
-  // Wait for React to render the div
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  // Now check for the div
-  const div = document.getElementById(scannerId);
-  if (!div) {
-    console.error('❌ Div with id', scannerId, 'not found after delay!');
-    setError('Camera failed to initialize. Please try again.');
-    setScanning(false);
-    return;
-  }
-  
-  console.log('✅ Div found, initializing camera...');
-  
-  try {
-    if (!scannerRef.current) {
-      scannerRef.current = new Html5Qrcode(scannerId);
+  const startCamera = async () => {
+    setError(null);
+    setScanning(true);
+    await new Promise((r) => setTimeout(r, 100));
+    const div = document.getElementById(scannerId);
+    if (!div) {
+      setError('Camera failed to initialize. Please try again.');
+      setScanning(false);
+      return;
     }
-
-    const config = { 
-      fps: 10, 
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0
-    };
-
-    await scannerRef.current.start(
-      { facingMode: "environment" },
-      config,
-      onScanSuccess,
-      onScanError
-    );
-    console.log('✅ Camera started successfully');
-    
-  } catch (err: any) {
-    console.error('❌ Camera error:', err);
-    // ... error handling
-    setScanning(false);
-  }
-};
+    try {
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(scannerId);
+      }
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+      };
+      await scannerRef.current.start(
+        { facingMode: 'environment' },
+        config,
+        onScanSuccess,
+        onScanError
+      );
+    } catch {
+      setError('Camera access denied or unavailable. Check permissions and try again.');
+      setScanning(false);
+    }
+  };
 
   const stopCamera = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {
@@ -87,35 +71,18 @@ const startCamera = async () => {
   };
 
   const onScanSuccess = (decodedText: string) => {
-    console.log('QR Code scanned:', decodedText);
-    
-    // Extract table ID from URL
-    // Expected format: http://localhost:5173/table/cmllhyepc0001zdv63vymrj0k
-    const match = decodedText.match(/\/table\/(.+)$/);
-    
+    const match = decodedText.match(/\/table\/([a-z0-9]+)$/i);
     if (match) {
       const tableId = match[1];
-      
-      // Stop camera before navigating
-      stopCamera().then(() => {
-        navigate(`/table/${tableId}`);
-      });
+      stopCamera().then(() => navigate(`/table/${tableId}`));
     } else {
-      // If the QR code doesn't contain a valid table URL, show error
       setError('Invalid QR code. Please scan a valid Drift table QR code.');
-      
-      // Restart scanning after 2 seconds
-      setTimeout(() => {
-        setError(null);
-      }, 2000);
+      setTimeout(() => setError(null), 2500);
     }
   };
 
-  const onScanError = (error: string) => {
-    // Only log in development (simplified check)
-    if (window.location.hostname === 'localhost') {
-      console.warn('Scan error:', error);
-    }
+  const onScanError = () => {
+    /* Ignore repeated scan errors; onScanSuccess handles valid codes */
   };
 
   // Fetch test tables when user opens test options
@@ -135,40 +102,43 @@ const startCamera = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--drift-surface-elevated)] pb-20 safe-bottom">
+    <div className="min-h-screen bg-[var(--drift-surface-elevated)] pb-24 safe-bottom">
       <div className="container max-w-md mx-auto px-5 py-8">
         {/* Header — same “drift” treatment as Pay / Money / Me */}
-        <div className="text-center mb-10 animate-fade-in">
-          <p className="text-[11px] uppercase tracking-widest text-[var(--drift-ink-subtle)] font-medium">drift</p>
+        <header className="text-center mb-10 animate-fade-in">
+          <p className="text-[11px] uppercase tracking-widest text-[var(--drift-ink-subtle)] font-semibold">drift</p>
           <h1 className="text-4xl font-bold tracking-tight mt-1 text-[var(--drift-ink)]">Dine</h1>
           <p className="text-[var(--drift-ink-muted)] text-[15px] mt-2 max-w-xs mx-auto">
             Scan the QR code at your table to order and pay
           </p>
-        </div>
+        </header>
 
         {!scanning ? (
           <>
-            <Card padding="xl" className="mb-6 animate-slide-up">
+            <Card
+              padding="xl"
+              className="mb-6 animate-slide-up shadow-[var(--drift-shadow)] hover:shadow-[var(--drift-shadow-lg)] transition-shadow duration-[var(--drift-duration)]"
+            >
               <div className="flex flex-col items-center">
                 <div className="relative mb-8">
-                  <div className="w-28 h-28 bg-[var(--drift-accent-muted)] rounded-[var(--drift-radius-2xl)] flex items-center justify-center">
-                    <QrCode className="w-14 h-14 text-[var(--drift-accent)]" strokeWidth={1.5} />
+                  <div className="w-32 h-32 bg-[var(--drift-accent-muted)] rounded-[var(--drift-radius-2xl)] flex items-center justify-center border border-[var(--drift-accent)]/10">
+                    <QrCode className="w-16 h-16 text-[var(--drift-accent)]" strokeWidth={1.5} />
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[var(--drift-accent)] rounded-full flex items-center justify-center shadow-[var(--drift-shadow)]">
-                    <Camera className="w-5 h-5 text-white" />
+                  <div className="absolute -bottom-2 -right-2 w-11 h-11 bg-[var(--drift-accent)] rounded-full flex items-center justify-center shadow-[var(--drift-shadow)] text-white">
+                    <Camera className="w-5 h-5" strokeWidth={2.5} />
                   </div>
                 </div>
                 <h2 className="text-xl font-bold text-[var(--drift-ink)] text-center mb-2">
                   Ready to order?
                 </h2>
                 <p className="text-[var(--drift-ink-muted)] text-[15px] text-center mb-8 max-w-xs">
-                  Open your camera and scan the QR code on your table to browse the menu and pay
+                  Open your camera and scan the QR code on your table to browse the menu and pay.
                 </p>
                 <Button
                   onClick={startCamera}
                   fullWidth
                   icon={<Camera className="w-5 h-5" />}
-                  className="py-4"
+                  className="py-4 text-[16px]"
                 >
                   Open camera
                 </Button>
@@ -226,24 +196,24 @@ const startCamera = async () => {
             </button>
           </>
         ) : (
-          <div className="relative rounded-[var(--drift-radius-xl)] overflow-hidden mb-6 animate-slide-up">
-            <div id={scannerId} className="w-full h-[500px] bg-[var(--drift-ink)]" />
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-64 h-64 border-2 border-white rounded-[var(--drift-radius-lg)] opacity-50" />
-              </div>
-              <div className="absolute top-4 left-4 bg-black/50 backdrop-blur text-white px-4 py-2 rounded-full text-sm">
-                Position QR code in the square
-              </div>
+          <div className="relative rounded-[var(--drift-radius-xl)] overflow-hidden mb-6 animate-slide-up shadow-[var(--drift-shadow-lg)]">
+            <div id={scannerId} className="w-full aspect-[4/5] max-h-[520px] bg-[var(--drift-ink)]" />
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+              <div className="w-64 h-64 border-2 border-white/60 rounded-2xl" />
             </div>
+            <p className="absolute top-5 left-0 right-0 text-center text-white/90 text-sm font-medium px-4">
+              Align QR code within the frame
+            </p>
             {error && (
-              <div className="absolute top-20 left-4 right-4 bg-[var(--drift-error-text)] text-white p-4 rounded-[var(--drift-radius-lg)] text-sm text-center">
+              <div className="absolute top-20 left-4 right-4 bg-[var(--drift-error-text)] text-white p-4 rounded-xl text-sm text-center shadow-lg">
                 {error}
               </div>
             )}
             <button
+              type="button"
               onClick={stopCamera}
-              className="absolute bottom-4 right-4 bg-black/50 backdrop-blur text-white p-3 rounded-full hover:bg-black/70 transition-colors z-10"
+              className="absolute bottom-5 right-5 bg-white/15 backdrop-blur-md text-white p-3 rounded-full hover:bg-white/25 transition-colors z-10 border border-white/20"
+              aria-label="Close camera"
             >
               <X className="w-5 h-5" />
             </button>

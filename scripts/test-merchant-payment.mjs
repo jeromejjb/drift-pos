@@ -77,12 +77,12 @@ async function test() {
     log('Invalid destination (connection)', false, e.message);
   }
 
-  // 5. Integration info endpoint - no auth needed
+  // 5. Integration metadata - no auth needed
   try {
-    const r = await fetch(`${API_URL}/api/integration/p2p`);
+    const r = await fetch(`${API_URL}/api/integration`);
     const data = await r.json().catch(() => ({}));
-    const hasMerchant = !!data.endpoints?.merchantPayment;
-    log('GET /api/integration/p2p includes merchantPayment', hasMerchant && r.ok);
+    const hasCheckout = !!data.flows?.dinerTableCheckout && !!data.endpoints?.orderPaymentIntent;
+    log('GET /api/integration documents table checkout', hasCheckout && r.ok);
   } catch (e) {
     log('Integration endpoint', false, e.message);
   }

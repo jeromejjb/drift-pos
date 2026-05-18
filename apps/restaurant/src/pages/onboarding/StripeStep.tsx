@@ -14,6 +14,8 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { config } from '../../lib/config';
+import { loadConnectAndInitialize } from '@stripe/connect-js';
+import { ConnectComponentsProvider, ConnectAccountOnboarding } from '@stripe/react-connect-js';
 
 interface StripeStepProps {
   restaurantId: string;
@@ -28,10 +30,14 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const CONNECT_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
+
 export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: StripeStepProps) {
   const [loading, setLoading] = useState(false);
   const [loadingSlow, setLoadingSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [embeddedClientSecret, setEmbeddedClientSecret] = useState<string | null>(null);
+  const [showEmbedded, setShowEmbedded] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     businessName: '',
@@ -103,14 +109,20 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
       setError(`Year of birth must be between 1900 and ${maxYear}.`);
       return;
     }
-    const zipDigits = formData.address.postal_code?.replace(/\D/g, '') ?? '';
-    if (formData.address.line1 && zipDigits.length > 0 && zipDigits.length !== 5 && zipDigits.length !== 9) {
+    if (!formData.address.line1?.trim() || !formData.address.city?.trim() || !formData.address.state?.trim() || !formData.address.postal_code?.trim()) {
+      setError('Please enter your full payout address (street, city, state, ZIP).');
+      return;
+    }
+    const zipDigits = formData.address.postal_code.replace(/\D/g, '');
+    if (zipDigits.length !== 5 && zipDigits.length !== 9) {
       setError('ZIP must be 5 or 9 digits.');
       return;
     }
+    // SSN last 4 is strongly recommended, but to keep onboarding light we don't hard-block
+    // if they leave it blank. Stripe will prompt for it in the hosted onboarding flow if needed.
     const ssnDigits = ssnLast4.replace(/\D/g, '');
-    if (ssnDigits.length !== 4) {
-      setError('Please enter the last 4 digits of your SSN.');
+    if (ssnDigits && ssnDigits.length !== 4) {
+      setError('Last 4 of SSN must be exactly 4 digits, or leave it blank for now.');
       return;
     }
     if (!bankAccount.routingNumber || !bankAccount.accountNumber || !bankAccount.accountHolderName) {
@@ -125,11 +137,13 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
 
     setLoading(true);
     setLoadingSlow(false);
-    let slowTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => setLoadingSlow(true), 5000);
+    // Show \"this may take a moment\" sooner, and cap request duration
+    let slowTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => setLoadingSlow(true), 3000);
     try {
       const token = localStorage.getItem('drift-token');
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 50000);
+      // Allow more time for Stripe + network on first-time account creation
+      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
       const res = await fetch(`${config.apiUrl}/api/stripe/create-account`, {
         method: 'POST',
         headers: {
@@ -142,14 +156,12 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
           businessName: formData.businessName,
           fullName: formData.fullName,
           phone: formData.phone || undefined,
-          address: formData.address.line1
-            ? {
-                line1: formData.address.line1,
-                city: formData.address.city,
-                state: formData.address.state,
-                postal_code: formData.address.postal_code,
-              }
-            : undefined,
+          address: {
+            line1: formData.address.line1.trim(),
+            city: formData.address.city.trim(),
+            state: formData.address.state.trim(),
+            postal_code: formData.address.postal_code.replace(/\D/g, ''),
+          },
           bankAccount: {
             accountHolderName: formData.bankAccount.accountHolderName,
             routingNumber: routingDigits,
@@ -184,6 +196,20 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
       if (json.accountId) {
         updateData({ stripeAccountId: json.accountId });
       }
+
+      // Prefer embedded onboarding in a modal if we have a client secret and Connect is configured.
+      if (json.embeddedClientSecret && CONNECT_PUBLISHABLE_KEY) {
+        setEmbeddedClientSecret(json.embeddedClientSecret as string);
+        setShowEmbedded(true);
+        return;
+      }
+
+      // Fallback: If the API returned a Stripe onboarding URL, send the user there to finish any remaining details.
+      if (json.onboardingUrl) {
+        window.location.href = json.onboardingUrl as string;
+        return;
+      }
+
       onNext();
     } catch (err) {
       if (slowTimer) clearTimeout(slowTimer);
@@ -269,8 +295,8 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
         <div className="w-16 h-16 bg-gradient-to-br from-black to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <CreditCard className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-3xl font-light mb-2">Bank Account</h2>
-        <p className="text-gray-400">Connect your bank to receive payouts. Bank-level security.</p>
+        <h2 className="text-3xl font-light mb-2">Payment account</h2>
+        <p className="text-gray-400">Set up in minutes. Connect your bank to receive diner payments directly. Bank-level security.</p>
       </div>
 
       {error && (
@@ -323,13 +349,14 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
           />
 
           <div>
-            <label className="block text-sm text-gray-500 mb-2">Payout address</label>
+            <label className="block text-sm text-gray-500 mb-2">Payout address <span className="text-red-500">*</span></label>
             {formData.address.line1 && (
               <p className="text-xs text-green-600 mb-2">Pre-filled from your business address. Edit if needed.</p>
             )}
             <div className="space-y-3">
               <Input
                 placeholder="Street address"
+                required
                 value={formData.address.line1}
                 onChange={(e) =>
                   setFormData((p) => ({
@@ -450,11 +477,17 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
             onChange={(e) => formatSsn(e.target.value)}
             icon={<Hash className="w-4 h-4" />}
             error={
-              formData.ssnLast4.length > 0 && formData.ssnLast4.replace(/\D/g, '').length !== 4
-                ? 'Must be 4 digits'
-                : /^(\d)\1+$/.test(formData.ssnLast4.replace(/\D/g, ''))
-                  ? 'Repeated digits (e.g. 2222) are not accepted. Use your real last 4, or 0000 for testing.'
-                  : undefined
+              (() => {
+                const digits = formData.ssnLast4.replace(/\D/g, '');
+                if (digits.length > 0 && digits.length !== 4) {
+                  return 'Must be 4 digits';
+                }
+                // Allow 0000 explicitly for test mode; block other repeated digits
+                if (digits.length === 4 && /^(\d)\1+$/.test(digits) && digits !== '0000') {
+                  return 'Repeated digits (e.g. 2222) are not accepted. Use your real last 4, or 0000 for testing.';
+                }
+                return undefined;
+              })()
             }
           />
           <p className="text-xs text-gray-500 mt-1">
@@ -529,11 +562,15 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
                 loading ||
                 (formData.dob.day && (isNaN(dobDayNum) || dobDayNum < 1 || dobDayNum > 31)) ||
                 (formData.dob.year && (isNaN(dobYearNum) || dobYearNum < minYear || dobYearNum > maxYear)) ||
-                (postalDigits.length > 0 && postalDigits.length !== 5 && postalDigits.length !== 9) ||
+                (!formData.address.line1?.trim() || !formData.address.city?.trim() || !formData.address.state?.trim() || !formData.address.postal_code?.trim() || (postalDigits.length !== 5 && postalDigits.length !== 9)) ||
                 (routingDigits.length > 0 && routingDigits.length !== 9) ||
                 (accountDigits.length > 0 && (accountDigits.length < 4 || accountDigits.length > 17)) ||
                 (phoneDigits.length > 0 && phoneDigits.length !== 10) ||
-                (formData.ssnLast4.length === 4 && /^(\d)\1+$/.test(formData.ssnLast4.replace(/\D/g, '')))
+                (() => {
+                  const digits = formData.ssnLast4.replace(/\D/g, '');
+                  // Disallow repeated digits except 0000 (allowed in test mode)
+                  return digits.length === 4 && /^(\d)\1+$/.test(digits) && digits !== '0000';
+                })()
               }
             >
               {loading ? 'Connecting…' : <>Continue <ChevronRight className="w-4 h-4" /></>}
@@ -551,6 +588,90 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
         <Lock className="w-3 h-3" />
         <span>Encrypted and secure</span>
       </div>
+
+      {showEmbedded && embeddedClientSecret && (
+        <EmbeddedStripeOnboardingModal
+          clientSecret={embeddedClientSecret}
+          onClose={() => {
+            setShowEmbedded(false);
+            setEmbeddedClientSecret(null);
+            // Let the next step / complete page verify account status.
+            onNext();
+          }}
+        />
+      )}
     </motion.div>
+  );
+}
+
+function EmbeddedStripeOnboardingModal({
+  clientSecret,
+  onClose,
+}: {
+  clientSecret: string;
+  onClose: () => void;
+}) {
+  const [connectInstance, setConnectInstance] = useState<any | null>(null);
+  const [ready, setReady] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!CONNECT_PUBLISHABLE_KEY) {
+      setErr('Stripe Connect is not configured.');
+      return;
+    }
+    loadConnectAndInitialize({
+      publishableKey: CONNECT_PUBLISHABLE_KEY,
+      fetchClientSecret: async () => clientSecret,
+      appearance: {
+        overlays: 'dialog',
+      },
+    })
+      .then((instance) => {
+        if (!cancelled) {
+          setConnectInstance(instance);
+          setReady(true);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setErr(e?.message || 'Failed to load Stripe Connect.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientSecret]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-medium text-gray-900">Finish payment setup</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {err && (
+            <p className="text-sm text-red-600 mb-2">{err}</p>
+          )}
+          {!ready || !connectInstance ? (
+            <p className="text-sm text-gray-500">Loading secure Stripe onboarding…</p>
+          ) : (
+            <ConnectComponentsProvider connectInstance={connectInstance}>
+              <ConnectAccountOnboarding
+                onExit={onClose}
+                // Stripe handles its own internal loading state; we rely on the
+                // outer `ready` flag above to gate initial render.
+              />
+            </ConnectComponentsProvider>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

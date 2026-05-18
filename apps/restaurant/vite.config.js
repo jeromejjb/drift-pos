@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
             'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.driftpos.com')
         },
         server: {
-            port: 5174,
+            port: 5175,
             host: true,
         },
         build: {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-/** Redirect /settings → /me. Taproom uses NEXT_PUBLIC_DRIFT_SETTINGS_URL (default: {DRIFT_PAY_URL base}/settings) for payment method setup. */
+/** Redirect `/settings` → `/me` (saved cards and profile live on Me). */
 export function SettingsRedirect() {
   const navigate = useNavigate();
   useEffect(() => {
