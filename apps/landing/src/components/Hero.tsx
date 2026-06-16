@@ -1,227 +1,102 @@
-import { useState } from 'react';
-import { ArrowRight, Smartphone, Store, CreditCard, QrCode, Menu,Banknote, Clock, MapPin } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+
+const benefits = [
+  'Grow average checks—guests reorder without flagging staff',
+  'Turn tables faster on busy tasting-room nights',
+  'Go live in 7 minutes on your existing processor—no hardware swap',
+];
 
 export function Hero() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'diner' | 'owner'>('owner'); // Default to owner
-  const [waitlistCount] = useState(47);
-
-  const dinerSteps = [
-    { icon: <Smartphone className="w-5 h-5" />, text: 'Scan' },
-    { icon: <Menu className="w-5 h-5" />, text: 'Browse' },
-    { icon: <CreditCard className="w-5 h-5" />, text: 'Order' },
-    { icon: <CreditCard className="w-5 h-5" />, text: 'Pay' },
-  ];
-
-  const ownerSteps = [
-    { icon: <Store className="w-5 h-5" />, text: 'Start' },
-    { icon: <Menu className="w-5 h-5" />, text: 'Menu' },
-    { icon: <QrCode className="w-5 h-5" />, text: 'Print' },
-    { icon: <Banknote className="w-5 h-5" />, text: 'Paid' },
-  ];
-
-  const steps = view === 'diner' ? dinerSteps : ownerSteps;
 
   return (
-    <section className="relative pt-32 pb-24 px-4 overflow-hidden bg-white">
-      {/* Subtle background texture */}
-      <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
+    <section className="relative overflow-hidden bg-white px-4 pb-20 pt-28 dark:bg-gray-950 sm:px-6 sm:pb-24 sm:pt-32">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.06]"
         style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, black 1px, transparent 0)`,
-          backgroundSize: '40px 40px'
+          backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
+          backgroundSize: '40px 40px',
         }}
       />
 
-      <div className="container max-w-5xl mx-auto text-center relative">
-        {/* Early access badge */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+      <div className="relative mx-auto w-full max-w-2xl">
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-800 text-sm px-4 py-2 rounded-full mb-8"
+          transition={{ duration: 0.4 }}
+          className="mb-5 text-sm font-medium tracking-wide text-gray-500 dark:text-gray-400"
         >
-          <Clock className="w-4 h-4" />
-          <span>Early access · {waitlistCount}+ restaurants waiting</span>
-        </motion.div>
-
-        {/* Main headline */}
-        <motion.h1 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-5xl md:text-7xl lg:text-8xl font-light mb-6 leading-tight"
-        >
-          <span className="block text-gray-900">Payments for</span>
-          <span className="block text-gray-900">business.</span>
-          <span className="relative mt-4 block">
-            <span className="relative z-10 bg-gradient-to-r from-black to-gray-600 bg-clip-text text-transparent">
-              Finally done right.
-            </span>
-            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 w-48 h-3 bg-yellow-200 -z-0 opacity-30" />
-          </span>
-        </motion.h1>
-
-        {/* Value prop */}
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-xl text-gray-400 max-w-2xl mx-auto mb-8"
-        >
-          One platform. One rate. No hidden fees.
-          <br />
-          Built for restaurants, retail, and everything in between.
+          eat · drink · drift
         </motion.p>
 
-        {/* Toggle - Default to owners */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-          className="flex justify-center mb-8"
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="mb-5 text-[1.75rem] font-semibold leading-[1.2] tracking-tight text-gray-900 dark:text-white sm:text-4xl sm:leading-tight md:text-[2.75rem]"
         >
-          <div className="bg-gray-100 p-1 rounded-full inline-flex shadow-sm">
-            <button
-              onClick={() => setView('diner')}
-              className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-                view === 'diner' 
-                  ? 'bg-black text-white shadow-md' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              👤 For diners
-            </button>
-            <button
-              onClick={() => setView('owner')}
-              className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-                view === 'owner' 
-                  ? 'bg-black text-white shadow-md' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              🏢 For owners
-            </button>
-          </div>
-        </motion.div>
+          Let tasting-room guests order and pay from their phones—tables turn faster
+          without chasing servers.
+        </motion.h1>
 
-        {/* Animated steps */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex justify-center gap-6 mb-8"
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="mb-8 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300 sm:text-lg"
         >
-          <AnimatePresence mode="wait">
-            {steps.map((step, i) => (
-              <motion.div
-                key={`${view}-${i}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex flex-col items-center"
-              >
-                <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white mb-1">
-                  {step.icon}
-                </div>
-                <span className="text-xs text-gray-500">{step.text}</span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+          Scan, order, pay, drift between tables—all from the guest&apos;s phone.
+          <br className="hidden sm:inline" />
+          <span className="sm:ml-0">
+            {' '}
+            Live in 7 minutes with your existing processor. No new hardware, no POS
+            replacement.
+          </span>
+        </motion.p>
 
-        {/* Tagline */}
+        <motion.ul
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+          className="mb-8 space-y-3"
+        >
+          {benefits.map((benefit) => (
+            <li key={benefit} className="flex items-start gap-3 text-sm sm:text-base">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white dark:bg-white dark:text-gray-900">
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </span>
+              <span className="text-gray-700 dark:text-gray-200">{benefit}</span>
+            </li>
+          ))}
+        </motion.ul>
+
         <motion.div
-          key={view}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-sm text-gray-400 mb-8"
-        >
-          {view === 'diner' 
-            ? 'Scan. Browse. Order. Pay.' 
-            : 'Start. Menu. Print. Paid.'}
-        </motion.div>
-
-        {/* Stats row */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.35 }}
-          className="flex justify-center gap-12 mb-8"
-        >
-          <div className="text-center">
-            <div className="text-2xl font-light text-gray-900">2.5%</div>
-            <div className="text-sm text-gray-400">Base rate</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-light text-gray-900">1.5%</div>
-            <div className="text-sm text-gray-400">At volume</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-light text-gray-900">Q2 2026</div>
-            <div className="text-sm text-gray-400">Launching Midwest</div>
-          </div>
-        </motion.div>
-
-        {/* CTA Buttons */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center mb-8"
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="mb-8"
         >
           <button
+            type="button"
             onClick={() => navigate('/signup')}
-            className="group px-8 py-4 bg-black text-white rounded-full hover:bg-gray-800 transition-all duration-300 text-lg font-light flex items-center justify-center gap-2 min-w-[200px]"
+            className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-gray-900 px-6 py-3.5 text-base font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 sm:w-auto"
           >
-            Get early access
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
-          <button
-            onClick={() => {
-              document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="px-8 py-4 bg-white text-black border border-gray-200 rounded-full hover:border-black transition-all duration-300 text-lg font-light min-w-[200px]"
-          >
-            See how it works
+            Start free
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </button>
         </motion.div>
 
-        {/* Great Lakes cities - BOLD and VISIBLE */}
-        <motion.div 
+        <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.45 }}
-          className="flex items-center justify-center gap-6 text-sm font-medium text-gray-600 flex-wrap"
+          transition={{ duration: 0.4, delay: 0.25 }}
+          className="border-t border-gray-100 pt-6 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400"
         >
-          <span className="flex items-center gap-1">
-            <MapPin className="w-4 h-4 text-gray-400" /> Milwaukee
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin className="w-4 h-4 text-gray-400" /> Chicago
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin className="w-4 h-4 text-gray-400" /> Detroit
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin className="w-4 h-4 text-gray-400" /> Cleveland
-          </span>
-          <span className="flex items-center gap-1 text-black font-semibold">
-            <MapPin className="w-4 h-4 text-gray-400" /> Your city?
-          </span>
-        </motion.div>
-
-        {/* Fine print */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-          className="text-xs text-gray-300 mt-6"
-        >
-          No credit card required · Free during early access
-        </motion.div>
+          Built for brewery taprooms and tasting rooms—not fine dining, counter-only
+          spots, or multi-location chains.
+        </motion.p>
       </div>
     </section>
   );

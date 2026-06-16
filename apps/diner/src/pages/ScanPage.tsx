@@ -189,7 +189,7 @@ export function ScanPage() {
             </p>
             <button
               type="button"
-              onClick={openAddCard}
+              onClick={() => openAddCard()}
               className="mt-6 w-full py-3 text-[15px] font-medium text-[var(--drift-ink-muted)] hover:text-[var(--drift-ink)] transition-colors"
             >
               Add card for faster checkout

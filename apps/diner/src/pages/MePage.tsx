@@ -79,7 +79,7 @@ export function MePage() {
               <span className="text-sm text-[var(--drift-ink-muted)]">Scan & order</span>
             </div>
           </button>
-          <button type="button" onClick={openAddCard} className={navRowClass}>
+          <button type="button" onClick={() => openAddCard()} className={navRowClass}>
             <span className="w-10 h-10 rounded-xl bg-[var(--drift-surface-overlay)] flex items-center justify-center flex-shrink-0">
               <CreditCard className="w-5 h-5 text-[var(--drift-ink-muted)]" strokeWidth={1.5} />
             </span>
