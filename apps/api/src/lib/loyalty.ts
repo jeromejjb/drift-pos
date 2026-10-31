@@ -3,7 +3,9 @@
  * Tiers: BRONZE 1x, SILVER 1.25x, GOLD 1.5x
  */
 
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
+
+type LoyaltyDb = PrismaClient | Prisma.TransactionClient;
 
 const POINTS_PER_DOLLAR = 1;
 const TIER_MULTIPLIERS: Record<string, number> = {
@@ -13,7 +15,7 @@ const TIER_MULTIPLIERS: Record<string, number> = {
 };
 
 export async function awardLoyaltyPoints(
-  prisma: PrismaClient,
+  prisma: LoyaltyDb,
   params: { restaurantId: string; userId: string; orderTotal: number; orderId: string; userEmail?: string }
 ) {
   const { restaurantId, userId, orderTotal, userEmail } = params;

@@ -9,6 +9,7 @@ interface OrderSummary {
   id: string;
   total: number;
   tipAmount: number;
+  paymentStatus?: string;
   restaurantName: string;
   tableNumber: number;
   items: { name: string; quantity: number; price: number }[];
@@ -26,13 +27,31 @@ export function ConfirmationPage() {
       setLoading(false);
       return;
     }
-    fetch(`${API_URL}/api/order/${orderId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        setOrder(data);
-      })
-      .catch(() => setOrder(null))
-      .finally(() => setLoading(false));
+    let stop = false;
+    const load = () =>
+      fetch(`${API_URL}/api/order/${orderId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!stop && data) setOrder(data);
+          return data;
+        })
+        .catch(() => null);
+
+    load().finally(() => {
+      if (!stop) setLoading(false);
+    });
+    const timer = setInterval(async () => {
+      const data = await load();
+      if (data?.paymentStatus === 'PAID' || data?.paymentStatus === 'FAILED' || data?.paymentStatus === 'REFUNDED') {
+        clearInterval(timer);
+      }
+    }, 2000);
+    const stopAfter = setTimeout(() => clearInterval(timer), 20000);
+    return () => {
+      stop = true;
+      clearInterval(timer);
+      clearTimeout(stopAfter);
+    };
   }, [orderId]);
 
   if (loading) {
@@ -49,9 +68,15 @@ export function ConfirmationPage() {
         <div className="w-24 h-24 rounded-full bg-[var(--drift-accent-muted)] flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="w-12 h-12 text-[var(--drift-accent)]" strokeWidth={2} />
         </div>
-        <h1 className="text-2xl font-bold text-[var(--drift-ink)] mb-2">Order confirmed</h1>
+        <h1 className="text-2xl font-bold text-[var(--drift-ink)] mb-2">
+          {order?.paymentStatus === 'PAID' ? 'Payment received' : 'Order sent'}
+        </h1>
         <p className="text-[var(--drift-ink-muted)] text-sm mb-6">
-          Your order has been sent to the kitchen.
+          {order?.paymentStatus === 'PAID'
+            ? 'The restaurant has the payment. Your order is in the kitchen.'
+            : order?.paymentStatus === 'FAILED'
+              ? 'The card was declined. Ask the restaurant to try again.'
+              : 'Your order has been sent. Payment confirmation can take a moment.'}
         </p>
 
         {order && (

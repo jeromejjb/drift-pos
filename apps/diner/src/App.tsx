@@ -3,14 +3,9 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AddCardProvider } from './contexts/AddCardContext';
 import { BottomNav } from './components/BottomNav';
 import { shouldShowNav } from './config/nav';
-import { ScanPage } from './pages/ScanPage';
-import { TablePage } from './pages/TablePage';
-import { MenuPage } from './pages/MenuPage';
-import { CartPage } from './pages/CartPage';
-import { PaymentPage } from './pages/PaymentPage';
 import { PaymentReturnPage } from './pages/PaymentReturnPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
-import { ConfirmationPage } from './pages/ConfirmationPage';
+import { qrTableOrderRoutes } from './qr/routes';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { SettingsRedirect } from './pages/SettingsRedirect';
@@ -20,13 +15,8 @@ import './index.css';
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<ScanPage />} />
-      <Route path="/table/:tableId" element={<TablePage />} />
-      <Route path="/menu/:tableId" element={<MenuPage />} />
-      <Route path="/cart/:tableId" element={<CartPage />} />
-      <Route path="/payment/:tableId" element={<PaymentPage />} />
+      {qrTableOrderRoutes}
       <Route path="/payment/return" element={<PaymentReturnPage />} />
-      <Route path="/confirmation/:orderId" element={<ConfirmationPage />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/signup" element={<SignUpPage />} />

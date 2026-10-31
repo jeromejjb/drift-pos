@@ -190,7 +190,7 @@ npm run dev --workspace=apps/landing
 ### Stripe webhooks (local)
 
 ```bash
-stripe listen --forward-to localhost:3001/api/stripe/webhook
+stripe listen --forward-to localhost:3001/api/stripe/webhook --forward-connect-to localhost:3001/api/stripe/webhook
 ```
 
 Put the signing secret in `STRIPE_WEBHOOK_SECRET` in `.env`.
@@ -220,15 +220,56 @@ Sign-in is optional; it enables saving a card for faster checkout. See [`apps/di
 
 ## Payments
 
-Drift uses **Stripe** for restaurant payouts and table checkout:
+Drift uses **Stripe Connect Express** for restaurant payouts and **destination charges** for table checkout. QR ordering is a separate diner route group (`apps/diner/src/qr`) that calls the same payment endpoint.
 
-- **Table pay** — Card charge with funds transferred to the restaurant’s Stripe Connect account.
-- **Restaurant onboarding** — Stripe Connect Express; configured in the restaurant onboarding flow.
-- **Saved cards** — Stripe SetupIntent + Customer (diner, optional).
+- **Restaurant onboarding** — The app collects the business name and email, creates an Express account, and hands identity and the bank account to Stripe (embedded onboarding when `VITE_STRIPE_PUBLISHABLE_KEY` is set, otherwise a hosted Account Link). Drift does not store routing or account numbers.
+- **Test merchant** — With an `sk_test_` key, onboarding offers “Use a Stripe test account”. That creates a Custom connected account with Stripe’s test fixtures so charges and payouts work without the hosted form. Live keys ignore this.
+- **Table pay** — a direct charge on the restaurant’s connected account. Drift’s application fee is `PLATFORM_FEE_RATE` (default 1.5% margin). The restaurant pays Stripe’s card fee. Line prices, tax, and tip are recomputed on the server.
+- **Payouts** — The restaurant app’s Payouts page lists the Connect balance and can pay out the available balance. `account.updated` and `payout.*` webhooks keep the database in sync.
+- **Webhooks** — `POST /api/stripe/webhook` requires the raw body and `Stripe-Signature`. Events are stored by id so retries do not double-charge, double-credit, or double-pay. Handled types include `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `refund.created`, `account.updated`, and `payout.*`. A paid order becomes `paymentStatus=PAID` and, if it was still `PENDING`, `CONFIRMED` for the kitchen. It is not marked completed just because the card succeeded.
 
-End-to-end architecture and flows: [`docs/PAYMENT_SYSTEM_OUTLINE.md`](docs/PAYMENT_SYSTEM_OUTLINE.md).
+### Run the money flow locally
 
-Shorter overview: [`docs/HOW_PAYMENTS_WORK.md`](docs/HOW_PAYMENTS_WORK.md).
+1. Copy `.env.example` to `.env`. Set `DATABASE_URL`, `JWT_SECRET`, `STRIPE_SECRET_KEY=sk_test_...`, and `VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...`. Leave live keys unset.
+2. In the Stripe Dashboard (test mode):
+   - **Settings → Connect**: enable Express. Also enable **Custom** if you want the one-click test merchant or `npm run test:payments`.
+   - **Settings → Connect → Branding / integration**: embedded onboarding components, if you want the in-app Stripe form. Hosted Account Links work without them.
+3. Create the database and seed the demo kitchen, menu, and table 1:
+
+   ```bash
+   cd apps/api
+   npm run db:push
+   npm run db:seed
+   ```
+
+   With a real `sk_test_` key, seed also provisions a chargeable test merchant (`SEED_STRIPE_CONNECT=0` skips that). Seed prints the table URL.
+4. Start the API, diner, and restaurant app (`npm run dev` from the repo root).
+5. Forward webhooks:
+
+   ```bash
+   stripe login
+   stripe listen --forward-to localhost:3001/api/stripe/webhook --forward-connect-to localhost:3001/api/stripe/webhook
+   ```
+
+   Put the CLI’s `whsec_...` signing secret in `STRIPE_WEBHOOK_SECRET` and restart the API. Subscribe at least to `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `refund.created`, `account.updated`, `payout.paid`, `payout.failed`, and `payout.created`.
+6. Restaurant: open the onboarding payment step (`/onboarding?restaurantId=RESTAURANT_ID&step=bank`) and continue with Stripe, or use the test-account button. Then open **Payouts**.
+7. Diner: open the seeded table URL (or scan the table QR). Add an item, pay with `4242 4242 4242 4242`, any future expiry, any CVC. The order shows up on the restaurant board as confirmed once the webhook lands. Pay out the available balance from **Payouts**. Decline with `4000 0000 0000 0002`.
+
+### Tests
+
+```bash
+npm test
+```
+
+Checkout, webhook signature/idempotency, refunds, failed payments, and payouts run against Postgres with Stripe stubbed. They do not call Stripe.
+
+```bash
+RUN_STRIPE_E2E=1 npm run test:payments
+```
+
+That reruns the API tests and the live test-mode flow: onboard a restaurant, confirm a PaymentIntent with `pm_card_visa`, deliver the signed webhook, pay out when the balance is available, then refund. It refuses to run unless `STRIPE_SECRET_KEY` is a real `sk_test_` key.
+
+End-to-end architecture: [`docs/PAYMENT_SYSTEM_OUTLINE.md`](docs/PAYMENT_SYSTEM_OUTLINE.md). Shorter overview: [`docs/HOW_PAYMENTS_WORK.md`](docs/HOW_PAYMENTS_WORK.md). Dashboard checklist: [`docs/PAYMENT_TEST_GUIDE.md`](docs/PAYMENT_TEST_GUIDE.md).
 
 ---
 

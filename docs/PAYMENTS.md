@@ -14,14 +14,13 @@ Drift uses **Stripe Connect** so restaurants receive payouts directly. When a di
 
 ### 1. Restaurant onboarding (Bank Account)
 
-During onboarding, restaurants connect a **Stripe Connected Account** via the Bank Account step:
+During onboarding, restaurants connect a **Stripe Express account**. Drift asks for the business name and email, then Stripe collects identity and the bank account (embedded onboarding, or a hosted Account Link if the publishable key is not set).
 
-- **Endpoint:** `POST /api/stripe/create-account`
-- **Data collected:** Business name, email, full name, DOB, SSN last 4, bank account (routing + account number)
-- **Result:** Restaurant gets `stripeAccount` (Stripe account ID) stored in the database
-- **Test values:** SSN `0000`, routing `110000000`, account `000123456789` (see `apps/restaurant/TEST_ONBOARDING.md`)
+- **Endpoint:** `POST /api/stripe/create-account` (restaurant JWT required)
+- **Saved immediately:** `stripeAccount` on the restaurant row, before the response returns
+- **Test mode shortcut:** send `completeInTestMode: true` (or use the button in the onboarding step) to provision a Custom account with Stripe's test fixtures. Live keys reject this. Test bank: routing `110000000`, account `000123456789`
 
-Until this step is complete, the restaurant **cannot accept card payments** from diners.
+Until charges are enabled, the restaurant **cannot accept card payments** from diners.
 
 ### Diner checkout (Order payment)
 
@@ -34,7 +33,7 @@ When a diner pays at the table (via QR → menu → checkout):
 
 ## Demo Restaurant
 
-The **demo account** (`demo@driftpos.com`) is seeded **without** a Stripe account. This means:
+The **demo account** (`demo@driftpos.com`) is seeded **with** a Stripe test merchant when `STRIPE_SECRET_KEY` is a real `sk_test_` key and Custom accounts are enabled. Otherwise it is seeded without one. That means:
 
 | What works | What doesn't |
 |------------|--------------|
@@ -67,6 +66,41 @@ When `STRIPE_SECRET_KEY` starts with `sk_test_`, all operations use Stripe test 
 | `POST /api/stripe/payment` | Generic payment (amount + destination, platform fee to Drift) |
 | `POST /api/stripe/webhook` | Stripe webhooks (payment confirmation, etc.) |
 
-## Platform Fee
+## How a charge is structured
 
-Drift charges a percentage of each transaction (see `apps/api/src/lib/rates.ts`). The fee is taken as `application_fee_amount` on the PaymentIntent and stays with the platform; the rest is transferred to the restaurant.
+Table checkout is a **direct charge** on the restaurant’s connected account. Stripe bills that account for card processing. Drift’s only take is `application_fee_amount`, which is the configured margin. The platform does not pay the 2.9% + 30¢, so a transaction cannot lose money.
+
+Destination charges were the previous shape. On those, the platform pays Stripe’s processing fee and also keeps the application fee. A 2.5% application fee on a $40 order is $1.00, while Stripe’s fee is $1.46, so Drift lost about $0.46 per order.
+
+Direct charges fit Express Connect: the restaurant is the merchant of record (statement descriptor, disputes, and Stripe fees sit on their account), and the diner’s Payment Element is initialized with that connected account id.
+
+Margin is one setting:
+
+- `PLATFORM_FEE_RATE` (default **0.015**)
+- `PLATFORM_VOLUME_FEE_RATE` after `PLATFORM_VOLUME_THRESHOLD` paid dollars in the month (default **0.01** / **50000**)
+- `restaurant.platformFeeRate` overrides the schedule for that restaurant
+- `STRIPE_PROCESSING_RATE` and `STRIPE_PROCESSING_FIXED_CENTS` are the estimate of what the connected account pays Stripe (default **0.029** and **30**). They are not added on top of Drift’s fee.
+
+Order amounts are recomputed on the server from menu prices. The client’s price and total are ignored. Tax is `restaurant.taxRate`. Tip is a percent of the pre-tax subtotal.
+
+A paid order stays in kitchen status `PENDING` (the New column) with `paymentStatus=PAID`. Staff move it to completed. Unpaid QR orders stay off that board.
+
+### $40 order
+
+Guest pays **$40.00**. Drift’s margin is 1.5%. Stripe’s card fee, paid by the restaurant, is 2.9% + 30¢.
+
+| Line | Amount |
+|------|--------|
+| Amount charged | $40.00 |
+| Stripe processing (restaurant pays) | $1.46 |
+| Drift application fee (1.5%) | $0.60 |
+| Restaurant nets | $37.94 |
+| Drift nets | $0.60 |
+
+The old destination-charge math on the same order: Drift kept $1.00 (2.5%) and paid Stripe $1.46, net **−$0.46**.
+
+Webhook forwarding for direct charges must include connected-account events:
+
+```bash
+stripe listen --forward-to localhost:3001/api/stripe/webhook --forward-connect-to localhost:3001/api/stripe/webhook
+```

@@ -6,7 +6,8 @@ import {
   Home, 
   Grid, 
   List, 
-  Settings, 
+  Settings,
+  DollarSign,
   QrCode,
   Menu,
   X,
@@ -77,6 +78,7 @@ export function Layout({ children, title }: LayoutProps) {
     { path: 'orders', icon: List, label: 'Orders', description: 'Active & past orders' },
     { path: 'menu', icon: Store, label: 'Menu', description: 'Edit your menu items' },
     { path: 'pos', icon: Plus, label: 'Quick Order', description: 'Place orders manually' },
+    { path: 'payouts', icon: DollarSign, label: 'Payouts', description: 'Balance and bank deposits' },
     { path: 'settings', icon: Settings, label: 'Settings', description: 'Restaurant preferences' },
   ];
 

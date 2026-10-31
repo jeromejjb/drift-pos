@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "test": "npm run test -w apps/api && npm run test -w apps/restaurant",
+    "test:payments": "npm run test -w apps/api",
     "test:output": "./scripts/test-output.sh",
     "test:restaurant": "node scripts/restaurant-flow-test.mjs",
     "test:e2e:demo": "node scripts/e2e-demo.mjs",

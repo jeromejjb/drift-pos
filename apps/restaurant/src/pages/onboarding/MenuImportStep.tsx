@@ -467,7 +467,7 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
         id: Date.now().toString() + itemIdx,
         name: itemName,
         description: '',
-        price: 0,
+        price: [9, 12, 14, 16, 18, 8][itemIdx % 6],
         category: cat.name,
         popular: false,
         available: true
@@ -506,6 +506,18 @@ export function MenuImportStep({ data, updateData, onNext, onPrev }: Props) {
             <h2 className="text-3xl font-light mb-2">Add your menu</h2>
             <p className="text-gray-400">Choose how you'd like to get started</p>
           </div>
+
+          <Card padding="lg" className="mb-6 bg-amber-50 border-amber-200">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-medium mb-1">Use a sample menu</h3>
+                <p className="text-sm text-gray-600">
+                  Start with priced dishes so you can place a test order today. Change names and prices before you open.
+                </p>
+              </div>
+              <Button type="button" onClick={() => loadTemplate('american')}>Use sample menu</Button>
+            </div>
+          </Card>
 
           {/* Manual Entry - Featured Option */}
           <Card padding="lg" className="mb-6 border-2 border-black hover:shadow-lg transition-all cursor-pointer" onClick={() => setMode('manual')}>

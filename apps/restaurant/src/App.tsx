@@ -6,6 +6,7 @@ import { OrdersPage } from './pages/OrdersPage';
 import { MenuPage } from './pages/MenuPage';
 import { PosPage } from './pages/PosPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PayoutsPage } from './pages/PayoutsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { useEffect } from 'react';
 import { config } from './lib/config';
@@ -117,6 +118,12 @@ function App() {
           element={
             token ? <SettingsPage /> : <RedirectToLandingLogin />
           } 
+        />
+        <Route
+          path="/payouts/:restaurantId"
+          element={
+            token ? <PayoutsPage /> : <RedirectToLandingLogin />
+          }
         />
         <Route 
           path="/analytics/:restaurantId" 

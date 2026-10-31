@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Gift } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -9,6 +9,16 @@ import { toPaymentError, toConnectionError } from '../lib/userErrors';
 import { InlineError } from '../components/ui/InlineError';
 
 const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
+
+/** One in-flight checkout per cart, shared across React strict-mode remounts. */
+const checkoutJobs = new Map<string, Promise<{
+  orderId: string;
+  clientSecret: string | null;
+  error: string | null;
+  tip: number;
+  connectedAccountId?: string | null;
+  amount?: number | null;
+}>>();
 
 export function PaymentPage() {
   const { tableId } = useParams();
@@ -25,6 +35,15 @@ export function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connectedAccountId, setConnectedAccountId] = useState<string | null>(null);
+  const [chargedTotal, setChargedTotal] = useState<number | null>(null);
+  const stripeForCharge = useMemo(
+    () =>
+      STRIPE_PUBLISHABLE_KEY && connectedAccountId
+        ? loadStripe(STRIPE_PUBLISHABLE_KEY, { stripeAccount: connectedAccountId })
+        : null,
+    [connectedAccountId]
+  );
 
   useEffect(() => {
     const savedCart = localStorage.getItem('drift-cart');
@@ -64,6 +83,169 @@ export function PaymentPage() {
       .catch(() => {});
   }, [accessToken, restaurantId]);
 
+  const storedTaxRate = Number(localStorage.getItem('drift-tax-rate') || '0');
+  const taxRate = Number.isFinite(storedTaxRate) ? storedTaxRate : 0;
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const tax = subtotal * taxRate;
+  const tip = (subtotal * tipPercent) / 100;
+  // The API charges `total` plus `tipAmount`. Sending a total that already includes tip double-charges it.
+  const orderTotal = subtotal + tax;
+  const total = orderTotal + tip;
+  const tipApplied = useRef<number | null>(null);
+  const checkoutKey = `${tableId}:${restaurantId}:${cartItems.map((item) => `${item.id}x${item.quantity}`).join(',')}`;
+
+  const requestPaymentIntent = useCallback(async (id: string, tipValue: number) => {
+    const payController = new AbortController();
+    const payTimeoutId = setTimeout(() => payController.abort(), 60000);
+    const payRes = await fetch(`${API_URL}/api/stripe/order/${id}/create-payment-intent`, {
+      method: 'POST',
+      signal: payController.signal,
+      headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipPercent: tipValue,
+          ...(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
+        }),
+    });
+    clearTimeout(payTimeoutId);
+    const payJson = await payRes.json().catch(() => ({}));
+    if (!payRes.ok) {
+      const message = payJson.code === 'RESTAURANT_NO_STRIPE'
+        ? "This restaurant isn't set up for card payments yet. Please pay at the table."
+        : toPaymentError(payJson.error, payRes.status);
+      return { clientSecret: null as string | null, error: message };
+    }
+    if (!payJson.clientSecret) {
+      return { clientSecret: null, error: toPaymentError('Invalid payment response'), connectedAccountId: null, amount: null };
+    }
+    localStorage.setItem('drift-pending-order', id);
+    const amount = typeof payJson.amountCents === 'number' ? payJson.amountCents / 100 : null;
+    return {
+      clientSecret: payJson.clientSecret as string,
+      error: null,
+      connectedAccountId: (payJson.connectedAccountId as string) || null,
+      amount,
+    };
+  }, [dinerProfile?.stripeCustomerId]);
+
+  const applyIntent = useCallback((id: string, tipValue: number, clientSecretValue: string | null, message: string | null) => {
+    setOrderId(id);
+    setClientSecret(clientSecretValue);
+    setError(message);
+    if (clientSecretValue) tipApplied.current = tipValue;
+  }, []);
+
+  useEffect(() => {
+    if (loading || !cartItems.length || !restaurantId || !tableId) return;
+    let cancelled = false;
+    setPiLoading(true);
+    let job = checkoutJobs.get(checkoutKey);
+    if (!job) {
+      const tipAtStart = tip;
+      job = (async () => {
+        if (!STRIPE_PUBLISHABLE_KEY) {
+          return { orderId: '', clientSecret: null, error: 'Card payment isn’t available right now. Please pay at the table or try again later.', tip: tipAtStart };
+        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        try {
+          const userId = dinerProfile?.id ?? 'guest-' + Math.random().toString(36).slice(2, 11);
+          const orderRes = await fetch(`${API_URL}/api/orders`, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+            body: JSON.stringify({
+              restaurantId,
+              tableId,
+              userId,
+              items: cartItems.map((item: any) => ({ menuItemId: item.id, quantity: item.quantity })),
+              tipPercent: tipAtStart,
+            }),
+          });
+          clearTimeout(timeoutId);
+          const orderText = await orderRes.text();
+          if (!orderRes.ok) {
+            const errData = orderText ? (() => { try { return JSON.parse(orderText); } catch { return {}; } })() : {};
+            return { orderId: '', clientSecret: null, error: toPaymentError(errData.error || orderText, orderRes.status), tip: tipAtStart };
+          }
+          const order = JSON.parse(orderText);
+          const payController = new AbortController();
+          const payTimeoutId = setTimeout(() => payController.abort(), 60000);
+          const payRes = await fetch(`${API_URL}/api/stripe/order/${order.id}/create-payment-intent`, {
+            method: 'POST',
+            signal: payController.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipPercent: tipAtStart,
+              ...(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
+            }),
+          });
+          clearTimeout(payTimeoutId);
+          const payJson = await payRes.json().catch(() => ({}));
+          if (!payRes.ok) {
+            const message = payJson.code === 'RESTAURANT_NO_STRIPE'
+              ? "This restaurant isn't set up for card payments yet. Please pay at the table."
+              : toPaymentError(payJson.error, payRes.status);
+            return { orderId: order.id, clientSecret: null, error: message, tip: tipAtStart };
+          }
+          localStorage.setItem('drift-pending-order', order.id);
+          return {
+            orderId: order.id as string,
+            clientSecret: (payJson.clientSecret as string) || null,
+            error: payJson.clientSecret ? null : toPaymentError('Invalid payment response'),
+            tip: tipAtStart,
+            connectedAccountId: (payJson.connectedAccountId as string) || null,
+            amount: typeof payJson.amountCents === 'number' ? payJson.amountCents / 100 : (order.total + (order.tipAmount ?? 0)),
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '';
+          const message = msg.includes('fetch') || msg.includes('network') || msg.includes('abort')
+            ? toConnectionError(API_URL)
+            : toPaymentError(msg);
+          return { orderId: '', clientSecret: null, error: message, tip: tipAtStart };
+        }
+      })();
+      checkoutJobs.set(checkoutKey, job);
+    }
+    job.then((result) => {
+      if (cancelled) return;
+      if (result.error && !result.orderId) checkoutJobs.delete(checkoutKey);
+      if (result.orderId) {
+        applyIntent(result.orderId, result.tip, result.clientSecret, result.error);
+        if (result.connectedAccountId) setConnectedAccountId(result.connectedAccountId);
+        if (typeof result.amount === 'number') setChargedTotal(result.amount);
+      }
+      else setError(result.error);
+      setPiLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Tip changes refresh the PaymentIntent below; they must not create another order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, checkoutKey, applyIntent]);
+
+  useEffect(() => {
+    if (!orderId || tipApplied.current == null || tipApplied.current === tip) return;
+    let cancelled = false;
+    setPiLoading(true);
+    setError(null);
+    requestPaymentIntent(orderId, tip)
+      .then((result) => {
+        if (cancelled) return;
+        setClientSecret(result.clientSecret);
+        setError(result.error);
+        if (result.connectedAccountId) setConnectedAccountId(result.connectedAccountId);
+        if (typeof result.amount === 'number') setChargedTotal(result.amount);
+        if (result.clientSecret) tipApplied.current = tip;
+      })
+      .finally(() => {
+        if (!cancelled) setPiLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, tip, requestPaymentIntent]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--drift-surface-elevated)] flex items-center justify-center">
@@ -72,98 +254,7 @@ export function PaymentPage() {
     );
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.1;
-  const tip = (subtotal * tipPercent) / 100;
-  const total = subtotal + tax + tip;
-
-  const createOrderAndGetPaymentIntent = useCallback(async () => {
-    setError(null);
-    setClientSecret(null);
-    if (!tableId || !restaurantId || !cartItems.length) {
-      setError('Missing table, restaurant, or cart. Please go back to the menu.');
-      return;
-    }
-    if (!STRIPE_PUBLISHABLE_KEY) {
-      setError('Card payment isn’t available right now. Please pay at the table or try again later.');
-      return;
-    }
-    setPiLoading(true);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-      const userId = dinerProfile?.id ?? 'guest-' + Math.random().toString(36).slice(2, 11);
-      const orderRes = await fetch(`${API_URL}/api/orders`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
-        body: JSON.stringify({
-          restaurantId,
-          tableId,
-          userId,
-          items: cartItems.map((item: any) => ({
-            menuItemId: item.id,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          total,
-          tip,
-        }),
-      });
-      clearTimeout(timeoutId);
-      const orderText = await orderRes.text();
-      if (!orderRes.ok) {
-        const errData = orderText ? (() => { try { return JSON.parse(orderText); } catch { return {}; } })() : {};
-        setError(toPaymentError(errData.error || orderText, orderRes.status));
-        return;
-      }
-      const order = JSON.parse(orderText);
-      setOrderId(order.id);
-
-      const payController = new AbortController();
-      const payTimeoutId = setTimeout(() => payController.abort(), 60000);
-      const payRes = await fetch(
-        `${API_URL}/api/stripe/order/${order.id}/create-payment-intent`,
-        {
-          method: 'POST',
-          signal: payController.signal,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
-        }
-      );
-      clearTimeout(payTimeoutId);
-      const payJson = await payRes.json().catch(() => ({}));
-      if (!payRes.ok) {
-        if (payJson.code === 'RESTAURANT_NO_STRIPE') {
-          setError("This restaurant isn't set up for card payments yet. Please pay at the table.");
-        } else {
-          setError(toPaymentError(payJson.error, payRes.status));
-        }
-        return;
-      }
-      if (payJson.clientSecret) {
-        setClientSecret(payJson.clientSecret);
-        localStorage.setItem('drift-pending-order', order.id);
-      } else {
-        setError(toPaymentError('Invalid payment response'));
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('fetch') || msg.includes('network') || msg.includes('abort')) {
-        setError(toConnectionError(API_URL));
-      } else {
-        setError(toPaymentError(msg));
-      }
-    } finally {
-      setPiLoading(false);
-    }
-  }, [tableId, restaurantId, cartItems, total, tip, dinerProfile?.id, dinerProfile?.stripeCustomerId, accessToken]);
-
-  // Effortless: create order + PI as soon as we have cart and tip
-  useEffect(() => {
-    if (loading || !cartItems.length || !restaurantId || !tableId) return;
-    createOrderAndGetPaymentIntent();
-  }, [loading, cartItems.length, restaurantId, tableId, tipPercent, createOrderAndGetPaymentIntent]);
+  const payable = chargedTotal ?? total;
 
   const handlePaymentSuccess = () => {
     localStorage.removeItem('drift-cart');
@@ -245,7 +336,7 @@ export function PaymentPage() {
         <div className="bg-[var(--drift-accent)] text-white rounded-[var(--drift-radius-xl)] p-5 mb-5 shadow-[0_4px_16px_var(--drift-accent-glow)]">
           <div className="flex justify-between items-center">
             <span className="text-white/90 font-medium">Total</span>
-            <span className="text-3xl font-bold tabular-nums">${total.toFixed(2)}</span>
+            <span className="text-3xl font-bold tabular-nums">${payable.toFixed(2)}</span>
           </div>
         </div>
 
@@ -268,7 +359,7 @@ export function PaymentPage() {
             <Gift className="w-5 h-5 text-[var(--drift-accent)] shrink-0" />
             <div>
               <p className="font-medium text-[var(--drift-ink)] text-sm">
-                Earn ~{Math.floor(total)} pts on this order
+                Earn ~{Math.floor(payable)} pts on this order
               </p>
               <p className="text-xs text-[var(--drift-ink-muted)]">
                 {loyalty ? `${loyalty.points} pts total · ${loyalty.tier}` : '1 pt per $1 · Points save automatically'}
@@ -279,7 +370,22 @@ export function PaymentPage() {
 
         {error && (
           <div className="mb-4">
-            <InlineError message={error} onRetry={() => { setError(null); createOrderAndGetPaymentIntent(); }} />
+            <InlineError message={error} onRetry={() => {
+              setError(null);
+              if (orderId) {
+                setPiLoading(true);
+                requestPaymentIntent(orderId, tip).then((result) => {
+                  setClientSecret(result.clientSecret);
+                  setError(result.error);
+                  if (result.connectedAccountId) setConnectedAccountId(result.connectedAccountId);
+                  if (typeof result.amount === 'number') setChargedTotal(result.amount);
+                  if (result.clientSecret) tipApplied.current = tip;
+                }).finally(() => setPiLoading(false));
+              } else {
+                checkoutJobs.delete(checkoutKey);
+                window.location.reload();
+              }
+            }} />
           </div>
         )}
 
@@ -288,9 +394,9 @@ export function PaymentPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--drift-border)] border-t-[var(--drift-accent)]" />
             <p className="text-[15px] text-[var(--drift-ink-muted)]">Preparing payment…</p>
           </div>
-        ) : clientSecret && stripePromise ? (
-          <Elements stripe={stripePromise} options={{ clientSecret }} key={clientSecret}>
-            <CheckoutForm onSuccess={handlePaymentSuccess} amount={total} />
+        ) : clientSecret && stripeForCharge ? (
+          <Elements stripe={stripeForCharge} options={{ clientSecret }} key={clientSecret}>
+            <CheckoutForm onSuccess={handlePaymentSuccess} amount={payable} />
           </Elements>
         ) : null}
       </div>

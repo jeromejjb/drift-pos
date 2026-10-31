@@ -68,16 +68,13 @@
 
 **Check:** No "Failed to generate QR codes". PDF downloads.
 
-### Step 7: Bank Account (Stripe)
+### Step 7: Payment account (Stripe Connect Express)
 
-1. Fill business name, full name, email, address
-2. DOB (e.g. 01/15/1990)
-3. SSN last 4: use `0000` for test mode
-4. Bank: use Stripe test routing `110000000`, account `000123456789`
-5. Accept TOS
-6. Submit
+1. Confirm business name, owner name, and email
+2. **Continue with Stripe** — Stripe collects identity and the bank account (Drift does not)
+3. Or, when the API is in test mode, **Use a Stripe test account**
 
-**Check:** No API error. Proceeds to Complete.
+**Check:** No API error. The restaurant row has `stripeAccount` before you continue. Hosted onboarding returns to the complete step. A test account skips straight there once `charges_enabled` is true.
 
 ### Step 8: Complete
 
@@ -113,6 +110,10 @@ Use when testing onboarding in isolation (e.g. restaurant already exists in DB).
 
 ## Stripe Test Values
 
-- **Routing number:** `110000000` (Stripe test)
-- **Account number:** `000123456789` (Stripe test)
-- **SSN last 4:** any non-repeating 4-digit value such as `1234` (use your real last 4 in live mode)
+Used by the test-mode merchant button and by seed. Enter these in Stripe's own form if you use hosted Express onboarding instead. Do not paste them into Drift.
+
+- **Routing number:** `110000000`
+- **Account number:** `000123456789`
+- **SSN:** `000000000` (last 4 `0000`)
+- **Address line 1:** `address_full_match`
+- **Card:** `4242 4242 4242 4242`

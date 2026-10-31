@@ -70,32 +70,8 @@ export function CompleteStep({ restaurantId, data }: CompleteStepProps) {
     checkPaymentStatus();
   }, [restaurantId]);
 
-  const handleFinishPaymentSetup = async () => {
-    if (!stripeAccountId || paymentActionLoading) {
-      // If we don't know the account ID yet, send them to Billing where they can finish setup.
-      window.location.href = `/settings?tab=billing`;
-      return;
-    }
-    setPaymentActionLoading(true);
-    try {
-      const token = localStorage.getItem('drift-token');
-      const res = await fetch(`${config.apiUrl}/api/stripe/login-link/${stripeAccountId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.url) {
-        throw new Error(json.error || 'Failed to open Stripe payment dashboard.');
-      }
-      window.location.href = json.url as string;
-    } catch (err: any) {
-      setError(err?.message || 'Failed to open Stripe payment dashboard.');
-    } finally {
-      setPaymentActionLoading(false);
-    }
+  const handleFinishPaymentSetup = () => {
+    window.location.href = `/onboarding?restaurantId=${encodeURIComponent(restaurantId)}&step=bank`;
   };
 
   const handleGoToDashboard = async () => {
@@ -141,12 +117,13 @@ export function CompleteStep({ restaurantId, data }: CompleteStepProps) {
       </div>
       
       <h2 className="text-3xl font-light text-gray-900 mb-4">
-        You're all set! 🎉
+        {paymentStatus === 'ready' ? "You're ready to take a table payment" : 'Almost there'}
       </h2>
       
-      <p className="text-gray-400 mb-6 max-w-md mx-auto">
-        Your restaurant is ready to start accepting orders. We’ll also make sure your payouts
-        are set up so you can get paid out automatically.
+      <p className="text-gray-500 mb-6 max-w-md mx-auto">
+        {paymentStatus === 'ready'
+          ? 'Menu, tables, and payouts are in place. Open a table QR code and place a test order with card 4242 4242 4242 4242.'
+          : 'The menu and tables can be used now. Card payments stay off until Stripe finishes verifying the restaurant.'}
       </p>
 
       {/* Payment readiness status */}
@@ -174,7 +151,7 @@ export function CompleteStep({ restaurantId, data }: CompleteStepProps) {
         {paymentStatus === 'incomplete' && (
           <div className="mt-4">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={handleFinishPaymentSetup}
               disabled={paymentActionLoading}

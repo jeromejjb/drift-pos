@@ -42,15 +42,12 @@ If you leave the default, you'll hit the deployed API (good for testing with rea
    - Go to http://localhost:5175/onboarding?restaurantId=YOUR_RESTAURANT_ID
    - Add `&token=YOUR_JWT` if you have one
 
-3. **Complete steps** until **Bank Account** (step 7):
-   - Business name, full name, email
-   - **Payout address** (required): street, city, state, ZIP
-   - DOB (e.g. Jan 15, 1990)
-   - SSN last 4: `0000` (test mode)
-   - Bank: routing `110000000`, account `000123456789`
-   - Accept TOS → Continue
+3. **Payment account step** (`step=bank`):
+   - Business name, owner name, email
+   - **Continue with Stripe** opens Express onboarding (Stripe collects the bank account)
+   - Or, in test mode, **Use a Stripe test account** (routing `110000000`, account `000123456789`). No real money moves.
 
-4. **Check:** No API error, proceeds to Complete.
+4. **Check:** The API returns an account id and the restaurant row has `stripeAccount` set before you leave the page. Then open **Payouts**.
 
 ---
 

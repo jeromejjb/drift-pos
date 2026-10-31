@@ -7,6 +7,7 @@ export interface Restaurant {
   name: string;
   address: string | null;
   logo: string | null;
+  taxRate?: number;
   tables: Table[];
 }
 

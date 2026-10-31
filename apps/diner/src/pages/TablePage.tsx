@@ -19,6 +19,8 @@ export function TablePage() {
         setLoading(true);
         const data = await getRestaurantByTableId(tableId);
         setRestaurant(data);
+        localStorage.setItem('drift-restaurant', data.id);
+        localStorage.setItem('drift-tax-rate', String(data.taxRate ?? 0));
         const cats = await getMenuByRestaurantId(data.id);
         setCategories(Array.isArray(cats) ? cats : []);
       } catch (err) {
