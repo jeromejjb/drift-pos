@@ -67,7 +67,7 @@ const steps = [
     title: 'Payment account',
     icon: CreditCard, 
     component: StripeStep,
-    description: 'Easy setup — connect bank'
+    description: 'Stripe Connect'
   },
   { 
     id: 'complete', 

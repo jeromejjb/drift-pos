@@ -471,6 +471,14 @@ export function SettingsPage() {
                         {accountStatusError}
                       </p>
                     )}
+                    <div className="mt-3">
+                      <Link
+                        to={`/payouts/${user?.restaurantId || urlRestaurantId || localStorage.getItem('drift-restaurant-id')}`}
+                        className="text-sm font-medium text-blue-800 underline"
+                      >
+                        View balance and payouts
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
