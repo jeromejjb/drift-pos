@@ -213,7 +213,7 @@ async function main() {
     } else {
       orderId = body.id;
       const tip = body.tipAmount ?? body.tip;
-      const expectedTip = Math.round(menuItemPrice * tipPercent) / 100;
+      const expectedTip = Math.round(Math.round(menuItemPrice * 100) * tipPercent / 100) / 100;
       const okTip = Number(tip) === expectedTip;
       record(
         'Diner',
