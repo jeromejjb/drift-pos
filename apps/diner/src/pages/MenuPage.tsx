@@ -248,7 +248,7 @@ export function MenuPage() {
       </div>
 
       {cartCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[var(--drift-surface-elevated)] via-[var(--drift-surface-elevated)]/95 to-transparent pt-8 safe-bottom">
+        <div className="fixed bottom-[72px] left-0 right-0 z-40 p-4 bg-gradient-to-t from-[var(--drift-surface-elevated)] via-[var(--drift-surface-elevated)]/95 to-transparent pt-8">
           <div className="max-w-md mx-auto">
             <button
               onClick={() => navigate(`/cart/${tableId}`)}

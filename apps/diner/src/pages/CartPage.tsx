@@ -136,7 +136,7 @@ export function CartPage() {
       </div>
 
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[var(--drift-surface)] border-t border-[var(--drift-border)] p-4 safe-bottom">
+        <div className="fixed bottom-[72px] left-0 right-0 z-40 bg-[var(--drift-surface)] border-t border-[var(--drift-border)] p-4">
           <div className="container max-w-md mx-auto">
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm text-[var(--drift-ink-muted)]">
