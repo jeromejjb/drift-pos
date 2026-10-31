@@ -89,6 +89,7 @@ const globalLimiter = rateLimit({
   message: { error: 'Too many requests', code: 'RATE_LIMITED' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.originalUrl.split('?')[0] === '/api/stripe/webhook',
 });
 
 const authLimiter = rateLimit({
@@ -155,7 +156,8 @@ app.use(cors({
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 // Skip express.json for webhook so it doesn't overwrite raw body
 app.use((req, res, next) => {
-  if (req.originalUrl === '/api/stripe/webhook') return next();
+  const pathOnly = req.originalUrl.split('?')[0];
+  if (pathOnly === '/api/stripe/webhook') return next();
   express.json({ limit: '10mb' })(req, res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -164,7 +166,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 morgan.token('body', (req: any) => {
   if (!req.body) return '';
   const sanitized = { ...req.body };
-  ['password', 'currentPassword', 'newPassword', 'token', 'secret', 'cardNumber', 'cvv'].forEach(field => {
+  ['password', 'currentPassword', 'newPassword', 'token', 'secret', 'cardNumber', 'cvv', 'ssnLast4', 'accountNumber', 'routingNumber', 'bankAccount'].forEach(field => {
     if (sanitized[field]) sanitized[field] = '[REDACTED]';
   });
   return JSON.stringify(sanitized);
@@ -736,6 +738,7 @@ app.get('/api/order/:orderId', async (req, res) => {
       total: order.total,
       tipAmount: order.tipAmount,
       status: order.status,
+      paymentStatus: order.paymentStatus,
       createdAt: order.createdAt,
       restaurantName: order.restaurant.name,
       tableNumber: order.table?.number ?? 0,

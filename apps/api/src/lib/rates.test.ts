@@ -41,5 +41,24 @@ describe('rates', () => {
     it('rounds to nearest cent', () => {
       expect(calcFeeCents(333, BASE_RATE)).toBe(8); // 8.325 -> 8
     });
+    it('adds a configurable flat fee', () => {
+      process.env.PLATFORM_FEE_FIXED_CENTS = '15';
+      expect(calcFeeCents(10_000, BASE_RATE)).toBe(265);
+      delete process.env.PLATFORM_FEE_FIXED_CENTS;
+    });
+  });
+
+  describe('environment overrides', () => {
+    it('reads PLATFORM_FEE_RATE as a fraction', () => {
+      process.env.PLATFORM_FEE_RATE = '0.01';
+      expect(getRateForVolume(0)).toBe(0.01);
+      delete process.env.PLATFORM_FEE_RATE;
+      expect(getRateForVolume(0)).toBe(BASE_RATE);
+    });
+    it('ignores a percent-style value such as 2.5', () => {
+      process.env.PLATFORM_FEE_RATE = '2.5';
+      expect(getRateForVolume(0)).toBe(BASE_RATE);
+      delete process.env.PLATFORM_FEE_RATE;
+    });
   });
 });

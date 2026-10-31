@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 
-describe('stripe create-account endpoint', () => {
+describe('stripe create-account validation', () => {
   let app: any;
 
   beforeAll(async () => {
@@ -11,72 +11,27 @@ describe('stripe create-account endpoint', () => {
   });
 
   it('returns 400 when required fields are missing', async () => {
-    const res = await request(app)
-      .post('/api/stripe/create-account')
-      .send({}) // no body
-      .expect(400);
-
+    const res = await request(app).post('/api/stripe/create-account').send({}).expect(400);
     expect(res.body.code).toBe('MISSING_FIELDS');
-    expect(Array.isArray(res.body.missing)).toBe(true);
-    expect(res.body.missing).toContain('restaurantId');
-    expect(res.body.missing).toContain('email');
-    expect(res.body.missing).toContain('businessName');
-    expect(res.body.missing).toContain('fullName');
-    expect(res.body.missing).toContain('bankAccount');
-    expect(res.body.missing).toContain('dob');
-    expect(res.body.missing).toContain('ssnLast4');
+    expect(res.body.missing).toEqual(expect.arrayContaining(['restaurantId', 'email', 'businessName']));
+    expect(res.body.missing).not.toContain('bankAccount');
+    expect(res.body.missing).not.toContain('ssnLast4');
+    expect(res.body.missing).not.toContain('dob');
   });
 
-  it('returns 400 for invalid DOB', async () => {
+  it('returns 400 for an invalid email before any Stripe call', async () => {
     const res = await request(app)
       .post('/api/stripe/create-account')
-      .send({
-        restaurantId: 'rest_123',
-        email: 'owner@example.com',
-        businessName: 'Test Restaurant',
-        fullName: 'Test Owner',
-        bankAccount: { accountHolderName: 'Test Owner', routingNumber: '021000021', accountNumber: '12345678' },
-        dob: { month: '13', day: '40', year: 'abcd' },
-        ssnLast4: '1234',
-      })
+      .send({ restaurantId: 'rest_123', email: 'not-an-email', businessName: 'Kitchen' })
       .expect(400);
-
-    expect(res.body.code).toBe('INVALID_DOB');
+    expect(res.body.code).toBe('INVALID_EMAIL');
   });
 
-  it('returns 400 for invalid SSN last 4', async () => {
+  it('requires a restaurant login once the payload is valid', async () => {
     const res = await request(app)
       .post('/api/stripe/create-account')
-      .send({
-        restaurantId: 'rest_123',
-        email: 'owner@example.com',
-        businessName: 'Test Restaurant',
-        fullName: 'Test Owner',
-        bankAccount: { accountHolderName: 'Test Owner', routingNumber: '021000021', accountNumber: '12345678' },
-        dob: { month: '1', day: '1', year: '1980' },
-        ssnLast4: '12', // too short
-      })
-      .expect(400);
-
-    expect(res.body.code).toBe('INVALID_SSN');
-  });
-
-  it('returns 400 for invalid address', async () => {
-    const res = await request(app)
-      .post('/api/stripe/create-account')
-      .send({
-        restaurantId: 'rest_123',
-        email: 'owner@example.com',
-        businessName: 'Test Restaurant',
-        fullName: 'Test Owner',
-        bankAccount: { accountHolderName: 'Test Owner', routingNumber: '021000021', accountNumber: '12345678' },
-        dob: { month: '1', day: '1', year: '1980' },
-        ssnLast4: '1234',
-        address: { line1: '', city: '', state: '', postal_code: '12' },
-      })
-      .expect(400);
-
-    expect(res.body.code).toBe('INVALID_ADDRESS');
+      .send({ restaurantId: 'rest_123', email: 'owner@example.com', businessName: 'Kitchen' })
+      .expect(401);
+    expect(res.body.code).toBe('UNAUTHORIZED');
   });
 });
-

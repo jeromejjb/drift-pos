@@ -16,13 +16,17 @@ model Restaurant {
   timezone      String         @default("America/New_York")
   supabaseUserId String?        @unique
   email          String?
-  stripeAccountId String? 
+  stripeAccountId String?
+  chargesEnabled   Boolean       @default(false) @map("charges_enabled")
+  payoutsEnabled   Boolean       @default(false) @map("payouts_enabled")
+  detailsSubmitted Boolean       @default(false) @map("details_submitted")
   
   tables        Table[]
   categories    MenuCategory[]
   menuItems     MenuItem[]
   orders        Order[]
   dinerLoyalty  DinerLoyalty[]
+  payouts       Payout[]
   
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
@@ -103,6 +107,8 @@ model Order {
   total        Float
   tipAmount    Float?        @default(0)
   guestCount   Int?
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
+  stripePaymentIntentId String? @unique @map("stripe_payment_intent_id")
   
   restaurantId String
   restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
@@ -162,6 +168,7 @@ model Transaction {
   status          TransactionStatus @default(PENDING)
   stripePaymentId String?           @unique(map: "transactions_payment_id_unique")
   stripeRefundId  String?
+  applicationFeeCents Int?        @map("application_fee_cents")
   
   orderId         String
   order           Order             @relation(fields: [orderId], references: [id])
@@ -271,6 +278,40 @@ model DemoRequest {
   @@index([status])
   @@index([createdAt])
   @@map("demo_requests")
+}
+
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("stripe_events")
+}
+
+model Payout {
+  id             String     @id @default(cuid())
+  restaurantId   String     @map("restaurant_id")
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  stripePayoutId String     @unique @map("stripe_payout_id")
+  amountCents    Int        @map("amount_cents")
+  currency       String     @default("usd")
+  status         String
+  arrivalDate    DateTime?  @map("arrival_date")
+  failureMessage String?    @map("failure_message")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  @@index([restaurantId], map: "payouts_restaurant_id_idx")
+  @@map("payouts")
+}
+
+enum PaymentStatus {
+  UNPAID
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
 }
 
 enum TableStatus {
