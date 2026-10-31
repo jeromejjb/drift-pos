@@ -329,13 +329,60 @@ async function main() {
   }
   console.log('  ✓ Demo loyalty: ' + loyaltyMembers.length + ' members');
 
+  const dinerBase = (process.env.DINER_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const tables = await prisma.table.findMany({
+    where: { restaurantId: restaurant.id },
+    orderBy: { number: 'asc' },
+  });
+  for (const table of tables) {
+    const url = `${dinerBase}/table/${table.id}`;
+    if (table.qrCode !== url) {
+      await prisma.table.update({ where: { id: table.id }, data: { qrCode: url } });
+    }
+  }
+  const tableOne = tables.find((t) => t.number === 1) || tables[0];
+  console.log('  ✓ Table QR links point at the diner app');
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY || '';
+  const provisionStripe =
+    process.env.SEED_STRIPE_CONNECT !== '0' &&
+    stripeKey.startsWith('sk_test_') &&
+    !stripeKey.includes('placeholder') &&
+    stripeKey.length > 30;
+  if (provisionStripe && restaurant.chargesEnabled && restaurant.stripeAccount) {
+    console.log('  ✓ Stripe test merchant already linked:', restaurant.stripeAccount);
+  } else if (provisionStripe) {
+    try {
+      const { provisionTestMerchant } = await import('../src/lib/connect');
+      const { getStripe } = await import('../src/lib/stripeClient');
+      const account = await provisionTestMerchant(getStripe(), prisma, restaurant.id, {
+        restaurantId: restaurant.id,
+        email: DEMO_EMAIL,
+        businessName: DEMO_RESTAURANT_NAME,
+        fullName: 'Demo Owner',
+      });
+      console.log(
+        `  ✓ Stripe test merchant ${account.id} charges=${account.charges_enabled} payouts=${account.payouts_enabled}`
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('  ! Stripe test merchant was not created:', message);
+      console.warn('    Enable Custom accounts in Stripe → Settings → Connect, or finish Express onboarding in the app.');
+    }
+  } else {
+    console.log('  · Stripe test merchant skipped (set a real sk_test_ key to provision one)');
+  }
+
   console.log('');
   console.log('✅ Demo restaurant ready!');
   console.log('');
-  console.log('  Sign in at: https://driftpos.com/login (or your landing URL)');
+  console.log('  Sign in at the restaurant app (local: http://localhost:5175)');
   console.log('  Email:    ' + DEMO_EMAIL);
   console.log('  Password: ' + DEMO_PASSWORD);
   console.log('  Restaurant ID: ' + restaurant.id);
+  if (tableOne) {
+    console.log('  Table 1:  ' + dinerBase + '/table/' + tableOne.id);
+  }
   console.log('');
 }
 

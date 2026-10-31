@@ -14,14 +14,13 @@ Drift uses **Stripe Connect** so restaurants receive payouts directly. When a di
 
 ### 1. Restaurant onboarding (Bank Account)
 
-During onboarding, restaurants connect a **Stripe Connected Account** via the Bank Account step:
+During onboarding, restaurants connect a **Stripe Express account**. Drift asks for the business name and email, then Stripe collects identity and the bank account (embedded onboarding, or a hosted Account Link if the publishable key is not set).
 
-- **Endpoint:** `POST /api/stripe/create-account`
-- **Data collected:** Business name, email, full name, DOB, SSN last 4, bank account (routing + account number)
-- **Result:** Restaurant gets `stripeAccount` (Stripe account ID) stored in the database
-- **Test values:** SSN `0000`, routing `110000000`, account `000123456789` (see `apps/restaurant/TEST_ONBOARDING.md`)
+- **Endpoint:** `POST /api/stripe/create-account` (restaurant JWT required)
+- **Saved immediately:** `stripeAccount` on the restaurant row, before the response returns
+- **Test mode shortcut:** send `completeInTestMode: true` (or use the button in the onboarding step) to provision a Custom account with Stripe's test fixtures. Live keys reject this. Test bank: routing `110000000`, account `000123456789`
 
-Until this step is complete, the restaurant **cannot accept card payments** from diners.
+Until charges are enabled, the restaurant **cannot accept card payments** from diners.
 
 ### Diner checkout (Order payment)
 
@@ -34,7 +33,7 @@ When a diner pays at the table (via QR → menu → checkout):
 
 ## Demo Restaurant
 
-The **demo account** (`demo@driftpos.com`) is seeded **without** a Stripe account. This means:
+The **demo account** (`demo@driftpos.com`) is seeded **with** a Stripe test merchant when `STRIPE_SECRET_KEY` is a real `sk_test_` key and Custom accounts are enabled. Otherwise it is seeded without one. That means:
 
 | What works | What doesn't |
 |------------|--------------|
