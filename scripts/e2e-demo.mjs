@@ -192,7 +192,7 @@ async function main() {
   }
 
   // --- Checkout: order + tip ---
-  const tipAmount = 4.25;
+  const tipPercent = 18;
   const dinerUserId = `e2e-guest-${Date.now()}`;
   let orderId;
   if (menuItemId && tableId) {
@@ -205,8 +205,7 @@ async function main() {
         tableId,
         userId: dinerUserId,
         items: [{ menuItemId: menuItemId, quantity: 1, price: menuItemPrice }],
-        total,
-        tip: tipAmount,
+        tipPercent,
       }),
     });
     if (!res.ok || !body.id) {
@@ -214,7 +213,8 @@ async function main() {
     } else {
       orderId = body.id;
       const tip = body.tipAmount ?? body.tip;
-      const okTip = Number(tip) === tipAmount;
+      const expectedTip = Math.round(menuItemPrice * tipPercent) / 100;
+      const okTip = Number(tip) === expectedTip;
       record(
         'Diner',
         'order',

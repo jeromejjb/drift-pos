@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Gift } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -11,7 +11,14 @@ import { InlineError } from '../components/ui/InlineError';
 const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
 
 /** One in-flight checkout per cart, shared across React strict-mode remounts. */
-const checkoutJobs = new Map<string, Promise<{ orderId: string; clientSecret: string | null; error: string | null; tip: number }>>();
+const checkoutJobs = new Map<string, Promise<{
+  orderId: string;
+  clientSecret: string | null;
+  error: string | null;
+  tip: number;
+  connectedAccountId?: string | null;
+  amount?: number | null;
+}>>();
 
 export function PaymentPage() {
   const { tableId } = useParams();
@@ -28,6 +35,15 @@ export function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connectedAccountId, setConnectedAccountId] = useState<string | null>(null);
+  const [chargedTotal, setChargedTotal] = useState<number | null>(null);
+  const stripeForCharge = useMemo(
+    () =>
+      STRIPE_PUBLISHABLE_KEY && connectedAccountId
+        ? loadStripe(STRIPE_PUBLISHABLE_KEY, { stripeAccount: connectedAccountId })
+        : null,
+    [connectedAccountId]
+  );
 
   useEffect(() => {
     const savedCart = localStorage.getItem('drift-cart');
@@ -67,8 +83,10 @@ export function PaymentPage() {
       .catch(() => {});
   }, [accessToken, restaurantId]);
 
+  const storedTaxRate = Number(localStorage.getItem('drift-tax-rate') || '0');
+  const taxRate = Number.isFinite(storedTaxRate) ? storedTaxRate : 0;
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.1;
+  const tax = subtotal * taxRate;
   const tip = (subtotal * tipPercent) / 100;
   // The API charges `total` plus `tipAmount`. Sending a total that already includes tip double-charges it.
   const orderTotal = subtotal + tax;
@@ -83,10 +101,10 @@ export function PaymentPage() {
       method: 'POST',
       signal: payController.signal,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tipAmount: tipValue,
-        ...(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
-      }),
+        body: JSON.stringify({
+          tipPercent: tipValue,
+          ...(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
+        }),
     });
     clearTimeout(payTimeoutId);
     const payJson = await payRes.json().catch(() => ({}));
@@ -97,10 +115,16 @@ export function PaymentPage() {
       return { clientSecret: null as string | null, error: message };
     }
     if (!payJson.clientSecret) {
-      return { clientSecret: null, error: toPaymentError('Invalid payment response') };
+      return { clientSecret: null, error: toPaymentError('Invalid payment response'), connectedAccountId: null, amount: null };
     }
     localStorage.setItem('drift-pending-order', id);
-    return { clientSecret: payJson.clientSecret as string, error: null };
+    const amount = typeof payJson.amountCents === 'number' ? payJson.amountCents / 100 : null;
+    return {
+      clientSecret: payJson.clientSecret as string,
+      error: null,
+      connectedAccountId: (payJson.connectedAccountId as string) || null,
+      amount,
+    };
   }, [dinerProfile?.stripeCustomerId]);
 
   const applyIntent = useCallback((id: string, tipValue: number, clientSecretValue: string | null, message: string | null) => {
@@ -117,7 +141,6 @@ export function PaymentPage() {
     let job = checkoutJobs.get(checkoutKey);
     if (!job) {
       const tipAtStart = tip;
-      const foodTotal = orderTotal;
       job = (async () => {
         if (!STRIPE_PUBLISHABLE_KEY) {
           return { orderId: '', clientSecret: null, error: 'Card payment isn’t available right now. Please pay at the table or try again later.', tip: tipAtStart };
@@ -134,9 +157,8 @@ export function PaymentPage() {
               restaurantId,
               tableId,
               userId,
-              items: cartItems.map((item: any) => ({ menuItemId: item.id, quantity: item.quantity, price: item.price })),
-              total: foodTotal,
-              tip: tipAtStart,
+              items: cartItems.map((item: any) => ({ menuItemId: item.id, quantity: item.quantity })),
+              tipPercent: tipAtStart,
             }),
           });
           clearTimeout(timeoutId);
@@ -153,7 +175,7 @@ export function PaymentPage() {
             signal: payController.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              tipAmount: tipAtStart,
+              tipPercent: tipAtStart,
               ...(dinerProfile?.stripeCustomerId ? { customerId: dinerProfile.stripeCustomerId } : {}),
             }),
           });
@@ -166,7 +188,14 @@ export function PaymentPage() {
             return { orderId: order.id, clientSecret: null, error: message, tip: tipAtStart };
           }
           localStorage.setItem('drift-pending-order', order.id);
-          return { orderId: order.id as string, clientSecret: (payJson.clientSecret as string) || null, error: payJson.clientSecret ? null : toPaymentError('Invalid payment response'), tip: tipAtStart };
+          return {
+            orderId: order.id as string,
+            clientSecret: (payJson.clientSecret as string) || null,
+            error: payJson.clientSecret ? null : toPaymentError('Invalid payment response'),
+            tip: tipAtStart,
+            connectedAccountId: (payJson.connectedAccountId as string) || null,
+            amount: typeof payJson.amountCents === 'number' ? payJson.amountCents / 100 : (order.total + (order.tipAmount ?? 0)),
+          };
         } catch (err) {
           const msg = err instanceof Error ? err.message : '';
           const message = msg.includes('fetch') || msg.includes('network') || msg.includes('abort')
@@ -180,7 +209,11 @@ export function PaymentPage() {
     job.then((result) => {
       if (cancelled) return;
       if (result.error && !result.orderId) checkoutJobs.delete(checkoutKey);
-      if (result.orderId) applyIntent(result.orderId, result.tip, result.clientSecret, result.error);
+      if (result.orderId) {
+        applyIntent(result.orderId, result.tip, result.clientSecret, result.error);
+        if (result.connectedAccountId) setConnectedAccountId(result.connectedAccountId);
+        if (typeof result.amount === 'number') setChargedTotal(result.amount);
+      }
       else setError(result.error);
       setPiLoading(false);
     });
@@ -201,6 +234,8 @@ export function PaymentPage() {
         if (cancelled) return;
         setClientSecret(result.clientSecret);
         setError(result.error);
+        if (result.connectedAccountId) setConnectedAccountId(result.connectedAccountId);
+        if (typeof result.amount === 'number') setChargedTotal(result.amount);
         if (result.clientSecret) tipApplied.current = tip;
       })
       .finally(() => {
@@ -218,6 +253,8 @@ export function PaymentPage() {
       </div>
     );
   }
+
+  const payable = chargedTotal ?? total;
 
   const handlePaymentSuccess = () => {
     localStorage.removeItem('drift-cart');
@@ -299,7 +336,7 @@ export function PaymentPage() {
         <div className="bg-[var(--drift-accent)] text-white rounded-[var(--drift-radius-xl)] p-5 mb-5 shadow-[0_4px_16px_var(--drift-accent-glow)]">
           <div className="flex justify-between items-center">
             <span className="text-white/90 font-medium">Total</span>
-            <span className="text-3xl font-bold tabular-nums">${total.toFixed(2)}</span>
+            <span className="text-3xl font-bold tabular-nums">${payable.toFixed(2)}</span>
           </div>
         </div>
 
@@ -322,7 +359,7 @@ export function PaymentPage() {
             <Gift className="w-5 h-5 text-[var(--drift-accent)] shrink-0" />
             <div>
               <p className="font-medium text-[var(--drift-ink)] text-sm">
-                Earn ~{Math.floor(total)} pts on this order
+                Earn ~{Math.floor(payable)} pts on this order
               </p>
               <p className="text-xs text-[var(--drift-ink-muted)]">
                 {loyalty ? `${loyalty.points} pts total · ${loyalty.tier}` : '1 pt per $1 · Points save automatically'}
@@ -340,6 +377,8 @@ export function PaymentPage() {
                 requestPaymentIntent(orderId, tip).then((result) => {
                   setClientSecret(result.clientSecret);
                   setError(result.error);
+                  if (result.connectedAccountId) setConnectedAccountId(result.connectedAccountId);
+                  if (typeof result.amount === 'number') setChargedTotal(result.amount);
                   if (result.clientSecret) tipApplied.current = tip;
                 }).finally(() => setPiLoading(false));
               } else {
@@ -355,9 +394,9 @@ export function PaymentPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--drift-border)] border-t-[var(--drift-accent)]" />
             <p className="text-[15px] text-[var(--drift-ink-muted)]">Preparing payment…</p>
           </div>
-        ) : clientSecret && stripePromise ? (
-          <Elements stripe={stripePromise} options={{ clientSecret }} key={clientSecret}>
-            <CheckoutForm onSuccess={handlePaymentSuccess} amount={total} />
+        ) : clientSecret && stripeForCharge ? (
+          <Elements stripe={stripeForCharge} options={{ clientSecret }} key={clientSecret}>
+            <CheckoutForm onSuccess={handlePaymentSuccess} amount={payable} />
           </Elements>
         ) : null}
       </div>

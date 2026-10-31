@@ -29,6 +29,7 @@ export function SettingsPage() {
     phone: '',
     cuisine: '',
     stripeAccount: null as string | null,
+    taxPercent: '0',
   });
 
   const [accountStatus, setAccountStatus] = useState<{
@@ -75,6 +76,7 @@ export function SettingsPage() {
           phone: data.phone || '',
           cuisine: data.cuisine || '',
           stripeAccount: data.stripeAccount ?? null,
+          taxPercent: data.taxRate != null ? String(Math.round(Number(data.taxRate) * 1000) / 10) : '0',
         });
       }
     } catch (error) {
@@ -130,7 +132,12 @@ export function SettingsPage() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(restaurant)
+        body: JSON.stringify({
+          name: restaurant.name,
+          address: restaurant.address,
+          phone: restaurant.phone,
+          taxRate: Number(restaurant.taxPercent) / 100,
+        })
       });
       
       if (response.ok) {
@@ -350,6 +357,20 @@ export function SettingsPage() {
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-black"
                   placeholder="(212) 555-0123"
                 />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Sales tax (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  step="0.001"
+                  value={restaurant.taxPercent}
+                  onChange={(e) => setRestaurant({ ...restaurant, taxPercent: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-black"
+                />
+                <p className="text-xs text-gray-400 mt-1">Used when a diner pays from a table QR code.</p>
               </div>
 
               <div>

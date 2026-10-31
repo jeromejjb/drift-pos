@@ -20,6 +20,8 @@ model Restaurant {
   chargesEnabled   Boolean       @default(false) @map("charges_enabled")
   payoutsEnabled   Boolean       @default(false) @map("payouts_enabled")
   detailsSubmitted Boolean       @default(false) @map("details_submitted")
+  taxRate          Float         @default(0) @map("tax_rate")
+  platformFeeRate  Float?        @map("platform_fee_rate")
   
   tables        Table[]
   categories    MenuCategory[]
@@ -105,7 +107,12 @@ model Order {
   id           String        @id @default(cuid())
   status       OrderStatus   @default(PENDING)
   total        Float
+  subtotal     Float         @default(0)
+  taxAmount    Float         @default(0) @map("tax_amount")
+  taxRate      Float         @default(0) @map("tax_rate")
   tipAmount    Float?        @default(0)
+  tipPercent   Float         @default(0) @map("tip_percent")
+  channel      OrderChannel  @default(QR)
   guestCount   Int?
   paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
   stripePaymentIntentId String? @unique @map("stripe_payment_intent_id")
@@ -303,6 +310,11 @@ model Payout {
 
   @@index([restaurantId], map: "payouts_restaurant_id_idx")
   @@map("payouts")
+}
+
+enum OrderChannel {
+  QR
+  POS
 }
 
 enum PaymentStatus {

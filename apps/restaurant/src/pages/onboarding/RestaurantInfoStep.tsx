@@ -36,7 +36,8 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext, onP
     address: { line1: '', city: '', state: '', postal_code: '' },
     fullName: '',
     role: '',
-    teamSize: ''
+    teamSize: '',
+    taxPercent: '8.875',
   });
 
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -164,7 +165,8 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext, onP
       address: addressObj,
       fullName: mergedData.fullName || '',
       role: mergedData.role || '',
-      teamSize: mergedData.teamSize || ''
+      teamSize: mergedData.teamSize || '',
+      taxPercent: mergedData.taxPercent || '8.875',
     });
   }, [data]);
 
@@ -179,6 +181,11 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext, onP
     const zipDigits = formData.address.postal_code.replace(/\D/g, '');
     if (zipDigits.length !== 5 && zipDigits.length !== 9) {
       setPostalCodeError('ZIP must be 5 or 9 digits');
+      return;
+    }
+    const taxPercent = Number(formData.taxPercent);
+    if (!Number.isFinite(taxPercent) || taxPercent < 0 || taxPercent > 30) {
+      setSaveError('Sales tax must be between 0 and 30 percent.');
       return;
     }
     setPostalCodeError(null);
@@ -208,7 +215,12 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext, onP
         const res = await fetch(`${config.apiUrl}/api/restaurants/${restaurantId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: formData.restaurantName, address: addressStr, phone: formData.phone || undefined })
+          body: JSON.stringify({
+            name: formData.restaurantName,
+            address: addressStr,
+            phone: formData.phone || undefined,
+            taxRate: Number(formData.taxPercent) / 100,
+          })
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -343,6 +355,25 @@ export function RestaurantInfoStep({ restaurantId, data, updateData, onNext, onP
             )}
             <p className="text-xs text-gray-400 mt-1">
               Enter 10-digit US/Canada number
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Sales tax <span className="text-gray-400">(percent)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              step="0.001"
+              required
+              value={formData.taxPercent}
+              onChange={(e) => setFormData({ ...formData, taxPercent: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black transition-all"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Applied to every table order. 8.875 is a starting point — use your local rate.
             </p>
           </div>
 

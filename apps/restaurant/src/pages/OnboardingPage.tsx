@@ -396,7 +396,7 @@ export function OnboardingPage() {
       {/* Step Navigation with long connector lines: business → … → bank → verify */}
       <div className="border-b border-gray-100 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="flex items-center w-full min-w-0">
+          <div className="flex items-center w-full min-w-0 overflow-x-auto pb-1">
             {steps.map((step, index) => {
               const StepIcon = step.icon;
               const isActive = index === currentStep;

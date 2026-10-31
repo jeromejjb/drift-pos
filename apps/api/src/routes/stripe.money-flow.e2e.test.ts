@@ -94,9 +94,11 @@ const enabled =
     expect(piRes.body.amountCents).toBe(2000);
     expect(piRes.body.applicationFeeCents).toBeGreaterThan(0);
 
-    const confirmed = await stripe.paymentIntents.confirm(paymentIntentId, {
-      payment_method: 'pm_card_visa',
-    });
+    const confirmed = await stripe.paymentIntents.confirm(
+      paymentIntentId,
+      { payment_method: 'pm_card_visa' },
+      { stripeAccount: accountId }
+    );
     expect(confirmed.status).toBe('succeeded');
 
     const payloadObject = {
@@ -126,7 +128,7 @@ const enabled =
 
     const paid = await prisma.order.findUnique({ where: { id: order.id } });
     expect(paid.paymentStatus).toBe('PAID');
-    expect(paid.status).toBe('CONFIRMED');
+    expect(paid.status).toBe('PENDING');
     expect(await prisma.transaction.count({ where: { orderId: order.id, status: 'SUCCEEDED' } })).toBe(1);
 
     const balance = await stripe.balance.retrieve({ stripeAccount: accountId });
@@ -147,7 +149,10 @@ const enabled =
       expect(pending, 'connected account received neither available nor pending funds').toBeGreaterThan(0);
     }
 
-    const refund = await stripe.refunds.create({ payment_intent: paymentIntentId });
+    const refund = await stripe.refunds.create(
+      { payment_intent: paymentIntentId },
+      { stripeAccount: accountId }
+    );
     const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id;
     const charge = await stripe.charges.retrieve(chargeId!);
     const refundEvent = {

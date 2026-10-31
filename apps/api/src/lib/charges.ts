@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type Stripe from 'stripe';
-import { applicationFeeCents, getRateForVolume } from './rates';
+import { applicationFeeCents, marginRate } from './rates';
 
 /** Charge is food/tax (`total`) plus a separate tip. Tip is not already inside `total`. */
 export function chargeAmountCents(total: number, tipAmount: number | null | undefined): number {
@@ -9,7 +9,11 @@ export function chargeAmountCents(total: number, tipAmount: number | null | unde
   return Math.round(dollars * 100);
 }
 
-export async function feeRateForRestaurant(prisma: PrismaClient, restaurantId: string): Promise<number> {
+export async function feeRateForRestaurant(
+  prisma: PrismaClient,
+  restaurantId: string,
+  restaurantOverride?: number | null
+): Promise<number> {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const result = await prisma.order.aggregate({
@@ -20,27 +24,31 @@ export async function feeRateForRestaurant(prisma: PrismaClient, restaurantId: s
     },
     _sum: { total: true },
   });
-  return getRateForVolume(result._sum.total ?? 0);
+  return marginRate(result._sum.total ?? 0, restaurantOverride);
 }
 
-export function buildDestinationChargeParams(input: {
+/**
+ * Direct charge on the connected account. Stripe bills that account for
+ * card processing. application_fee_amount is Drift's margin only.
+ */
+export function buildDirectCharge(input: {
   amountCents: number;
   destination: string;
   feeRate: number;
   orderId: string;
   restaurantId: string;
   customerId?: string;
-}): Stripe.PaymentIntentCreateParams {
+}): { params: Stripe.PaymentIntentCreateParams; options: Stripe.RequestOptions } {
   const fee = applicationFeeCents(input.amountCents, input.feeRate);
   const params: Stripe.PaymentIntentCreateParams = {
     amount: input.amountCents,
     currency: 'usd',
     payment_method_types: ['card'],
-    transfer_data: { destination: input.destination },
     metadata: {
       orderId: input.orderId,
       restaurantId: input.restaurantId,
       platform: 'Drift POS',
+      chargeType: 'direct',
       applicationFeeCents: String(fee),
       feeRate: String(input.feeRate),
     },
@@ -50,5 +58,8 @@ export function buildDestinationChargeParams(input: {
     params.customer = input.customerId;
     params.setup_future_usage = 'off_session';
   }
-  return params;
+  return {
+    params,
+    options: { stripeAccount: input.destination },
+  };
 }

@@ -27,7 +27,8 @@ export function CartPage() {
   }, [cart, loading]);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.1;
+  const storedTaxRate = Number(localStorage.getItem('drift-tax-rate') || '0');
+  const tax = subtotal * (Number.isFinite(storedTaxRate) ? storedTaxRate : 0);
   const total = subtotal + tax;
 
   const updateQuantity = (itemId: string, delta: number) => {

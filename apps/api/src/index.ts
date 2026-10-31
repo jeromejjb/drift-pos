@@ -15,6 +15,8 @@ import stripeRouter from './routes/stripe';
 import p2pRouter from './routes/p2p';
 import createAuthRouter from './routes/auth';
 import { createAuthMiddleware } from './routes/middleware';
+import { PricingError, priceOrder } from './lib/pricing';
+import jwt from 'jsonwebtoken';
 import path from 'path';
 import fs from 'fs';
 
@@ -253,7 +255,7 @@ app.get('/api/restaurants/:restaurantId', async (req, res) => {
     const { restaurantId } = req.params;
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
-      select: { id: true, name: true, email: true, phone: true, address: true, logo: true, timezone: true, stripeAccount: true }
+      select: { id: true, name: true, email: true, phone: true, address: true, logo: true, timezone: true, stripeAccount: true, taxRate: true, platformFeeRate: true }
     });
     if (!restaurant) return res.status(404).json({ error: 'Restaurant not found', code: 'NOT_FOUND' });
     res.json(restaurant);
@@ -269,11 +271,22 @@ app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, 
       return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
     }
 
-    const { name, address, phone } = req.body;
+    const { name, address, phone, taxRate } = req.body;
+    const data: { name?: string; address?: string; phone?: string; taxRate?: number } = {};
+    if (name !== undefined) data.name = name;
+    if (address !== undefined) data.address = address;
+    if (phone !== undefined) data.phone = phone;
+    if (taxRate !== undefined) {
+      const rate = Number(taxRate);
+      if (!Number.isFinite(rate) || rate < 0 || rate > 0.3) {
+        return res.status(400).json({ error: 'Tax rate must be between 0% and 30%', code: 'INVALID_TAX_RATE' });
+      }
+      data.taxRate = rate;
+    }
     const restaurant = await prisma.restaurant.update({
       where: { id: restaurantId },
-      data: { name, address, phone },
-      select: { id: true, name: true, address: true, phone: true, email: true, logo: true, timezone: true }
+      data,
+      select: { id: true, name: true, address: true, phone: true, email: true, logo: true, timezone: true, taxRate: true }
     });
     res.json(restaurant);
   } catch (error) {
@@ -282,10 +295,11 @@ app.patch('/api/restaurants/:restaurantId', authenticateToken, async (req: any, 
 });
 
 // Test tables for Dine tab (no QR needed) — returns first N tables from DB
-app.get('/api/test-tables', async (req, res) => {
+app.get('/api/test-tables', authenticateToken, async (req: any, res) => {
   try {
     const tables = await prisma.table.findMany({
-      take: 10,
+      where: { restaurantId: req.user.restaurantId },
+      take: 20,
       orderBy: { number: 'asc' },
       include: { restaurant: { select: { name: true } } }
     });
@@ -323,7 +337,7 @@ app.get('/api/restaurant/:restaurantId/tables', async (req, res) => {
   }
 });
 
-app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
+app.post('/api/tables/:tableId/generate-qr', authenticateToken, async (req: any, res) => {
   try {
     const { tableId } = req.params;
     const table = await prisma.table.findUnique({
@@ -331,6 +345,9 @@ app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
       include: { restaurant: true }
     });
     if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+    if (table.restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
@@ -349,9 +366,12 @@ app.post('/api/tables/:tableId/generate-qr', async (req, res) => {
   }
 });
 
-app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) => {
+app.post('/api/restaurants/:restaurantId/tables/generate-qrs', authenticateToken, async (req: any, res) => {
   try {
     const { restaurantId } = req.params;
+    if (restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
     const { tables: requestedTables } = req.body;
     
     // Validate we have tables to generate
@@ -416,7 +436,7 @@ app.post('/api/restaurants/:restaurantId/tables/generate-qrs', async (req, res) 
   }
 });
 
-app.get('/api/table/:tableId/qrcode', async (req, res) => {
+app.get('/api/table/:tableId/qrcode', authenticateToken, async (req: any, res) => {
   try {
     const { tableId } = req.params;
     const table = await prisma.table.findUnique({
@@ -424,6 +444,9 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
       include: { restaurant: true }
     });
     if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+    if (table.restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
@@ -435,7 +458,7 @@ app.get('/api/table/:tableId/qrcode', async (req, res) => {
   }
 });
 
-app.get('/api/tables/:tableId/qrcode/download', async (req, res) => {
+app.get('/api/tables/:tableId/qrcode/download', authenticateToken, async (req: any, res) => {
   try {
     const { tableId } = req.params;
     const table = await prisma.table.findUnique({
@@ -443,6 +466,9 @@ app.get('/api/tables/:tableId/qrcode/download', async (req, res) => {
       include: { restaurant: true }
     });
     if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+    if (table.restaurantId !== req.user.restaurantId) {
+      return res.status(403).json({ error: 'Unauthorized', code: 'FORBIDDEN' });
+    }
 
     const baseUrl = process.env.DINER_URL || 'https://drift-diner.onrender.com';
     const url = `${baseUrl}/table/${tableId}`;
@@ -612,7 +638,12 @@ app.get('/api/restaurant/:restaurantId/orders', authenticateToken, async (req: a
       tableNumber: order.table.number,
       items: order.items.map(item => ({ name: item.menuItem.name, quantity: item.quantity, price: item.price })),
       status: order.status.toLowerCase(),
-      total: order.total,
+      paymentStatus: order.paymentStatus,
+      channel: order.channel.toLowerCase(),
+      total: order.total + (order.tipAmount ?? 0),
+      subtotal: order.subtotal,
+      taxAmount: order.taxAmount,
+      tipAmount: order.tipAmount,
       createdAt: order.createdAt
     }));
 
@@ -658,9 +689,9 @@ app.get('/api/restaurant/:restaurantId/stats', authenticateToken, async (req: an
 
 app.post('/api/orders', async (req, res) => {
   try {
-    const { restaurantId, tableId, userId, items, total, tip } = req.body;
+    const { restaurantId, tableId, userId, items, tipPercent, channel } = req.body;
 
-    if (!restaurantId || !userId || !items || !total) {
+    if (!restaurantId || !userId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields', code: 'MISSING_FIELDS' });
     }
 
@@ -670,9 +701,10 @@ app.post('/api/orders', async (req, res) => {
     let table;
     if (tableId) {
       table = await prisma.table.findUnique({ where: { id: tableId } });
-      if (!table) return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+      if (!table || table.restaurantId !== restaurantId) {
+        return res.status(404).json({ error: 'Table not found', code: 'NOT_FOUND' });
+      }
     } else {
-      // Walk-in / Quick Order: use table 0 (create if needed)
       table = await prisma.table.findFirst({ where: { restaurantId, number: 0 } });
       if (!table) {
         table = await prisma.table.create({
@@ -681,42 +713,76 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
+    let orderChannel: 'QR' | 'POS' = 'QR';
+    if (channel === 'POS') {
+      const header = req.headers.authorization;
+      const token = header?.startsWith('Bearer ') ? header.slice(7) : '';
+      try {
+        const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
+        if (payload.restaurantId === restaurantId) orderChannel = 'POS';
+      } catch {
+        orderChannel = 'QR';
+      }
+    }
+
+    const ids = items.map((item: { menuItemId?: string }) => item.menuItemId).filter(Boolean) as string[];
+    const menu = await prisma.menuItem.findMany({ where: { id: { in: ids } } });
+    let quote;
+    try {
+      quote = priceOrder({
+        restaurantId,
+        lines: items,
+        menu,
+        taxRate: restaurant.taxRate ?? 0,
+        tipPercent: tipPercent == null ? 0 : Number(tipPercent),
+      });
+    } catch (err) {
+      if (err instanceof PricingError) {
+        return res.status(400).json({ error: err.message, code: err.code });
+      }
+      throw err;
+    }
+
     const user = await prisma.user.upsert({
       where: { id: userId },
       update: {},
-      create: { id: userId, name: 'Guest User' }
+      create: { id: userId, name: orderChannel === 'POS' ? 'Staff order' : 'Guest' }
     });
-
-    const orderItemsWithPrice: Array<{ menuItemId: string; quantity: number; price: number }> = [];
-    for (const item of items) {
-      const menuItem = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
-      if (!menuItem) return res.status(404).json({ error: `Menu item not found: ${item.menuItemId}`, code: 'NOT_FOUND' });
-      orderItemsWithPrice.push({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        price: item.price ?? menuItem.price
-      });
-    }
 
     const order = await prisma.order.create({
       data: {
         restaurantId,
         tableId: table.id,
         userId: user.id,
-        total,
-        tipAmount: tip || 0,
+        subtotal: quote.subtotal,
+        taxAmount: quote.taxAmount,
+        taxRate: quote.taxRate,
+        tipAmount: quote.tipAmount,
+        tipPercent: quote.tipPercent,
+        total: quote.total,
+        channel: orderChannel,
         status: 'PENDING',
-        items: { create: orderItemsWithPrice.map((item: any) => ({ menuItemId: item.menuItemId, quantity: item.quantity, price: item.price, userId: user.id })) }
+        items: {
+          create: quote.items.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            price: item.price,
+            userId: user.id,
+          })),
+        },
       },
       include: { items: { include: { menuItem: true } }, table: true }
     });
 
-    io.to(`restaurant:${restaurantId}`).emit('order-updated', order);
+    if (orderChannel === 'POS') {
+      io.to(`restaurant:${restaurantId}`).emit('order-updated', order);
+    }
     res.json(order);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return res.status(500).json({ error: 'Database error', code: error.code });
     }
+    console.error('Create order failed:', error);
     res.status(500).json({ error: 'Failed to create order', code: 'SERVER_ERROR' });
   }
 });
@@ -739,6 +805,10 @@ app.get('/api/order/:orderId', async (req, res) => {
       tipAmount: order.tipAmount,
       status: order.status,
       paymentStatus: order.paymentStatus,
+      subtotal: order.subtotal,
+      taxAmount: order.taxAmount,
+      taxRate: order.taxRate,
+      tipPercent: order.tipPercent,
       createdAt: order.createdAt,
       restaurantName: order.restaurant.name,
       tableNumber: order.table?.number ?? 0,

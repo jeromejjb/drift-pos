@@ -124,7 +124,7 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
         <h2 className="text-2xl font-light mb-2">Get paid</h2>
         <p className="text-sm text-gray-600 mb-6">
           Stripe holds the bank account and identity check. Drift never stores the account number.
-          Diners pay the restaurant directly. Drift keeps {feeLabel} as the platform fee, with no per-swipe charge.
+          Diners pay the restaurant directly. Drift keeps {feeLabel}. Stripe’s card fee (2.9% + 30¢) comes out of the restaurant balance, not Drift’s.
         </p>
 
         {error && (
@@ -195,7 +195,7 @@ export function StripeStep({ restaurantId, data, updateData, onNext, onPrev }: S
           onClose={() => {
             setShowEmbedded(false);
             setEmbeddedClientSecret(null);
-            onNext();
+            setError('Stripe setup is not finished. Continue with Stripe when you are ready. Card payments stay off until charges are enabled.');
           }}
         />
       )}

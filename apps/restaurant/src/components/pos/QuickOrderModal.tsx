@@ -107,16 +107,20 @@ export function QuickOrderModal({ isOpen, onClose, restaurantId, onOrderComplete
         };
       });
 
+      const token = localStorage.getItem('drift-token');
       const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           restaurantId,
           tableId: selectedTableId || null,
-          userId: 'staff-order',
-          items,
-          total: calculateTotal(),
-          tip: 0
+          userId: 'staff-' + restaurantId,
+          items: items.map(({ menuItemId, quantity }) => ({ menuItemId, quantity })),
+          tipPercent: 0,
+          channel: 'POS',
         })
       });
 

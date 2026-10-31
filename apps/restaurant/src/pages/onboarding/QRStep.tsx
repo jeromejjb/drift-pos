@@ -72,9 +72,13 @@ export function QRStep({ restaurantId, data, updateData, onNext, onPrev }: QRSte
         }));
       }
       
+      const token = localStorage.getItem('drift-token');
       const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/tables/generate-qrs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ tables })
       });
 

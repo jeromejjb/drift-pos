@@ -190,7 +190,7 @@ npm run dev --workspace=apps/landing
 ### Stripe webhooks (local)
 
 ```bash
-stripe listen --forward-to localhost:3001/api/stripe/webhook
+stripe listen --forward-to localhost:3001/api/stripe/webhook --forward-connect-to localhost:3001/api/stripe/webhook
 ```
 
 Put the signing secret in `STRIPE_WEBHOOK_SECRET` in `.env`.
@@ -224,7 +224,7 @@ Drift uses **Stripe Connect Express** for restaurant payouts and **destination c
 
 - **Restaurant onboarding** — The app collects the business name and email, creates an Express account, and hands identity and the bank account to Stripe (embedded onboarding when `VITE_STRIPE_PUBLISHABLE_KEY` is set, otherwise a hosted Account Link). Drift does not store routing or account numbers.
 - **Test merchant** — With an `sk_test_` key, onboarding offers “Use a Stripe test account”. That creates a Custom connected account with Stripe’s test fixtures so charges and payouts work without the hosted form. Live keys ignore this.
-- **Table pay** — `POST /api/stripe/order/:orderId/create-payment-intent` creates a PaymentIntent with `transfer_data.destination` set to the restaurant and `application_fee_amount` set from `PLATFORM_FEE_RATE` (default 2.5%, no fixed per-order fee).
+- **Table pay** — a direct charge on the restaurant’s connected account. Drift’s application fee is `PLATFORM_FEE_RATE` (default 1.5% margin). The restaurant pays Stripe’s card fee. Line prices, tax, and tip are recomputed on the server.
 - **Payouts** — The restaurant app’s Payouts page lists the Connect balance and can pay out the available balance. `account.updated` and `payout.*` webhooks keep the database in sync.
 - **Webhooks** — `POST /api/stripe/webhook` requires the raw body and `Stripe-Signature`. Events are stored by id so retries do not double-charge, double-credit, or double-pay. Handled types include `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `refund.created`, `account.updated`, and `payout.*`. A paid order becomes `paymentStatus=PAID` and, if it was still `PENDING`, `CONFIRMED` for the kitchen. It is not marked completed just because the card succeeded.
 
@@ -248,7 +248,7 @@ Drift uses **Stripe Connect Express** for restaurant payouts and **destination c
 
    ```bash
    stripe login
-   stripe listen --forward-to localhost:3001/api/stripe/webhook
+   stripe listen --forward-to localhost:3001/api/stripe/webhook --forward-connect-to localhost:3001/api/stripe/webhook
    ```
 
    Put the CLI’s `whsec_...` signing secret in `STRIPE_WEBHOOK_SECRET` and restart the API. Subscribe at least to `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `refund.created`, `account.updated`, `payout.paid`, `payout.failed`, and `payout.created`.

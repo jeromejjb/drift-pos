@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applicationFeeCents } from './rates';
+import { quoteOrderFees } from './rates';
 import {
   destinationChargeBlocker,
   expressAccountCreateParams,
   testConnectedAccountParams,
 } from './connect';
-import { buildDestinationChargeParams, chargeAmountCents } from './charges';
+import { buildDirectCharge, chargeAmountCents } from './charges';
 
 describe('connect account params', () => {
   it('builds an Express account without bank details or TOS', () => {
@@ -46,23 +46,23 @@ describe('connect account params', () => {
 });
 
 describe('destination charges', () => {
-  it('blocks a bare Express account that cannot transfer yet', () => {
+  it('blocks a connected account that cannot take cards yet', () => {
     const blocker = destinationChargeBlocker({
       id: 'acct_new',
       charges_enabled: false,
       payouts_enabled: false,
-      capabilities: { transfers: 'inactive' },
+      capabilities: { card_payments: 'inactive' },
     });
-    expect(blocker?.code).toBe('DESTINATION_INSUFFICIENT_CAPABILITIES');
+    expect(blocker?.code).toBe('CHARGES_NOT_ENABLED');
   });
 
-  it('allows an account with charges and transfers active', () => {
+  it('allows a direct charge once charges are enabled', () => {
     expect(
       destinationChargeBlocker({
         id: 'acct_ready',
         charges_enabled: true,
-        payouts_enabled: true,
-        capabilities: { transfers: 'active' },
+        payouts_enabled: false,
+        capabilities: { card_payments: 'active', transfers: 'inactive' },
       })
     ).toBeNull();
   });
@@ -71,17 +71,22 @@ describe('destination charges', () => {
     expect(chargeAmountCents(21, 3.78)).toBe(2478);
   });
 
-  it('sends a destination charge with a configurable application fee', () => {
-    const params = buildDestinationChargeParams({
-      amountCents: 3000,
+  it('creates a direct charge whose application fee is only Drift margin', () => {
+    const { params, options } = buildDirectCharge({
+      amountCents: 4000,
       destination: 'acct_rest',
-      feeRate: 0.02,
+      feeRate: 0.015,
       orderId: 'ord_1',
       restaurantId: 'rest_1',
     });
-    expect(params.amount).toBe(3000);
-    expect(params.transfer_data).toEqual({ destination: 'acct_rest' });
-    expect(params.application_fee_amount).toBe(applicationFeeCents(3000, 0.02));
-    expect(params.metadata).toMatchObject({ orderId: 'ord_1', restaurantId: 'rest_1', applicationFeeCents: '60' });
+    const quote = quoteOrderFees(4000, 0.015);
+    expect(params.amount).toBe(4000);
+    expect(params).not.toHaveProperty('transfer_data');
+    expect(params.application_fee_amount).toBe(quote.applicationFeeCents);
+    expect(options.stripeAccount).toBe('acct_rest');
+    expect(quote.stripeProcessingCents).toBe(146);
+    expect(quote.driftNetCents).toBe(60);
+    expect(quote.restaurantNetCents).toBe(3794);
+    expect(params.metadata).toMatchObject({ orderId: 'ord_1', chargeType: 'direct', applicationFeeCents: '60' });
   });
 });

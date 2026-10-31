@@ -69,8 +69,8 @@ describe('stripe checkout, webhooks, and payouts', () => {
         }),
       },
       paymentIntents: {
-        create: async (params: any) => {
-          created = params;
+        create: async (params: any, options: any) => {
+          created = { params, options };
           return { id: 'pi_checkout', client_secret: 'pi_checkout_secret', amount: params.amount };
         },
       },
@@ -79,19 +79,21 @@ describe('stripe checkout, webhooks, and payouts', () => {
     try {
       const res = await request(app)
         .post(`/api/stripe/order/${order.id}/create-payment-intent`)
-        .send({ tipAmount: 4 })
+        .send({ tipPercent: 0 })
         .expect(200);
 
       expect(res.body.clientSecret).toBe('pi_checkout_secret');
-      expect(res.body.amountCents).toBe(2900);
-      expect(created.transfer_data.destination).toBe(restaurant.stripeAccount);
-      expect(created.application_fee_amount).toBe(Math.round(2900 * 0.025));
-      expect(created.metadata.orderId).toBe(order.id);
+      expect(res.body.amountCents).toBe(2500);
+      expect(res.body.connectedAccountId).toBe(restaurant.stripeAccount);
+      expect(created.params.application_fee_amount).toBe(Math.round(2500 * 0.015));
+      expect(created.options.stripeAccount).toBe(restaurant.stripeAccount);
+      expect(created.params.transfer_data).toBeUndefined();
+      expect(created.params.metadata.orderId).toBe(order.id);
 
       const saved = await prisma.order.findUnique({ where: { id: order.id } });
       expect(saved.stripePaymentIntentId).toBe('pi_checkout');
       expect(saved.paymentStatus).toBe('PROCESSING');
-      expect(saved.tipAmount).toBe(4);
+      expect(saved.tipAmount).toBe(0);
     } finally {
       await prisma.stripeEvent.deleteMany({ where: { id: { startsWith: 'evt_' } } });
       await cleanup(restaurant.id, user.id);
@@ -116,7 +118,7 @@ describe('stripe checkout, webhooks, and payouts', () => {
         .post(`/api/stripe/order/${order.id}/create-payment-intent`)
         .send({})
         .expect(400);
-      expect(res.body.code).toBe('DESTINATION_INSUFFICIENT_CAPABILITIES');
+      expect(res.body.code).toBe('CHARGES_NOT_ENABLED');
     } finally {
       await cleanup(restaurant.id, user.id);
     }
@@ -213,7 +215,7 @@ describe('stripe checkout, webhooks, and payouts', () => {
 
       const paid = await prisma.order.findUnique({ where: { id: order.id } });
       expect(paid.paymentStatus).toBe('PAID');
-      expect(paid.status).toBe('CONFIRMED');
+      expect(paid.status).toBe('PENDING');
       const txns = await prisma.transaction.count({ where: { stripePaymentId: 'pi_hook' } });
       expect(txns).toBe(1);
 
@@ -331,7 +333,7 @@ describe('stripe checkout, webhooks, and payouts', () => {
       expect(listed.body.pendingCents).toBe(800);
       expect(listed.body.payouts).toHaveLength(1);
       expect(listed.body.payouts[0].stripePayoutId).toBe('po_test');
-      expect(listed.body.feeRate).toBe(0.025);
+      expect(listed.body.feeRate).toBe(0.015);
     } finally {
       await prisma.payout.deleteMany({ where: { restaurantId: restaurant.id } });
       await prisma.restaurant.delete({ where: { id: restaurant.id } });

@@ -267,8 +267,7 @@ async function run() {
             price,
           },
         ],
-        total,
-        tip: 3.5,
+        tipPercent: 0,
       }),
     });
     const orderJson = await orderRes.json().catch(() => ({}));

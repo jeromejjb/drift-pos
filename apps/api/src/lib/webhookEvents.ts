@@ -137,12 +137,14 @@ async function onPaymentSucceeded(pi: Stripe.PaymentIntent, tx: Db): Promise<str
     },
   });
 
+  const stillNew = order.status === 'PENDING' || order.status === 'CONFIRMED';
   await tx.order.update({
     where: { id: order.id },
     data: {
       paymentStatus: 'PAID',
       stripePaymentIntentId: pi.id,
-      status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+      // Paid tickets stay in the kitchen's New column until staff move them.
+      status: stillNew ? 'PENDING' : order.status,
     },
   });
 

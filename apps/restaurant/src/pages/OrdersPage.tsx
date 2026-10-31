@@ -35,6 +35,8 @@ interface Order {
   tableNumber: number;
   items: { name: string; quantity: number; price: number }[];
   status: OrderStatus;
+  paymentStatus?: string;
+  channel?: string;
   total: number;
   createdAt: string;
 }
@@ -69,7 +71,7 @@ function getTableLabel(tableNumber: number): string {
 }
 
 const STATUS_COLUMNS: { id: OrderStatus; label: string; icon: typeof Timer }[] = [
-  { id: 'pending', label: 'Pending', icon: Timer },
+  { id: 'pending', label: 'New', icon: Timer },
   { id: 'preparing', label: 'Preparing', icon: ChefHat },
   { id: 'ready', label: 'Ready', icon: UtensilsCrossed },
   { id: 'served', label: 'Served', icon: CheckCircle },
@@ -78,7 +80,7 @@ const STATUS_COLUMNS: { id: OrderStatus; label: string; icon: typeof Timer }[] =
 ];
 
 const statusConfig: Record<OrderStatus, { icon: typeof Timer; label: string; color: string; iconColor: string }> = {
-  pending: { icon: Timer, label: 'Pending', color: 'bg-amber-50 text-amber-700', iconColor: 'text-amber-600' },
+  pending: { icon: Timer, label: 'New', color: 'bg-amber-50 text-amber-700', iconColor: 'text-amber-600' },
   preparing: { icon: ChefHat, label: 'Preparing', color: 'bg-blue-50 text-blue-700', iconColor: 'text-blue-600' },
   ready: { icon: UtensilsCrossed, label: 'Ready', color: 'bg-emerald-50 text-emerald-700', iconColor: 'text-emerald-600' },
   served: { icon: CheckCircle, label: 'Served', color: 'bg-gray-100 text-gray-600', iconColor: 'text-gray-500' },
@@ -110,6 +112,9 @@ function OrderCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="font-semibold text-gray-900">{getTableLabel(order.tableNumber)}</span>
+            {order.paymentStatus === 'PAID' && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700">Paid</span>
+            )}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium ${config.color}`}>
               <StatusIcon className="w-3 h-3" />
               {config.label}
@@ -269,14 +274,16 @@ export function OrdersPage() {
         tableNumber: o.tableNumber,
         items: o.items || [],
         status: (o.status || 'pending').toLowerCase(),
+        paymentStatus: o.paymentStatus,
+        channel: o.channel,
         total: o.total ?? 0,
         createdAt: o.createdAt,
       }));
       setOrders(normalized);
       return normalized;
     } catch (err) {
-      setError('Unable to load orders. Showing sample data.');
-      setOrders(FALLBACK_ORDERS);
+      setError('Unable to load orders. Check that you are signed in and the API is running.');
+      setOrders([]);
       return FALLBACK_ORDERS;
     } finally {
       setLoading(false);
@@ -333,6 +340,8 @@ export function OrdersPage() {
   };
 
   const filteredOrders = orders.filter((order) => {
+    const onKitchenBoard = order.channel === 'pos' || order.paymentStatus === 'PAID' || order.paymentStatus === 'PARTIALLY_REFUNDED';
+    if (!onKitchenBoard) return false;
     if (filter === 'active') return !['served', 'completed', 'cancelled'].includes(order.status);
     if (filter === 'completed') return ['served', 'completed'].includes(order.status);
     if (search) {

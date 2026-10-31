@@ -137,20 +137,17 @@ export async function linkRestaurantAccount(prisma: PrismaClient, restaurantId: 
 }
 
 /**
- * Destination charges need the connected account to accept charges and transfers.
- * A bare Express account (capabilities still inactive) is not ready — that used to
- * be the only outcome of onboarding, so checkout could never be tested.
+ * Direct charges run on the connected account, so it must be allowed to
+ * accept card payments. Transfers are not required for this charge type.
  */
-export function destinationChargeBlocker(account: AccountFlags): { code: string; error: string } | null {
-  const transfers = account.capabilities?.transfers;
-  const legacy = account.capabilities?.legacy_payments;
-  const canTransfer = transfers === 'active' || legacy === 'active';
-  if (account.charges_enabled && canTransfer) return null;
-  if (account.charges_enabled && account.payouts_enabled) return null;
+export function destinationChargeBlocker(account: AccountFlags & {
+  capabilities?: { transfers?: string | null; legacy_payments?: string | null; card_payments?: string | null } | null;
+}): { code: string; error: string } | null {
+  if (account.charges_enabled) return null;
   return {
-    code: 'DESTINATION_INSUFFICIENT_CAPABILITIES',
+    code: 'CHARGES_NOT_ENABLED',
     error:
-      'This restaurant cannot take card payments yet. Finish Stripe Connect onboarding so charges and transfers are enabled.',
+      'This restaurant cannot take card payments yet. Finish Stripe Connect onboarding so charges are enabled.',
   };
 }
 

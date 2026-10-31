@@ -59,6 +59,7 @@ async function main() {
         phone: '4155550123',
         email: DEMO_EMAIL,
         timezone: 'America/Los_Angeles',
+        taxRate: 0.08875,
       },
     });
   } else {
@@ -70,6 +71,7 @@ async function main() {
         email: DEMO_EMAIL,
         supabaseUserId: user.id,
         timezone: 'America/Los_Angeles',
+        taxRate: 0.08875,
       },
     });
   }
@@ -174,6 +176,7 @@ async function main() {
             total,
             tipAmount: o.tip,
             status: o.status,
+            channel: 'POS',
             items: {
               create: o.items.map((item) => ({
                 menuItemId: item.id,
@@ -201,8 +204,11 @@ async function main() {
             tableId: allTables[d % allTables.length].id,
             userId: orderUser.id,
             total,
+            subtotal: total,
             tipAmount: Math.round(total * 0.18),
             status: 'COMPLETED',
+            paymentStatus: 'PAID',
+            channel: 'POS',
             completedAt: date,
             createdAt: date,
             items: {
@@ -279,8 +285,11 @@ async function main() {
             tableId: allTables[d % allTables.length].id,
             userId: orderUser.id,
             total,
+            subtotal: total,
             tipAmount: Math.round(total * 0.18),
             status: 'COMPLETED',
+            paymentStatus: 'PAID',
+            channel: 'POS',
             completedAt: date,
             createdAt: date,
             items: {

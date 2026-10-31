@@ -4,10 +4,11 @@ import jwt from 'jsonwebtoken';
 import type Stripe from 'stripe';
 import { ApiError } from '../lib/apiError';
 import {
-  buildDestinationChargeParams,
+  buildDirectCharge,
   chargeAmountCents,
   feeRateForRestaurant,
 } from '../lib/charges';
+import { dollarsToCents, repriceTip } from '../lib/pricing';
 import {
   destinationChargeBlocker,
   provisionTestMerchant,
@@ -326,16 +327,20 @@ router.post('/stripe/payment', async (req, res) => {
     const blocker = destinationChargeBlocker(account);
     if (blocker) return res.status(400).json(blocker);
     const amountInCents = Math.round(Number(amount) * 100);
-    const params = buildDestinationChargeParams({
+    const built = buildDirectCharge({
       amountCents: amountInCents,
       destination: restaurantStripeId,
       feeRate: configuredBaseRate(),
       orderId: 'ad-hoc',
       restaurantId: String(account.metadata?.restaurantId || ''),
     });
-    params.currency = currency;
-    const paymentIntent = await stripe.paymentIntents.create(params);
-    res.json({ clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id });
+    built.params.currency = currency;
+    const paymentIntent = await stripe.paymentIntents.create(built.params, built.options);
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      connectedAccountId: restaurantStripeId,
+    });
   } catch (error) {
     sendError(res, error);
   }
@@ -344,7 +349,7 @@ router.post('/stripe/payment', async (req, res) => {
 router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { customerId, tipAmount } = req.body || {};
+    const { customerId, tipPercent } = req.body || {};
     if (!orderId) return res.status(400).json({ error: 'Order ID required', code: 'MISSING_ORDER_ID' });
 
     const { prisma: db } = await prisma();
@@ -357,13 +362,18 @@ router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => 
       return res.status(409).json({ error: 'This order is already paid.', code: 'ORDER_ALREADY_PAID' });
     }
 
-    if (tipAmount != null) {
-      const tip = Number(tipAmount);
-      if (!Number.isFinite(tip) || tip < 0 || tip > 10000) {
-        return res.status(400).json({ error: 'Invalid tip', code: 'INVALID_TIP' });
+    if (tipPercent != null) {
+      try {
+        const repriced = repriceTip(dollarsToCents(order.subtotal), dollarsToCents(order.taxAmount), Number(tipPercent));
+        await db.order.update({
+          where: { id: order.id },
+          data: { tipAmount: repriced.tipAmount, tipPercent: repriced.tipPercent },
+        });
+        order.tipAmount = repriced.tipAmount;
+        order.tipPercent = repriced.tipPercent;
+      } catch (err: any) {
+        return res.status(400).json({ error: err.message || 'Invalid tip', code: err.code || 'INVALID_TIP' });
       }
-      await db.order.update({ where: { id: order.id }, data: { tipAmount: tip } });
-      order.tipAmount = tip;
     }
 
     const destination = order.restaurant.stripeAccount;
@@ -392,8 +402,8 @@ router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => 
       return res.status(400).json({ error: 'Order total must be greater than zero', code: 'INVALID_AMOUNT' });
     }
 
-    const feeRate = await feeRateForRestaurant(db, order.restaurantId);
-    const params = buildDestinationChargeParams({
+    const feeRate = await feeRateForRestaurant(db, order.restaurantId, order.restaurant.platformFeeRate);
+    const built = buildDirectCharge({
       amountCents,
       destination,
       feeRate,
@@ -401,7 +411,8 @@ router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => 
       restaurantId: order.restaurantId,
       customerId: typeof customerId === 'string' ? customerId : undefined,
     });
-    const paymentIntent = await stripe.paymentIntents.create(params, {
+    const paymentIntent = await stripe.paymentIntents.create(built.params, {
+      ...built.options,
       idempotencyKey: `order_${order.id}_${amountCents}`,
     });
 
@@ -414,8 +425,14 @@ router.post('/stripe/order/:orderId/create-payment-intent', async (req, res) => 
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       amountCents,
-      applicationFeeCents: params.application_fee_amount ?? 0,
+      applicationFeeCents: built.params.application_fee_amount ?? 0,
       feeRate,
+      connectedAccountId: destination,
+      subtotal: order.subtotal,
+      taxAmount: order.taxAmount,
+      tipAmount: order.tipAmount,
+      total: order.total,
+      tipPercent: order.tipPercent,
     });
   } catch (error) {
     sendError(res, error);
